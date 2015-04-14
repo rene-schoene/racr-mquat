@@ -4,6 +4,9 @@
 
 (define spec (create-specification))
 
+(define impl1 0)
+(define comp1 0)
+
 (define ast
   (with-specification
    spec
@@ -42,11 +45,11 @@
        (fold-left (lambda (totalValue child) (+ totalValue (att-value 'get-objective-function-value child)))
                   (att-value 'get-objective-function-value
                              (ast-child 'selectedimpl n))
-                  (ast-child 'ReqComp n))))
+                  (ast-children (ast-child 'ReqComp n)))))
     (Impl
      (lambda (n)
        (cond
-         ((att-value 'is-selected n) 1) ;TODO: calculate objective-function-value
+         ((att-value 'is-selected n) (string-length (symbol->string (ast-child 'name n)))) ;TODO: calculate objective-function-value
          (else 0))))
     )
    
@@ -68,7 +71,7 @@
     is-selected
     (Impl
      (lambda (n)
-       (eq? (ast-child 'selectedimpl (ast-parent n)) n)))
+       (eq? (ast-child 'selectedimpl (ast-parent (ast-parent n))) n)))
     )
    
    (ag-rule
@@ -82,66 +85,72 @@
    (compile-ag-specifications)
    
    ;; Concrete AST
-   (create-ast
-    'Root
-    (list
-     (create-ast
-      'HWRoot
-      (list
-       (create-ast-list
-        (list
+   (let
+       ((cubie1
          (create-ast
           'Resource
           (list
            'Cubie1 ;name
            (create-ast-list (list)) ;"subresources"
            (create-ast-list (list)) ;"provClauses"
-           )) ;end-of:Resource
-         )) ;end-of:Resource* from HWRoot
-       )) ;end-of:HWRoot
-     (create-ast
-      'SWRoot
-      (list
-       (create-ast-list ;Comp*
-        (list
+           )))
+        (sample-impl 
          (create-ast
-          'Comp
+          'Impl
           (list
-           'Example-Component ;name
-           (create-ast-list ;Impl*
-            (list
-             (create-ast
-              'Impl
-              (list
-               'Sample-Implementation ;name
-               (create-ast-bud) ;Contract
-               (create-ast-bud) ;deployedon
-               )) ;end-of:Impl (Sample-Implementation)
-             )
-            ) ;end-of:Impl* from ExampleComponent
-           (create-ast-list ;ReqComp
-            '()
-            )
-           (create-ast-bud) ;selectedimpl
-           )) ;end-of:Comp (ExampleComponent)
-         )) ;end-of:Comp* from SWRoot
-       )) ;end-of:SWRoot
+           'Sample-Implementation ;name
+           (create-ast-bud) ;Contract
+           (create-ast-bud) ;deployedon
+           ))))
+     (set! impl1 sample-impl)
      (create-ast
-      'Request
+      'Root
       (list
-       (create-ast-list ;MetaParameter*
-        '())
-       (create-ast-list ;Constraints
-        '())
        (create-ast
-        'Property
+        'HWRoot
         (list
-         'Requested-property
-         ))
-       )) ;end-of:Request
-     )) ;end-of:Root
-   )
-)
+         (create-ast-list
+          (list
+           cubie1
+           )) ;end-of:Resource* from HWRoot
+         )) ;end-of:HWRoot
+       (create-ast
+        'SWRoot
+        (list
+         (create-ast-list ;Comp*
+          (list
+           (create-ast
+            'Comp
+            (list
+             'Example-Component ;name
+             (create-ast-list ;Impl*
+              (list
+               sample-impl
+               )
+              ) ;end-of:Impl* from ExampleComponent
+             (create-ast-list ;ReqComp
+              '()
+              )
+             sample-impl ;selectedimpl
+             )) ;end-of:Comp (ExampleComponent)
+           )) ;end-of:Comp* from SWRoot
+         )) ;end-of:SWRoot
+       (create-ast
+        'Request
+        (list
+         (create-ast-list ;MetaParameter*
+          '())
+         (create-ast-list ;Constraints
+          '())
+         (create-ast
+          'Property
+          (list
+           'Requested-property
+           ))
+         )) ;end-of:Request
+       )) ;end-of:Root
+     ))
+  )
 
 ; Copied from racr-tune
 (define display-part
@@ -162,7 +171,3 @@
        (cons (ast-child 'name child) l))
      '()
      (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast))))))
-
-;(define set-first-impl
-;  (lambda ()
-;    )) ;TODO
