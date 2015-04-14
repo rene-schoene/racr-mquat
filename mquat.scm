@@ -5,6 +5,7 @@
 (define spec (create-specification))
 
 (define impl1 0)
+(define impl2 0)
 (define comp1 0)
 
 (define ast
@@ -14,7 +15,6 @@
    (ast-rule 'Root->HWRoot-SWRoot-Request)
    (ast-rule 'SWRoot->Comp*)
    (ast-rule 'Comp->name-Impl*-Comp*<ReqComp-selectedimpl)
-   ; (ast-rule 'ReqComp:Comp->)
    (ast-rule 'Impl->name-Contract-deployedon)
    (ast-rule 'Contract->Mode*)
    (ast-rule 'Mode->Clause*)
@@ -78,14 +78,14 @@
     is-deployed
     (Impl
      (lambda (n)
-       (null? (ast-child 'deployedon n))))
+       (ast-node? (ast-child 'deployedon n))))
     )
    
    
    (compile-ag-specifications)
    
    ;; Concrete AST
-   (let
+   (let*
        ((cubie1
          (create-ast
           'Resource
@@ -94,15 +94,24 @@
            (create-ast-list (list)) ;"subresources"
            (create-ast-list (list)) ;"provClauses"
            )))
-        (sample-impl 
+        (sample-impl1
          (create-ast
           'Impl
           (list
-           'Sample-Implementation ;name
+           'Sample-Implementation1 ;name
            (create-ast-bud) ;Contract
-           (create-ast-bud) ;deployedon
+           cubie1 ;deployedon
+           )))
+        (sample-impl2
+         (create-ast
+          'Impl
+          (list
+           'Another-Sample-Implementation2 ;name
+           (create-ast-bud) ;Contract
+           #f ;deployedon
            ))))
-     (set! impl1 sample-impl)
+     (set! impl1 sample-impl1)
+     (set! impl2 sample-impl2)
      (create-ast
       'Root
       (list
@@ -125,13 +134,14 @@
              'Example-Component ;name
              (create-ast-list ;Impl*
               (list
-               sample-impl
+               sample-impl1
+               sample-impl2
                )
               ) ;end-of:Impl* from ExampleComponent
              (create-ast-list ;ReqComp
               '()
               )
-             sample-impl ;selectedimpl
+             sample-impl1 ;selectedimpl
              )) ;end-of:Comp (ExampleComponent)
            )) ;end-of:Comp* from SWRoot
          )) ;end-of:SWRoot
@@ -152,6 +162,8 @@
      ))
   )
 
+(set! comp1 (ast-parent (ast-parent impl1)))
+
 ; Copied from racr-tune
 (define display-part
   (lambda (node)
@@ -171,3 +183,36 @@
        (cons (ast-child 'name child) l))
      '()
      (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast))))))
+
+(define select-impl
+  (lambda (new-impl new-pe)
+    (let*
+        ((comp (ast-parent (ast-parent new-impl)))
+         (former-impl (ast-child 'selectedimpl comp)))
+      (rewrite-terminal 'deployedon former-impl #f)
+      (rewrite-terminal 'selectedimpl comp new-impl)
+      (rewrite-terminal 'deployedon new-impl new-pe)
+      new-impl)))
+
+; returns a list of the form
+; (comp1 (impl1.a impl1.b (impl1.c cubie1)) comp2 ((impl2.a cubie2)) comp3 ())
+; selected-impls are encapsulated inside a list along with their deployed-on-PE
+(define comp-and-impls
+  (letrec
+      ((I
+        (lambda (loi)
+          (if (null? loi)
+              '()
+              (cons 
+               (if (att-value 'is-selected (car loi))
+                   (cons (ast-child 'name (car loi))
+                         (cons (ast-child 'name (ast-child 'deployedon (car loi)))
+                               '()))
+                   (ast-child 'name (car loi)))
+               (I (cdr loi)))))))
+  (lambda ()
+    (fold-left
+     (lambda (result comp)
+       (cons (ast-child 'name comp) (cons (I (ast-children (ast-child 'Impl* comp))) result)))
+     '()
+     (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast)))))))
