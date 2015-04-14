@@ -17,8 +17,8 @@
    (ast-rule 'Comp->name-Impl*-Comp*<ReqComp-selectedimpl)
    (ast-rule 'Impl->name-Contract-deployedon)
    (ast-rule 'Contract->Mode*)
-   (ast-rule 'Mode->Clause*)
-   (ast-rule 'Clause->function) ;references MetaParameter
+   (ast-rule 'Mode->name-Clause*)
+   (ast-rule 'Clause->Property<ReturnType-MetaParameter*<Params-function) ;references MetaParameter
    (ast-rule 'ReqClause:Clause->)
    (ast-rule 'ProvClause:Clause->)
    (ast-rule 'HWRoot->Resource*)
@@ -58,13 +58,32 @@
     clauses-met
     (Root
      (lambda (n)
-       0));(fold-left and #t (ast-child 'Comp* (ast-child 'SWRoot n)))))
+       #f)) ;TODO: iterate over components and combine with "and"
+    ;(fold-left and #t (ast-child 'Comp* (ast-child 'SWRoot n)))))
     (Comp
      (lambda (n)
-       (att-value 'selectedimpl n)))
+       (att-value 'clauses-met (att-value 'selectedimpl n))))
     (Impl
      (lambda (n)
-       (att-value 'selectedimpl n)))
+       (att-value 'clauses-met (att-value 'Contract n)))
+    (Clause
+     (lambda (n)
+       #f ;TODO: iterate over clauses and combine with "and"
+       ))
+    )
+   
+   (ag-rule
+    get-request
+    (Root
+     (lambda (n)
+       (ast-child 'Request n))))
+   
+   (ag-rule
+    eval
+    (Clause
+     (lambda (n)
+       #f ;TODO: check against request constraints
+       ))
     )
    
    (ag-rule
@@ -86,30 +105,83 @@
    
    ;; Concrete AST
    (let*
-       ((cubie1
+       ([cubie1
          (create-ast
           'Resource
           (list
            'Cubie1 ;name
            (create-ast-list (list)) ;"subresources"
            (create-ast-list (list)) ;"provClauses"
-           )))
-        (sample-impl1
+           ))]
+        [prop-load
+         (lambda ()
+           (create-ast
+            'Property
+            (list
+             'load ;name
+             )))]
+        [mp-size
+         (lambda ()
+           (create-ast
+            'MetaParameter
+            (list
+             'size ;name
+             0 ;value
+             )))]
+        [make-simple-contract
+         (lambda (f mode-name)
+           (create-ast
+            'Contract
+            (list
+             (create-ast-list ;Mode*
+              (list
+               (create-ast
+                'Mode
+                (list
+                 mode-name
+                 (create-ast-list ;Clause*
+                  (list
+                   (create-ast
+                    'Clause
+                    (list
+                     (prop-load)
+                     (create-ast-list ;Params
+                      (list
+                       (mp-size)
+                       ))
+                     f ;function -> not a valid terminal
+                     )) ;end-of:Clause
+                   )) ;end-of:Clause* in Mode
+                 )) ;end-of:Mode
+               )) ;end-of:Mode* in Contract
+             )) ;end-of:Contract
+           )]
+        [sample-impl1
          (create-ast
           'Impl
           (list
-           'Sample-Implementation1 ;name
-           (create-ast-bud) ;Contract
+           'Sample-Implementation1 ;name of Impl
+           (make-simple-contract ;Contract = static value of 0.5
+            (lambda (mp-size)
+              0.5)
+             'static-mode-1 ;name of Mode
+             )
            cubie1 ;deployedon
-           )))
-        (sample-impl2
+           ))]
+        [sample-impl2
          (create-ast
           'Impl
           (list
-           'Another-Sample-Implementation2 ;name
-           (create-ast-bud) ;Contract
+           'Another-Sample-Implementation2 ;name of Impl
+           (make-simple-contract ;Contract = dynamic value, either 0.2 or 0.8
+            (lambda (mp-size)
+              (if (> mp-size 100)
+                  0.8
+                  0.2))
+            'dynamic-mode-2 ;name of Mode
+            )
            #f ;deployedon
-           ))))
+           ))])
      (set! impl1 sample-impl1)
      (set! impl2 sample-impl2)
      (create-ast
@@ -131,7 +203,7 @@
            (create-ast
             'Comp
             (list
-             'Example-Component ;name
+             'Example-Component ;name of Comp
              (create-ast-list ;Impl*
               (list
                sample-impl1
