@@ -65,7 +65,7 @@
        (att-value 'clauses-met (att-value 'selectedimpl n))))
     (Impl
      (lambda (n)
-       (att-value 'clauses-met (att-value 'Contract n)))
+       (att-value 'clauses-met (att-value 'Contract n))))
     (Clause
      (lambda (n)
        #f ;TODO: iterate over clauses and combine with "and"
@@ -78,13 +78,52 @@
      (lambda (n)
        (ast-child 'Request n))))
    
+   ; Clause: Call the function with the Params-AST-node
+   ; Mode: Return list of form (property-name value)
+   ; Contract/Impl: Return list of form (mode-name (eval clauses))
    (ag-rule
     eval
     (Clause
      (lambda (n)
-       #f ;TODO: check against request constraints
+       ((ast-child 'function n) (ast-child 'MetaParameter* (att-value 'get-request n)))
        ))
+    (Mode
+     (lambda (n)
+       (fold-left
+        (lambda (result clause)
+          (cons (list (ast-child 'name (ast-child 'ReturnType clause)) (att-value 'eval clause)) result))
+        '()
+        (ast-children (ast-child 'Clause* n)))))
+    (Contract
+     (lambda (n)
+       (fold-left
+        (lambda (result mode)
+          (cons (list (ast-child 'name mode) (att-value 'eval mode)) result))
+        '()
+        (ast-children (ast-child 'Mode* n)))))
+    (Impl
+     (lambda (n)
+       (att-value 'eval (ast-child 'Contract n))))
     )
+   
+   ; Given a list-node n, search for a MetaParameter with the given name.
+   ; If none found, return the default value
+   (define get-val
+     (lambda (n name default)
+       (letrec
+           ([G
+             (lambda (lomp)
+               (cond
+                 ((null? lomp) default)
+                 ((eq? (ast-child 'name (car lomp)) name) (ast-child 'value (car lomp)))
+                 (else (G (cdr lomp)))))])
+         (G (ast-children n)))))
+   
+   (ag-rule
+    value-of
+    (Request
+     (lambda (n name)
+       (get-val (ast-child 'MetaParameter* n) name #f))))
    
    (ag-rule
     is-selected
@@ -113,20 +152,20 @@
            (create-ast-list (list)) ;"subresources"
            (create-ast-list (list)) ;"provClauses"
            ))]
-        [prop-load
+        [make-prop-load
          (lambda ()
            (create-ast
             'Property
             (list
              'load ;name
              )))]
-        [mp-size
-         (lambda ()
+        [make-mp-size
+         (lambda (value)
            (create-ast
             'MetaParameter
             (list
              'size ;name
-             0 ;value
+             value ;value
              )))]
         [make-simple-contract
          (lambda (f mode-name)
@@ -144,10 +183,10 @@
                    (create-ast
                     'Clause
                     (list
-                     (prop-load)
+                     (make-prop-load)
                      (create-ast-list ;Params
                       (list
-                       (mp-size)
+                       (make-mp-size 0)
                        ))
                      f ;function -> not a valid terminal
                      )) ;end-of:Clause
@@ -162,7 +201,7 @@
           (list
            'Sample-Implementation1 ;name of Impl
            (make-simple-contract ;Contract = static value of 0.5
-            (lambda (mp-size)
+            (lambda (lomp)
               0.5)
              'static-mode-1 ;name of Mode
              )
@@ -174,10 +213,12 @@
           (list
            'Another-Sample-Implementation2 ;name of Impl
            (make-simple-contract ;Contract = dynamic value, either 0.2 or 0.8
-            (lambda (mp-size)
-              (if (> mp-size 100)
-                  0.8
-                  0.2))
+            (lambda (lomp)
+              (let
+                  ([mp-size (att-value 'value-of lomp 'size)])
+                (if (> mp-size 100)
+                    0.8
+                    0.2)))
             'dynamic-mode-2 ;name of Mode
             )
            #f ;deployedon
@@ -221,7 +262,9 @@
         'Request
         (list
          (create-ast-list ;MetaParameter*
-          '())
+          (list
+           (make-mp-size 50)
+           ))
          (create-ast-list ;Constraints
           '())
          (create-ast
