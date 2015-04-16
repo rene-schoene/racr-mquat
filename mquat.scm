@@ -51,51 +51,45 @@
    ;; AG rules
    (ag-rule
     get-objective-function-value
-    (Root
+    (Root ; sum of objective value of all software components (skipping SWRoot)
      (lambda (n)
        (fold-left
         ; call the same attribute on all childs
         (lambda (totalValue child) (+ totalValue (att-value 'get-objective-function-value child)))
         0
-        ; childs are components of sw-root (skipping call to SWRoot)
         (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
-    (Comp
+    (Comp ; sum of objective value of selected impl and all objective value of required components
      (lambda (n)
        (fold-left (lambda (totalValue child) (+ totalValue (att-value 'get-objective-function-value child)))
                   (att-value 'get-objective-function-value
                              (ast-child 'selectedimpl n))
                   (ast-children (ast-child 'ReqComp n)))))
-    (Impl
+    (Impl ;TODO: calculate objective-function-value
      (lambda (n)
        (cond
-         ((att-value 'is-selected n) (string-length (symbol->string (ast-child 'name n)))) ;TODO: calculate objective-function-value
+         ((att-value 'is-selected n) (string-length (symbol->string (ast-child 'name n))))
          (else 0))))
     )
    
    (ag-rule
-    clauses-met
-    (Root
+    clauses-met?
+    (Root ; clauses-met for all software components?
      (lambda (n)
-       (fold-left (lambda (result comp) (and result (att-value 'clauses-met comp)))
+       (fold-left (lambda (result comp) (and result (att-value 'clauses-met? comp)))
                   #t
                   (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
-    (Comp
+    (Comp ; clauses-met for selected impl?
      (lambda (n)
-       (att-value 'clauses-met (ast-child 'selectedimpl n))))
-    (Impl
+       (att-value 'clauses-met? (ast-child 'selectedimpl n))))
+    (Impl ; clauses-met for selected mode?
      (lambda (n)
-       (att-value 'clauses-met (ast-child 'Contract n))))
-    (Contract
-     (lambda (n)
-       (fold-left (lambda (result mode) (and result (att-value 'clauses-met mode)))
-                  #t
-                  (ast-children (ast-child 'Mode* n)))))
-    (Mode
+       (att-value 'clauses-met? (ast-child 'selectedmode n))))
+    (Mode ; clauses-met for all clauses?
      (lambda (n)
        (fold-left (lambda (result clause) (and result (att-value 'clauses-met clause)))
                   #t
                   (ast-children (ast-child 'Clause* n)))))
-    (ReqClause
+    (ReqClause ; comparator function returns true?
      (lambda (n)
        (let*
            ([comp (ast-child 'comp n)]
@@ -104,8 +98,8 @@
             )
          (comp required actual))
        ))
-    (ProvClause
-     (lambda (n) #t)) ;Provision clauses are always fulfilled
+    (ProvClause ; Provision clauses are always fulfilled
+     (lambda (n) #t))
     )
    
    (ag-rule
@@ -118,10 +112,10 @@
             )
          ((ast-child
            'value (if (ast-subtype? target 'ResourceType)
-                         (att-value 'get-provided-clause (ast-child 'deployedon   (att-value 'get-impl n)) propName target) ;hw -> search in deployedon for name and type
-                         (att-value 'get-provided-clause (ast-child 'selectedimpl (ast-child 'selectedmode target)) propName) ;sw -> search in reqComps
+                         (att-value 'get-provided-clause (ast-child 'deployedon   (att-value 'get-impl n)) propName target) ; hw -> search in deployedon for name and type
+                         (att-value 'get-provided-clause (ast-child 'selectedimpl (ast-child 'selectedmode target)) propName) ; sw -> search in reqComps
                          ))
-          ;; Params from request, applied to the function
+          ; Params from request, applied to the value function
           (ast-child 'MetaParameter* (att-value 'get-request n))
         ))))
     (ProvClause
@@ -132,7 +126,7 @@
    ; Given the name of a property (and optionally the type of the resource), get ProvisionClause for this property
    (ag-rule
     get-provided-clause
-    (Resource ;; Search through ProvClauses of this resource and its subresources to find a clause with matching name of a resource with matching type
+    (Resource ; Search through ProvClauses of this resource and its subresources to find a clause with matching name of a resource with matching type
      (lambda (n name type)
        (let
            ([search-subresources
@@ -143,20 +137,20 @@
                 (ast-child 'SubResources n)
                 ))
              ])
-         (if (eq? (ast-child 'type n) type) ;; if n has correct type ...
+         (if (eq? (ast-child 'type n) type) ; if n has correct type ...
              (let
                  ([found-clause
-                   (ast-find-child ;; (1) ... then try to find a child in n ...
+                   (ast-find-child ; (1) ... then try to find a child in n ...
                     (lambda (index clause)
                       (eq? (ast-child 'name (ast-child 'ReturnType clause)) name))
                     (ast-child 'ProvClause* n))])
-               (if found-clause ;; (1.q) if a child was found ...
-                   found-clause ;; (1.1) ... return it
-                   (search-subresources))) ;; (1.2) ... else search in subresources
-             ;; (2) ... if not correct type or no child was found, search subresources of n
+               (if found-clause ; (1.q) if a child was found ...
+                   found-clause ; (1.1) ... return it
+                   (search-subresources))) ; (1.2) ... else search in subresources
+             ; (2) ... if not correct type or no child was found, search subresources of n
              (search-subresources)))
        ))
-    (Mode ;;Search through Clauses to find a ProvClause with matching name
+    (Mode ; Search through Clauses to find a ProvClause with matching name
      (lambda (n name)
        (ast-find-child
         (lambda (index clause)
@@ -165,48 +159,19 @@
        ))
     )
     
-   (ag-rule
-    get-request
-    (Root
-     (lambda (n) (ast-child 'Request n))))
+   (ag-rule get-request (Root (lambda (n) (ast-child 'Request n)))) ; Get request from every node
 
-   (ag-rule
-    get-impl
-    (Impl
-     (lambda (n) n)))
+   (ag-rule get-impl (Impl (lambda (n) n))) ; Get Impl in subtree of the Impl
 
-   (ag-rule
-    get-comp
-    (Comp
-     (lambda (n) n)))
+   (ag-rule get-comp (Comp (lambda (n) n))) ; Get Comp in subtree of the Comp
 
-   ; primary use case = Clause: Call the function with the Params-AST-node
-   ; secondary use cases (for debugging clauses):
-   ; Mode: Return list of form (property-name value)
-   ; Contract/Impl: Return list of form (mode-name (eval clauses))
+   ; Call the function of a ReqClause with the MetaParams-AST-node of the request
    (ag-rule
     eval
     (Clause
      (lambda (n)
        ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))
        ))
-    (Mode
-     (lambda (n)
-       (fold-left
-        (lambda (result clause)
-          (cons (list (ast-child 'name (ast-child 'ReturnType clause)) (att-value 'eval clause)) result))
-        '()
-        (ast-children (ast-child 'Clause* n)))))
-    (Contract
-     (lambda (n)
-       (fold-left
-        (lambda (result mode)
-          (cons (list (ast-child 'name mode) (att-value 'eval mode)) result))
-        '()
-        (ast-children (ast-child 'Mode* n)))))
-    (Impl
-     (lambda (n)
-       (att-value 'eval (ast-child 'Contract n))))
     )
    
    ; Given a list-node n, search for a MetaParameter with the given name.
@@ -241,7 +206,6 @@
      (lambda (n)
        (ast-node? (ast-child 'deployedon n))))
     )
-   
    
    (compile-ag-specifications)
    
@@ -427,8 +391,8 @@
 (define select-impl
   (lambda (new-impl new-pe)
     (let*
-        ((comp (ast-parent (ast-parent new-impl)))
-         (former-impl (ast-child 'selectedimpl comp)))
+        ([comp (ast-parent (ast-parent new-impl))]
+         [former-impl (ast-child 'selectedimpl comp)])
       (rewrite-terminal 'deployedon former-impl #f)
       (rewrite-terminal 'selectedimpl comp new-impl)
       (rewrite-terminal 'deployedon new-impl new-pe)
