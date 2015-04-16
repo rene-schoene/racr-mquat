@@ -7,6 +7,7 @@
 (define impl1 0)
 (define impl2 0)
 (define comp1 0)
+(define comp-names (list))
 
 (define ast
   (with-specification
@@ -18,22 +19,32 @@
    (ast-rule 'Impl->name-Contract-deployedon-selectedmode)
    (ast-rule 'Contract->Mode*)
    (ast-rule 'Mode->name-Clause*)
-   ;function is lambda expecting an AST-List-Node
-   ;kind is one of {kind-max, kind-min} (defined below)
-   (ast-rule 'Clause->Property<ReturnType-kind-function)
+   ;value is a lambda expecting an AST-List-Node with MetaParameters, returning the value
+   ;comp is a lambda expecting two values, required and actual, returning #t or #f
+   (ast-rule 'Clause->Property<ReturnType-comp-value)
    ; target is either a Comp or a ResourceType
    (ast-rule 'ReqClause:Clause->target)
    (ast-rule 'ProvClause:Clause->)
    (ast-rule 'HWRoot->ResourceType*-Resource*)
-   ; type is a ResourceType
    (ast-rule 'ResourceType->name)
+   ; type is a ResourceType
    (ast-rule 'Resource->name-type-Resource*<SubResources-ProvClause*)
    (ast-rule 'Request->MetaParameter*-ReqClause*<Constraints-Property<Objective)
    (ast-rule 'MetaParameter->name-value)
    (ast-rule 'Property->name) ;tbd
    
-   (define kind-min 'min) ;requires MIN value
-   (define kind-max 'max) ;requires MAX value
+   (define comp-min-eq (lambda (req act) (<= req act)))
+   (define comp-max-eq (lambda (req act) (>= req act)))
+   (define comp-eq (lambda (req act) (= req act)))
+   (define f-comp-max-diff-eq
+     (lambda (diff)
+       (lambda (req act) (<= (- req act) diff))))
+   
+   (set! comp-names
+         (list
+          (list comp-min-eq '<=)
+          (list comp-max-eq '>=)
+          (list comp-eq '=)))
    
    (compile-ast-specifications 'Root)
    
@@ -87,26 +98,35 @@
     (ReqClause
      (lambda (n)
        (let*
-           ([kind (ast-child 'kind n)]
-            [propName (ast-child 'name (ast-child 'ReturnType n))]
-            [expected (att-value 'eval n)]
-            [target (ast-child 'target n)]
-            [actual ((ast-child
-                      'function (if (ast-subtype? target 'ResourceType)
-                                    (att-value 'get-provided-clause (ast-child 'deployedon   (att-value 'get-impl n)) propName target) ;hw -> search in deployedon for name and type
-                                    (att-value 'get-provided-clause (ast-child 'selectedimpl (ast-child 'selectedmode target)) propName) ;sw -> search in reqComps
-                                    ))
-                     ;; Params from request, applied to the function
-                     (ast-child 'MetaParameter* (att-value 'get-request n))
-                     )]
+           ([comp (ast-child 'comp n)]
+            [required (att-value 'eval n)]
+            [actual (att-value 'get-actual-value n)]
             )
-         (cond
-           ((eq? kind kind-min) (<= expected actual))
-           ((eq? kind kind-max) (>= expected actual))
-           (else #f)))
+         (comp required actual))
        ))
     (ProvClause
      (lambda (n) #t)) ;Provision clauses are always fulfilled
+    )
+   
+   (ag-rule
+    get-actual-value
+    (ReqClause
+     (lambda (n)
+       (let
+           ([propName (ast-child 'name (ast-child 'ReturnType n))]
+            [target (ast-child 'target n)]
+            )
+         ((ast-child
+           'value (if (ast-subtype? target 'ResourceType)
+                         (att-value 'get-provided-clause (ast-child 'deployedon   (att-value 'get-impl n)) propName target) ;hw -> search in deployedon for name and type
+                         (att-value 'get-provided-clause (ast-child 'selectedimpl (ast-child 'selectedmode target)) propName) ;sw -> search in reqComps
+                         ))
+          ;; Params from request, applied to the function
+          (ast-child 'MetaParameter* (att-value 'get-request n))
+        ))))
+    (ProvClause
+     (lambda (n)
+       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))))
     )
    
    ; Given the name of a property (and optionally the type of the resource), get ProvisionClause for this property
@@ -168,7 +188,7 @@
     eval
     (Clause
      (lambda (n)
-       ((ast-child 'function n) (ast-child 'MetaParameter* (att-value 'get-request n)))
+       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))
        ))
     (Mode
      (lambda (n)
@@ -252,9 +272,9 @@
              (create-ast
               'ProvClause
               (list
-               (make-prop-load) ;ReturnType
-               (create-ast-list (list)) ;Params
-               (lambda (lomp) 0.4) ;function
+               (make-prop-load) ; ReturnType
+               comp-eq ; comp
+               (lambda (lomp) 0.4) ; value
                )) ;end-of:ProvClause
              )) ;"provClauses"
            ))]
@@ -278,7 +298,7 @@
                 'ReqClause
                 (list
                  (make-prop-load)
-                 kind-max
+                 comp-max-eq
                  f ;function -> not a valid terminal
                  Cubieboard ;target
                  )) ;end-of:Clause
@@ -404,14 +424,6 @@
   (lambda ()
     (display-part ast)))
 
-(define comp-names
-  (lambda ()
-    (fold-left
-     (lambda (l child)
-       (cons (ast-child 'name child) l))
-     '()
-     (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast))))))
-
 (define select-impl
   (lambda (new-impl new-pe)
     (let*
@@ -430,31 +442,122 @@
          [num-impls (ast-num-children (ast-child 'Impl* comp))]
          [former-deployed (ast-child 'deployedon former-impl)]
          [new-index (+ (mod former-index num-impls) 1)]
-         [new-impl (ast-sibling new-index former-impl)])
+         [new-impl (ast-sibling new-index former-impl)]
+         [first-new-mode (car (ast-children (ast-child 'Mode* (ast-child 'Contract new-impl))))])
       (rewrite-terminal 'deployedon former-impl #f)
+      (rewrite-terminal 'selectedmode former-impl #f)
       (rewrite-terminal 'selectedimpl comp new-impl)
       (rewrite-terminal 'deployedon new-impl former-deployed)
+      (rewrite-terminal 'selectedmode new-impl first-new-mode) ; use first mode
       new-impl)))
 
-; returns a list of the form
-; (comp1 (impl1.a impl1.b (impl1.c cubie1)) comp2 ((impl2.a cubie2)) comp3 ())
-; selected-impls are encapsulated inside a list along with their deployed-on-PE
-(define comp-and-impls
+(define clauses-to-list
   (letrec
-      ((I
-        (lambda (loi)
+      ([comp->string
+        (lambda (comp table)
+          (cond
+            ((null? table) '?~)
+            ((eq? comp (caar table)) (cadar table))
+            (else (comp->string comp (cdr table)))))])
+    (lambda (loc)
+      (fold-left
+       (lambda (result clause)
+         (let
+             ([returnType (ast-child 'name (ast-child 'ReturnType clause))]
+              [evalValue (att-value 'eval clause)]
+              [compName (comp->string (ast-child 'comp clause) comp-names)])
+         (cons
+          (if (ast-subtype? clause 'ProvClause)
+              (list returnType compName evalValue)
+              (list
+               returnType
+               'on
+               (ast-child 'name (ast-child 'target clause))
+               evalValue
+               compName
+               (att-value 'get-actual-value clause)))
+          result)))
+       (list) ; nil of fold-left
+       loc)) ; list of fold-left
+    ))
+
+; [Debugging] returns a list of the components, implementations and modes
+; Form: (compI ((implI1 deployedon-I1 (selectedmode-I1 ((propName min|max actual-value) ... ))) ...) ...)
+(define cim
+  (letrec
+      ([M
+        (lambda (mode)
+          (list
+           (ast-child 'name mode)
+           (clauses-to-list
+            (ast-children (ast-child 'Clause* mode)))))]
+       [I
+        (lambda (loi) ; [l]ist [o]f [i]mpls
           (if (null? loi)
-              '()
-              (cons 
-               (if (att-value 'is-selected (car loi))
-                   (cons (ast-child 'name (car loi))
-                         (cons (ast-child 'name (ast-child 'deployedon (car loi)))
-                               '()))
-                   (ast-child 'name (car loi)))
-               (I (cdr loi)))))))
+              (list)
+              (let
+                  ([deployed-on (ast-child 'deployedon (car loi))]
+                   [selected-mode (ast-child 'selectedmode (car loi))]
+                   [name (ast-child 'name (car loi))])
+                (cons
+                 (list
+                  (if (att-value 'is-selected (car loi))
+                      (string-append "*" (symbol->string name))
+                      name)
+                  (if deployed-on
+                      (ast-child 'name deployed-on)
+                      #f)
+                  (if selected-mode
+                      (M selected-mode)
+                      #f))
+                  (I (cdr loi))))))])
   (lambda ()
     (fold-left
      (lambda (result comp)
        (cons (ast-child 'name comp) (cons (I (ast-children (ast-child 'Impl* comp))) result)))
-     '()
+     (list)
      (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast)))))))
+
+; [Debuggin] Returns a list of hardware resources along with their provided properties
+; Form: (res1 ((provClause1a-name -comp->string -actualValue) ... (res1-subresources ... )) ... )
+(define hw
+  (lambda ()
+    (letrec
+        ([R
+          (lambda (lor) ; [l]ist [o]f [r]esources
+            (if (null? lor)
+                (list)
+                (let
+                    ([subs (R (ast-children (ast-child 'SubResources (car lor))))]
+                     [rest (R (cdr lor))])
+                  (cons
+                   (list
+                    (ast-child 'name (car lor)) ; resource name
+                    (ast-child 'name (ast-child 'type (car lor))) ; resource type name
+                    (clauses-to-list
+                     (ast-children (ast-child 'ProvClause* (car lor))))) ; list of clauses
+                   (if (null? subs)
+                       rest
+                       (cons subs rest))))))])
+      (R (ast-children (ast-child 'Resource* (ast-child 'HWRoot ast)))))))
+
+; [Debugging] Returns a list of the request
+; Form: (((metaparam1-name -value) ... ) ((constraint1-name -comp->string -requiredValue) ... ) objective)
+(define req
+  (lambda ()
+    (letrec
+        ([r (att-value 'get-request ast)]
+         [MP
+          (lambda (lomp) ; [l]ist [o]f [m]eta[p]arameter
+            (if (null? lomp)
+                (list)
+                (cons
+                 (list
+                  (ast-child 'name (car lomp))
+                  (ast-child 'value (car lomp)))
+                 (MP (cdr lomp)))))])
+      (list
+       (MP (ast-children (ast-child 'MetaParameter* r))) ; metaparams
+       (clauses-to-list (ast-children (ast-child 'Constraints r))) ; constraints
+       (ast-child 'name (ast-child 'Objective r)) ; objective
+       ))))
