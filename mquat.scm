@@ -8,6 +8,7 @@
 (define impl2 0)
 (define comp1 0)
 (define comp-names (list))
+(define energy 'energy-consumption) ; The name of the property energy-consumption, to be used for all properties. Used for the objective function
 
 (define ast
   (with-specification
@@ -55,20 +56,21 @@
      (lambda (n)
        (fold-left
         ; call the same attribute on all childs
-        (lambda (totalValue child) (+ totalValue (att-value 'get-objective-function-value child)))
+        (lambda (totalValue comp) (+ totalValue (att-value 'get-objective-function-value comp)))
         0
         (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
     (Comp ; sum of objective value of selected impl and all objective value of required components
      (lambda (n)
-       (fold-left (lambda (totalValue child) (+ totalValue (att-value 'get-objective-function-value child)))
+       (fold-left (lambda (totalValue reqComp) (+ totalValue (att-value 'get-objective-function-value reqComp)))
                   (att-value 'get-objective-function-value
                              (ast-child 'selectedimpl n))
                   (ast-children (ast-child 'ReqComp n)))))
-    (Impl ;TODO: calculate objective-function-value
+    (Impl ; call the same attribute on the selected mode
      (lambda (n)
-       (cond
-         ((att-value 'is-selected n) (string-length (symbol->string (ast-child 'name n))))
-         (else 0))))
+       (att-value 'get-objective-function-value (ast-child 'selectedmode n))))
+    (Mode ; find and evaluate the energy-consumption provClause
+     (lambda (n)
+       (att-value 'eval (att-value 'get-provided-clause n energy))))
     )
    
    (ag-rule
@@ -78,15 +80,17 @@
        (fold-left (lambda (result comp) (and result (att-value 'clauses-met? comp)))
                   #t
                   (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
-    (Comp ; clauses-met for selected impl?
+    (Comp ; clauses-met for selected impl and for all required components?
      (lambda (n)
-       (att-value 'clauses-met? (ast-child 'selectedimpl n))))
+       (fold-left (lambda (result reqComp) (and result (att-value 'clauses-met? reqComp)))
+                  (att-value 'clauses-met? (ast-child 'selectedimpl n))
+                  (ast-children (ast-child 'ReqComp n)))))
     (Impl ; clauses-met for selected mode?
      (lambda (n)
        (att-value 'clauses-met? (ast-child 'selectedmode n))))
     (Mode ; clauses-met for all clauses?
      (lambda (n)
-       (fold-left (lambda (result clause) (and result (att-value 'clauses-met clause)))
+       (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
                   #t
                   (ast-children (ast-child 'Clause* n)))))
     (ReqClause ; comparator function returns true?
@@ -154,7 +158,7 @@
      (lambda (n name)
        (ast-find-child
         (lambda (index clause)
-          (and (ast-subtype? clause 'ProvClause) (eq? (ast-child 'name) name)))
+          (and (ast-subtype? clause 'ProvClause) (eq? (ast-child 'name (ast-child 'ReturnType clause)) name)))
         (ast-child 'Clause* n))
        ))
     )
@@ -211,19 +215,16 @@
    
    ;; Concrete AST
    (let*
-       ([make-prop-load
-         (lambda ()
+       ([load 'server-load]
+        [make-prop
+         (lambda (name)
            (create-ast
             'Property
-            (list
-             'server-load ;name
-             )))]
+            (list name)))]
         [Cubieboard
          (create-ast
           'ResourceType
-          (list
-           'Cubieboard
-           ))]
+          (list 'Cubieboard))]
         [cubie1
          (create-ast
           'Resource
@@ -236,7 +237,7 @@
              (create-ast
               'ProvClause
               (list
-               (make-prop-load) ; ReturnType
+               (make-prop load) ; ReturnType
                comp-eq ; comp
                (lambda (lomp) 0.4) ; value
                )) ;end-of:ProvClause
@@ -251,7 +252,7 @@
              value ;value
              )))]
         [make-simple-mode
-         (lambda (f mode-name)
+         (lambda (req-f prov-f mode-name)
            (create-ast
             'Mode
             (list
@@ -261,11 +262,18 @@
                (create-ast
                 'ReqClause
                 (list
-                 (make-prop-load)
-                 comp-max-eq
-                 f ;function -> not a valid terminal
+                 (make-prop load)
+                 comp-max-eq ;comp
+                 req-f ;function
                  Cubieboard ;target
-                 )) ;end-of:Clause
+                 )) ;end-of:ReqClause
+               (create-ast
+                'ProvClause
+                (list
+                 (make-prop energy)
+                 comp-eq ;comp
+                 prov-f ;function
+                 )) ;end-of:ProvClause
                )) ;end-of:Clause* in Mode
              )) ;end-of:Mode
            )]
@@ -284,7 +292,9 @@
          (let
              [(mode (make-simple-mode
                      (lambda (lomp)
-                       0.5)
+                       0.5) ;always return 0.5 for prop-load
+                     (lambda (lomp)
+                       20) ;always return 20 for energy
                      'static-mode-1 ;name of Mode
                      ))]
            (create-ast
@@ -299,12 +309,20 @@
          (let
              [(mode
                (make-simple-mode
-                (lambda (lomp)
+                (lambda (lomp) ;dynamic value for prop-load
                   (let
                       ([mp-size (att-value 'value-of lomp 'size)])
                     (if (> mp-size 100)
                         0.8
                         0.2)))
+                (lambda (lomp) ;dynamic value for energy
+                  (let
+                      ([mp-size (att-value 'value-of lomp 'size)]
+                       [deployed-kind (ast-child 'type (ast-child 'deployedon impl2))])
+                    (if (eq? deployed-kind Cubieboard)
+                        (* 10 (log mp-size))
+                        (* 2 mp-size))
+                    ))
                 'dynamic-mode-2))] ;name of Mode
            (create-ast
             'Impl
@@ -373,6 +391,8 @@
        )) ;end-of:Root
      ))
   )
+
+;; Misc and UI
 
 (set! comp1 (ast-parent (ast-parent impl1)))
 
