@@ -62,9 +62,9 @@
                   (att-value 'get-objective-function-value
                              (ast-child 'selectedimpl n))
                   (ast-children (ast-child 'ReqComps n)))))
-    (Impl ; call the same attribute on the selected mode
+    (Impl ; call the same attribute on the mode to use
      (lambda (n)
-       (att-value 'get-objective-function-value (ast-child 'selectedmode n))))
+       (att-value 'get-objective-function-value (att-value 'mode-to-use n))))
     (Mode ; find and evaluate the energy-consumption provClause
      (lambda (n)
        (att-value 'eval (att-value 'get-provided-clause n energy))))
@@ -82,9 +82,9 @@
        (fold-left (lambda (result reqComp) (and result (att-value 'clauses-met? reqComp)))
                   (att-value 'clauses-met? (ast-child 'selectedimpl n))
                   (ast-children (ast-child 'ReqComps n)))))
-    (Impl ; clauses-met for selected mode?
+    (Impl ; clauses-met for mode to use?
      (lambda (n)
-       (att-value 'clauses-met? (ast-child 'selectedmode n))))
+       (att-value 'clauses-met? (att-value 'mode-to-use n))))
     (Mode ; clauses-met for all clauses?
      (lambda (n)
        (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
@@ -113,12 +113,12 @@
             )
          ((ast-child
            'value (if (ast-subtype? target 'ResourceType)
-                         (att-value 'get-provided-clause (ast-child 'deployedon   (att-value 'get-impl n)) propName target) ; hw -> search in deployedon for name and type
-                         (att-value 'get-provided-clause (ast-child 'selectedimpl (ast-child 'selectedmode target)) propName) ; sw -> search in reqComps
-                         ))
+                      (att-value 'get-provided-clause (ast-child 'deployedon  (att-value 'get-impl n)) propName target) ; hw -> search in deployedon for name and type
+                      (att-value 'get-provided-clause (att-value 'mode-to-use (ast-child 'selectedimpl target)) propName) ; sw -> search in target-component
+                      ))
           ; Params from request, applied to the value function
           (ast-child 'MetaParameter* (att-value 'get-request n))
-        ))))
+          ))))
     (ProvClause
      (lambda (n)
        ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))))
@@ -159,20 +159,21 @@
         (ast-child 'Clause* n))
        ))
     )
-    
+   
    (ag-rule get-request (Root (lambda (n) (ast-child 'Request n)))) ; Get request from every node
-
+   
    (ag-rule get-impl (Impl (lambda (n) n))) ; Get Impl in subtree of the Impl
-
+   
    (ag-rule get-comp (Comp (lambda (n) n))) ; Get Comp in subtree of the Comp
-
-   ; Call the function of a ReqClause with the MetaParams-AST-node of the request
+   
+   ; Call the function of a Clause with the MetaParams-AST-node of the request
    (ag-rule
     eval
     (Clause
      (lambda (n)
-       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))
-       ))
+       (if (or (not (ast-subtype? (ast-parent (ast-parent n)) 'Mode)) (att-value 'is-selected (att-value 'get-impl n)))
+           ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))
+           #f)))
     )
    
    ; Given a list-node n, search for a MetaParameter with the given name.
@@ -207,6 +208,13 @@
      (lambda (n)
        (ast-node? (ast-child 'deployedon n))))
     )
+   
+   ; Return either the selected-mode or the first mode
+   (ag-rule
+    get-mode
+    (Impl
+     (lambda (n)
+       (or (ast-child 'selectedmode n) (ast-child 1 (ast-child 'Mode* (ast-child 'Contract n)))))))
    
    (compile-ag-specifications)
    
@@ -460,13 +468,14 @@
 
 ;; Display (parts of) AST
 
-; Copied from racr-tune
-(define display-part
-  (lambda (node)
-    (print-ast
-     node
-     (list)
-     (current-output-port))))
+(define (display-part node)
+  (define (print name) (cons name (lambda (v) v)))
+  (define printer
+    (list (print 'eval)))
+  (print-ast
+   node
+   printer
+   (current-output-port)))
 
 (define display-ast
   (lambda ()
@@ -487,23 +496,23 @@
              ([returnType (ast-child 'name (ast-child 'ReturnType clause))]
               [evalValue (att-value 'eval clause)]
               [compName (comp->string (ast-child 'comp clause))])
-         (cons
-          (if (ast-subtype? clause 'ProvClause)
-              (list returnType compName evalValue)
-              (list
-               returnType
-               'on
-               (ast-child 'name (ast-child 'target clause))
-               evalValue
-               compName
-               (att-value 'get-actual-value clause)))
-          result)))
+           (cons
+            (if (ast-subtype? clause 'ProvClause)
+                (list returnType compName evalValue)
+                (list
+                 returnType
+                 'on
+                 (ast-child 'name (ast-child 'target clause))
+                 evalValue
+                 compName
+                 (att-value 'get-actual-value clause)))
+            result)))
        (list) ; nil of fold-left
        loc)) ; list of fold-left
     ))
 
 ; [Debugging] returns a list of the components, implementations and modes
-; Form: (compI ((implI1 deployedon-I1 (selectedmode-I1 ((propName min|max actual-value) ... ))) ...) ...)
+; Form: (compI ((implI1 deployedon-I1 (mode-to-use-I1 ((propName min|max actual-value) ... ))) ...) ...)
 (define cim
   (letrec
       ([C
@@ -528,7 +537,7 @@
               (list)
               (let
                   ([deployed-on (ast-child 'deployedon (car loi))]
-                   [selected-mode (ast-child 'selectedmode (car loi))]
+                   [selected-mode (att-value 'mode-to-use (car loi))]
                    [name (ast-child 'name (car loi))])
                 (cons
                  (list
@@ -541,13 +550,13 @@
                   (if selected-mode
                       (M selected-mode)
                       #f))
-                  (I (cdr loi))))))])
-  (lambda ()
-    (fold-left
-     (lambda (result comp)
-       (cons (C comp) result))
-     (list)
-     (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast)))))))
+                 (I (cdr loi))))))])
+    (lambda ()
+      (fold-left
+       (lambda (result comp)
+         (cons (C comp) result))
+       (list)
+       (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast)))))))
 
 ; [Debuggin] Returns a list of hardware resources along with their provided properties
 ; Form: (res1-type res1-name ((provClause1a-name -comp->string -actualValue) ... (res1-subresources ... )) ... )
