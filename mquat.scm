@@ -157,7 +157,7 @@
     eval
     (Clause
      (lambda (n)
-       (if (or (not (ast-subtype? (ast-parent (ast-parent n)) 'Mode)) (att-value 'is-selected (att-value 'get-impl n)))
+       (if (or (not (ast-subtype? (ast-parent (ast-parent n)) 'Mode)) (att-value 'is-selected? (att-value 'get-impl n)))
            ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))
            #f))))
    
@@ -181,13 +181,13 @@
        (get-val (ast-child 'MetaParameter* n) name #f))))
    
    (ag-rule
-    is-selected
+    is-selected?
     (Impl
      (lambda (n)
        (eq? (ast-child 'selectedimpl (ast-parent (ast-parent n))) n))))
    
    (ag-rule
-    is-deployed
+    is-deployed?
     (Impl
      (lambda (n)
        (ast-node? (ast-child 'deployedon n))))
@@ -484,13 +484,13 @@
                    [name (ast-child 'name impl)])
                 (cons
                  (list
-                  (if (att-value 'is-selected (car loi))
+                  (if (att-value 'is-selected? (car loi))
                       (string-append "*" (symbol->string name))
                       name)
-                  (if (att-value 'is-deployed impl)
+                  (if (att-value 'is-deployed? impl)
                       (ast-child 'name (ast-child 'deployedon impl))
                       #f)
-                  (if (att-value 'is-selected impl)
+                  (if (att-value 'is-selected? impl)
                       (M (att-value 'mode-to-use impl))
                       #f))
                  (I (cdr loi))))))])
