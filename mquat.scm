@@ -67,8 +67,7 @@
        (att-value 'get-objective-function-value (att-value 'mode-to-use n))))
     (Mode ; find and evaluate the energy-consumption provClause
      (lambda (n)
-       (att-value 'eval (att-value 'get-provided-clause n energy))))
-    )
+       (att-value 'eval (att-value 'get-provided-clause n energy)))))
    
    (ag-rule
     clauses-met?
@@ -95,13 +94,10 @@
        (let*
            ([comp (ast-child 'comp n)]
             [required (att-value 'eval n)]
-            [actual (att-value 'get-actual-value n)]
-            )
-         (comp required actual))
-       ))
+            [actual (att-value 'get-actual-value n)])
+         (comp required actual))))
     (ProvClause ; Provision clauses are always fulfilled
-     (lambda (n) #t))
-    )
+     (lambda (n) #t)))
    
    (ag-rule
     get-actual-value
@@ -109,20 +105,15 @@
      (lambda (n)
        (let
            ([propName (ast-child 'name (ast-child 'ReturnType n))]
-            [target (ast-child 'target n)]
-            )
+            [target (ast-child 'target n)])
          ((ast-child
            'value (if (ast-subtype? target 'ResourceType)
                       (att-value 'get-provided-clause (ast-child 'deployedon  (att-value 'get-impl n)) propName target) ; hw -> search in deployedon for name and type
-                      (att-value 'get-provided-clause (att-value 'mode-to-use (ast-child 'selectedimpl target)) propName) ; sw -> search in target-component
-                      ))
-          ; Params from request, applied to the value function
-          (ast-child 'MetaParameter* (att-value 'get-request n))
-          ))))
+                      (att-value 'get-provided-clause (att-value 'mode-to-use (ast-child 'selectedimpl target)) propName))) ; sw -> search in target-component
+          (ast-child 'MetaParameter* (att-value 'get-request n)))))) ; Params from request, applied to the value function
     (ProvClause
      (lambda (n)
-       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))))
-    )
+       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n))))))
    
    ; Given the name of a property (and optionally the type of the resource), get ProvisionClause for this property
    (ag-rule
@@ -135,9 +126,7 @@
                (ast-find-child
                 (lambda (index subres)
                   (att-value 'get-provided-clause subres))
-                (ast-child 'SubResources n)
-                ))
-             ])
+                (ast-child 'SubResources n)))])
          (if (eq? (ast-child 'type n) type) ; if n has correct type ...
              (let
                  ([found-clause
@@ -149,16 +138,13 @@
                    found-clause ; (1.1) ... return it
                    (search-subresources))) ; (1.2) ... else search in subresources
              ; (2) ... if not correct type or no child was found, search subresources of n
-             (search-subresources)))
-       ))
+             (search-subresources)))))
     (Mode ; Search through Clauses to find a ProvClause with matching name
      (lambda (n name)
        (ast-find-child
         (lambda (index clause)
           (and (ast-subtype? clause 'ProvClause) (eq? (ast-child 'name (ast-child 'ReturnType clause)) name)))
-        (ast-child 'Clause* n))
-       ))
-    )
+        (ast-child 'Clause* n)))))
    
    (ag-rule get-request (Root (lambda (n) (ast-child 'Request n)))) ; Get request from every node
    
@@ -173,8 +159,7 @@
      (lambda (n)
        (if (or (not (ast-subtype? (ast-parent (ast-parent n)) 'Mode)) (att-value 'is-selected (att-value 'get-impl n)))
            ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))
-           #f)))
-    )
+           #f))))
    
    ; Given a list-node n, search for a MetaParameter with the given name.
    ; If none found, return the default value
@@ -199,8 +184,7 @@
     is-selected
     (Impl
      (lambda (n)
-       (eq? (ast-child 'selectedimpl (ast-parent (ast-parent n))) n)))
-    )
+       (eq? (ast-child 'selectedimpl (ast-parent (ast-parent n))) n))))
    
    (ag-rule
     is-deployed
@@ -211,7 +195,7 @@
    
    ; Return either the selected-mode or the first mode
    (ag-rule
-    get-mode
+    mode-to-use
     (Impl
      (lambda (n)
        (or (ast-child 'selectedmode n) (ast-child 1 (ast-child 'Mode* (ast-child 'Contract n)))))))
@@ -237,7 +221,7 @@
             (list
              name
              Cubieboard ;type
-             (create-ast-list (list)) ;"subresources"
+             (create-ast-list (list)) ;Subresources
              (create-ast-list
               (list
                (create-ast
@@ -245,10 +229,7 @@
                 (list
                  (make-prop load) ; ReturnType
                  comp-eq ; comp
-                 f-load ; value
-                 )) ;end-of:ProvClause
-               )) ;"provClauses"
-             )))]
+                 f-load)))))))] ; value
         [cubie1 (make-cubie 'Cubie1 (lambda (lomp) 0.7))]
         [cubie2 (make-cubie 'Cubie2 (lambda (lomp) 0.4))]
         [make-mp-size
@@ -257,8 +238,7 @@
             'MetaParameter
             (list
              'size ;name
-             value ;value
-             )))]
+             value)))] ;value
         [make-simple-mode
          (lambda (req-f prov-f mode-name)
            (create-ast
@@ -273,29 +253,20 @@
                  (make-prop load)
                  comp-max-eq ;comp
                  req-f ;function
-                 Cubieboard ;target
-                 )) ;end-of:ReqClause
+                 Cubieboard)) ;target
                (create-ast
                 'ProvClause
                 (list
                  (make-prop energy)
                  comp-eq ;comp
-                 prov-f ;function
-                 )) ;end-of:ProvClause
-               )) ;end-of:Clause* in Mode
-             )) ;end-of:Mode
-           )]
+                 prov-f)))))))] ;function
         [make-simple-contract
          (lambda (mode)
            (create-ast
             'Contract
             (list
              (create-ast-list ;Mode*
-              (list
-               mode
-               )) ;end-of:Mode* in Contract
-             )) ;end-of:Contract
-           )]
+              (list mode)))))]
         [sample-impl1a
          (let
              [(mode (make-simple-mode
@@ -303,16 +274,14 @@
                        0.5) ;always return 0.5 for prop-load
                      (lambda (lomp)
                        20) ;always return 20 for energy
-                     'static-mode-1a ;name of Mode
-                     ))]
+                     'static-mode-1a))] ;name of Mode
            (create-ast
             'Impl
             (list
              'Sample-Implementation1a ;name of Impl
              (make-simple-contract mode) ;Contract = static value of 0.5
              cubie1 ;deployedon
-             mode
-             )))]
+             mode)))]
         [sample-impl1b
          (let
              [(mode
@@ -329,8 +298,7 @@
                        [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))])
                     (if (eq? deployed-kind Cubieboard)
                         (* 10 (log mp-size))
-                        (* 2 mp-size))
-                    ))
+                        (* 2 mp-size))))
                 'dynamic-mode-1b))] ;name of Mode
            (create-ast
             'Impl
@@ -338,8 +306,7 @@
              'Another-Sample-Implementation1b ;name of Impl
              (make-simple-contract mode) ;Contract = dynamic value, either 0.2 or 0.8
              #f ;deployedon
-             #f ;selectedmode
-             )))]
+             #f)))] ;selectedmode
         [part-impl2a
          (let
              [(mode
@@ -352,8 +319,7 @@
                        [deployed-kind (ast-child 'type (ast-child 'deployedon impl2a))])
                     (if (eq? deployed-kind Cubieboard)
                         (* 3 (log mp-size))
-                        (* 1.5 mp-size))
-                    ))
+                        (* 1.5 mp-size))))
                 'dynamic-mode-2a))] ;name of Mode
            (create-ast
             'Impl
@@ -361,8 +327,7 @@
              'Part-Implementation2a ;name of Impl
              (make-simple-contract mode) ;Contract = dynamic value, either 0.2 or 0.8
              cubie1 ;deployedon
-             mode ;selectedmode
-             )))])
+             mode)))]) ;selectedmode
      (create-ast
       'Root
       (list
@@ -370,14 +335,9 @@
         'HWRoot
         (list
          (create-ast-list
-          (list
-           Cubieboard
-           )) ;end-of:ResourceType* from HWRoot
+          (list Cubieboard))
          (create-ast-list
-          (list
-           cubie1 cubie2
-           )) ;end-of:Resource* from HWRoot
-         )) ;end-of:HWRoot
+          (list cubie1 cubie2))))
        (create-ast
         'SWRoot
         (list
@@ -388,10 +348,7 @@
             (list
              'Example-Component ;name of Comp
              (create-ast-list ;Impl*
-              (list
-               sample-impl1a
-               sample-impl1b
-               )) ;end-of:Impl* from Example-Component
+              (list sample-impl1a sample-impl1b))
              (create-ast-list ;ReqComps
               (list
                (create-ast
@@ -399,24 +356,18 @@
                 (list
                  'Depth2-Component
                  (create-ast-list ;Impl*
-                  (list
-                   part-impl2a
-                   )) ;end-of:Impl* from Comp
+                  (list part-impl2a))
                  (create-ast-list (list)) ;ReqComps
-                 part-impl2a
-                 )) ;end-of:Comp (Depth2-Component)
-               )) ;enf-of:ReqComps from Comp
-             sample-impl1a ;selectedimpl
-             )) ;end-of:Comp (Example-Component)
-           )) ;end-of:Comp* from SWRoot
-         )) ;end-of:SWRoot
+                 part-impl2a ;selectedimpl of Depth2-Component
+                 ))))
+             sample-impl1a ;selectedimpl of Example-Component
+             ))))))
        (create-ast
         'Request
         (list
          (create-ast-list ;MetaParameter*
           (list
-           (make-mp-size 50)
-           ))
+           (make-mp-size 50)))
          (create-ast-list ;Constraints
           (list
            ;TODO: define a constraint on prop-load
@@ -425,11 +376,7 @@
           'Property
           (list
            'Requested-property
-           ))
-         )) ;end-of:Request
-       )) ;end-of:Root
-     ))
-  )
+           )))))))))
 
 ;; Misc and UI
 
@@ -477,9 +424,7 @@
    printer
    (current-output-port)))
 
-(define display-ast
-  (lambda ()
-    (display-part ast)))
+(define display-ast (lambda () (display-part ast)))
 
 (define clauses-to-list
   (let
@@ -508,8 +453,7 @@
                  (att-value 'get-actual-value clause)))
             result)))
        (list) ; nil of fold-left
-       loc)) ; list of fold-left
-    ))
+       loc)))) ; list of fold-left
 
 ; [Debugging] returns a list of the components, implementations and modes
 ; Form: (compI ((implI1 deployedon-I1 (mode-to-use-I1 ((propName min|max actual-value) ... ))) ...) ...)
@@ -535,20 +479,19 @@
         (lambda (loi) ; [l]ist [o]f [i]mpls
           (if (null? loi)
               (list)
-              (let
-                  ([deployed-on (ast-child 'deployedon (car loi))]
-                   [selected-mode (att-value 'mode-to-use (car loi))]
-                   [name (ast-child 'name (car loi))])
+              (let*
+                  ([impl (car loi)]
+                   [name (ast-child 'name impl)])
                 (cons
                  (list
                   (if (att-value 'is-selected (car loi))
                       (string-append "*" (symbol->string name))
                       name)
-                  (if deployed-on
-                      (ast-child 'name deployed-on)
+                  (if (att-value 'is-deployed impl)
+                      (ast-child 'name (ast-child 'deployedon impl))
                       #f)
-                  (if selected-mode
-                      (M selected-mode)
+                  (if (att-value 'is-selected impl)
+                      (M (att-value 'mode-to-use impl))
                       #f))
                  (I (cdr loi))))))])
     (lambda ()
@@ -599,19 +542,10 @@
       (list
        (MP (ast-children (ast-child 'MetaParameter* r))) ; metaparams
        (clauses-to-list (ast-children (ast-child 'Constraints r))) ; constraints
-       (ast-child 'name (ast-child 'Objective r)) ; objective
-       ))))
+       (ast-child 'name (ast-child 'Objective r)))))) ; objective
 
 ;; Shortcuts
 
-(define clauses-met?
-  (lambda ()
-    (att-value 'clauses-met? ast)))
-
-(define obj
-  (lambda ()
-    (att-value 'get-objective-function-value ast)))
-
-(define comp1-next-impl
-  (lambda ()
-    (use-next-impl comp1)))
+(define clauses-met? (lambda () (att-value 'clauses-met? ast)))
+(define obj (lambda () (att-value 'get-objective-function-value ast)))
+(define comp1-next-impl (lambda () (use-next-impl comp1)))
