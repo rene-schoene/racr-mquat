@@ -5,13 +5,13 @@
 (define spec (create-specification))
 
 (define comp-names (list))
-(define energy 'energy-consumption) ; The name of the property energy-consumption, to be used for all properties. Used for the objective function
+(define pn-energy 'energy-consumption) ; Property-Name of energy-consumption used for all properties and the default objective function
 
 (define ast
   (with-specification
    spec
    ;; AST rules
-   (ast-rule 'Root->HWRoot-SWRoot-Request)
+   (ast-rule 'Root->HWRoot-SWRoot-Property*-Request)
    (ast-rule 'SWRoot->Comp*)
    (ast-rule 'Comp->name-Impl*-Comp*<ReqComps-selectedimpl)
    (ast-rule 'Impl->name-Contract-deployedon-selectedmode)
@@ -19,7 +19,7 @@
    (ast-rule 'Mode->name-Clause*)
    ;value is a lambda expecting an AST-List-Node with MetaParameters, returning the value
    ;comp is a lambda expecting two values, required and actual, returning #t or #f
-   (ast-rule 'Clause->Property<ReturnType-comp-value)
+   (ast-rule 'Clause->returntype-comp-value)
    ; target is either a Comp or a ResourceType
    (ast-rule 'ReqClause:Clause->target)
    (ast-rule 'ProvClause:Clause->)
@@ -27,9 +27,10 @@
    (ast-rule 'ResourceType->name)
    ; type is a ResourceType
    (ast-rule 'Resource->name-type-Resource*<SubResources-ProvClause*)
-   (ast-rule 'Request->MetaParameter*-ReqClause*<Constraints-Property<Objective)
+   (ast-rule 'Request->MetaParameter*-ReqClause*<Constraints-objective)
    (ast-rule 'MetaParameter->name-value)
-   (ast-rule 'Property->name) ;tbd
+   ; kind=static|runtime|derived. direction=decreasing|increasing
+   (ast-rule 'Property->name-unit-kind-direction)
    
    (define comp-min-eq (lambda (req act) (<= req act)))
    (define comp-max-eq (lambda (req act) (>= req act)))
@@ -48,33 +49,31 @@
    
    ;; AG rules
    (ag-rule
-    get-objective-function-value
+    objective-value
     (Root ; sum of objective value of all software components (skipping SWRoot)
      (lambda (n)
        (fold-left
         ; call the same attribute on all childs
-        (lambda (totalValue comp) (+ totalValue (att-value 'get-objective-function-value comp)))
-        0
-        (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
+        (lambda (totalValue comp) (+ totalValue (att-value 'objective-value comp)))
+        0 (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
     (Comp ; sum of objective value of selected impl and all objective value of required components
      (lambda (n)
-       (fold-left (lambda (totalValue reqComp) (+ totalValue (att-value 'get-objective-function-value reqComp)))
-                  (att-value 'get-objective-function-value
-                             (ast-child 'selectedimpl n))
+       (fold-left (lambda (totalValue reqComp) (+ totalValue (att-value 'objective-value reqComp)))
+                  (att-value 'objective-value (ast-child 'selectedimpl n))
                   (ast-children (ast-child 'ReqComps n)))))
     (Impl ; call the same attribute on the mode to use
      (lambda (n)
-       (att-value 'get-objective-function-value (att-value 'mode-to-use n))))
+       (att-value 'objective-value (att-value 'mode-to-use n))))
     (Mode ; find and evaluate the energy-consumption provClause
      (lambda (n)
-       (att-value 'eval (att-value 'get-provided-clause n energy)))))
+       (att-value 'eval (att-value 'get-provided-clause n pn-energy)))))
    
    (ag-rule
     clauses-met?
-    (Root ; clauses-met for all software components?
+    (Root ; clauses-met for all software components and for request?
      (lambda (n)
        (fold-left (lambda (result comp) (and result (att-value 'clauses-met? comp)))
-                  #t
+                  (att-value 'objective-value (ast-child 'Request n))
                   (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
     (Comp ; clauses-met for selected impl and for all required components?
      (lambda (n)
@@ -87,24 +86,23 @@
     (Mode ; clauses-met for all clauses?
      (lambda (n)
        (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
-                  #t
-                  (ast-children (ast-child 'Clause* n)))))
+                  #t (ast-children (ast-child 'Clause* n)))))
     (ReqClause ; comparator function returns true?
      (lambda (n)
-       (let*
-           ([comp (ast-child 'comp n)]
-            [required (att-value 'eval n)]
-            [actual (att-value 'get-actual-value n)])
-         (comp required actual))))
+       ((ast-child 'comp n) (att-value 'eval n) (att-value 'actual-value n))))
     (ProvClause ; Provision clauses are always fulfilled
-     (lambda (n) #t)))
+     (lambda (n) #t))
+    (Request ; clauses-met for all constraints
+     (lambda (n)
+       (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
+                  #t (ast-children (ast-child 'Constraints n))))))
    
    (ag-rule
-    get-actual-value
+    actual-value
     (ReqClause
      (lambda (n)
        (let
-           ([propName (ast-child 'name (ast-child 'ReturnType n))]
+           ([propName (ast-child 'name (ast-child 'returntype n))]
             [target (ast-child 'target n)])
          ((ast-child
            'value (if (ast-subtype? target 'ResourceType)
@@ -132,7 +130,7 @@
                  ([found-clause
                    (ast-find-child ; (1) ... then try to find a child in n ...
                     (lambda (index clause)
-                      (eq? (ast-child 'name (ast-child 'ReturnType clause)) name))
+                      (eq? (ast-child 'name (ast-child 'returntype clause)) name))
                     (ast-child 'ProvClause* n))])
                (if found-clause ; (1.q) if a child was found ...
                    found-clause ; (1.1) ... return it
@@ -141,9 +139,10 @@
              (search-subresources)))))
     (Mode ; Search through Clauses to find a ProvClause with matching name
      (lambda (n name)
+       (display (string-append (symbol->string name) " in " (symbol->string (ast-child 'name n)) "\n"))
        (ast-find-child
         (lambda (index clause)
-          (and (ast-subtype? clause 'ProvClause) (eq? (ast-child 'name (ast-child 'ReturnType clause)) name)))
+          (and (ast-subtype? clause 'ProvClause) (eq? (ast-child 'name (ast-child 'returntype clause)) name)))
         (ast-child 'Clause* n)))))
    
    (ag-rule get-request (Root (lambda (n) (ast-child 'Request n)))) ; Get request from every node
@@ -157,12 +156,12 @@
     eval
     (Clause
      (lambda (n)
+       ; If inside a mode and impl of mode is selected, or outside of a mode ...
        (if (or (not (ast-subtype? (ast-parent (ast-parent n)) 'Mode)) (att-value 'is-selected? (att-value 'get-impl n)))
-           ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)))
-           #f))))
+           ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n))) ; ... apply value function with metaparams ...
+           #f)))) ; ... else don't evaluate and return false
    
-   ; Given a list-node n, search for a MetaParameter with the given name.
-   ; If none found, return the default value
+   ; Given a list-node n, search for a MetaParameter with the given name. If none found, return the default value
    (define get-val
      (lambda (n name default)
        (letrec
@@ -204,12 +203,13 @@
    
    ;; Concrete AST
    (let*
-       ([load 'server-load]
-        [make-prop
-         (lambda (name)
+       ([make-simple-prop ; kind=runtime, direction=decreasing
+         (lambda (name unit)
            (create-ast
             'Property
-            (list name)))]
+            (list name unit 'runtime 'decreasing)))]
+        [load (make-simple-prop 'server-load '%)]
+        [energy (make-simple-prop pn-energy 'Joule)]
         [Cubieboard
          (create-ast
           'ResourceType
@@ -227,7 +227,7 @@
                (create-ast
                 'ProvClause
                 (list
-                 (make-prop load) ; ReturnType
+                 load ; returntype
                  comp-eq ; comp
                  f-load)))))))] ; value
         [cubie1 (make-cubie 'Cubie1 (lambda (lomp) 0.7))]
@@ -250,14 +250,14 @@
                (create-ast
                 'ReqClause
                 (list
-                 (make-prop load)
+                 load
                  comp-max-eq ;comp
                  req-f ;function
                  Cubieboard)) ;target
                (create-ast
                 'ProvClause
                 (list
-                 (make-prop energy)
+                 energy
                  comp-eq ;comp
                  prov-f)))))))] ;function
         [make-simple-contract
@@ -362,6 +362,8 @@
                  ))))
              sample-impl1a ;selectedimpl of Example-Component
              ))))))
+       (create-ast-list ;Property*
+        (list load energy))
        (create-ast
         'Request
         (list
@@ -376,6 +378,9 @@
           'Property
           (list
            'Requested-property
+           'unit
+           'static
+           'decreasing
            )))))))))
 
 ;; Misc and UI
@@ -438,7 +443,7 @@
       (fold-left
        (lambda (result clause)
          (let
-             ([returnType (ast-child 'name (ast-child 'ReturnType clause))]
+             ([returnType (ast-child 'name (ast-child 'returntype clause))]
               [evalValue (att-value 'eval clause)]
               [compName (comp->string (ast-child 'comp clause))])
            (cons
@@ -450,10 +455,9 @@
                  (ast-child 'name (ast-child 'target clause))
                  evalValue
                  compName
-                 (att-value 'get-actual-value clause)))
+                 (att-value 'actual-value clause)))
             result)))
-       (list) ; nil of fold-left
-       loc)))) ; list of fold-left
+       (list) loc))))
 
 ; [Debugging] returns a list of the components, implementations and modes
 ; Form: (compI ((implI1 deployedon-I1 (mode-to-use-I1 ((propName min|max actual-value) ... ))) ...) ...)
@@ -542,10 +546,10 @@
       (list
        (MP (ast-children (ast-child 'MetaParameter* r))) ; metaparams
        (clauses-to-list (ast-children (ast-child 'Constraints r))) ; constraints
-       (ast-child 'name (ast-child 'Objective r)))))) ; objective
+       (ast-child 'name (ast-child 'objective r)))))) ; objective
 
 ;; Shortcuts
 
 (define clauses-met? (lambda () (att-value 'clauses-met? ast)))
-(define obj (lambda () (att-value 'get-objective-function-value ast)))
+(define obj (lambda () (att-value 'objective-value ast)))
 (define comp1-next-impl (lambda () (use-next-impl comp1)))
