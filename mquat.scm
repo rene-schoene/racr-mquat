@@ -199,6 +199,22 @@
      (lambda (n)
        (or (ast-child 'selectedmode n) (ast-child 1 (ast-child 'Mode* (ast-child 'Contract n)))))))
    
+   (ag-rule
+    to-ilp
+    (Root
+     (lambda (n)
+       #f))
+    (Request
+     (lambda (n)
+       (fold-left
+        (lambda (result c)
+          (string-append
+           (number->string (att-value 'eval c))
+           (symbol->string (comp->string (ast-child 'comp c)))
+           (symbol->string (ast-child 'name (ast-child 'returntype c)))))
+        (list)
+        (ast-children (ast-child 'Constraints n))))))
+   
    (compile-ag-specifications)
    
    ;; Concrete AST
@@ -210,6 +226,8 @@
             (list name unit 'runtime 'decreasing)))]
         [load (make-simple-prop 'server-load '%)]
         [energy (make-simple-prop pn-energy 'Joule)]
+        [rt-C1 (make-simple-prop 'response-time-C1 'ms)]
+        [rt-C2 (make-simple-prop 'response-time-C2 'ms)]
         [Cubieboard
          (create-ast
           'ResourceType
@@ -240,7 +258,7 @@
              'size ;name
              value)))] ;value
         [make-simple-mode
-         (lambda (req-f prov-f mode-name)
+         (lambda (req-f prov-e-f rt prov-rt-f mode-name)
            (create-ast
             'Mode
             (list
@@ -259,7 +277,13 @@
                 (list
                  energy
                  comp-eq ;comp
-                 prov-f)))))))] ;function
+                 prov-e-f))
+               (create-ast
+                'ProvClause
+                (list
+                 rt
+                 comp-eq ;comp
+                 prov-rt-f)))))))] ;function
         [make-simple-contract
          (lambda (mode)
            (create-ast
@@ -274,6 +298,9 @@
                        0.5) ;always return 0.5 for prop-load
                      (lambda (lomp)
                        20) ;always return 20 for energy
+                     rt-C1
+                     (lambda (lomp)
+                       0.2) ;always return 0.2 for response-time
                      'static-mode-1a))] ;name of Mode
            (create-ast
             'Impl
@@ -299,6 +326,9 @@
                     (if (eq? deployed-kind Cubieboard)
                         (* 10 (log mp-size))
                         (* 2 mp-size))))
+                rt-C1
+                (lambda (lomp)
+                  0.4) ;always return 0.4 for response-time
                 'dynamic-mode-1b))] ;name of Mode
            (create-ast
             'Impl
@@ -320,6 +350,9 @@
                     (if (eq? deployed-kind Cubieboard)
                         (* 3 (log mp-size))
                         (* 1.5 mp-size))))
+                rt-C2
+                (lambda (lomp)
+                  0.5) ;always return 0.5 for response-time
                 'dynamic-mode-2a))] ;name of Mode
            (create-ast
             'Impl
@@ -327,7 +360,26 @@
              'Part-Implementation2a ;name of Impl
              (make-simple-contract mode) ;Contract = dynamic value, either 0.2 or 0.8
              cubie1 ;deployedon
-             mode)))]) ;selectedmode
+             mode)))] ;selectedmode
+        [comp1 (create-ast
+                'Comp
+                (list
+                 'Example-Component ;name of Comp
+                 (create-ast-list ;Impl*
+                  (list sample-impl1a sample-impl1b))
+                 (create-ast-list ;ReqComps
+                  (list
+                   (create-ast
+                    'Comp
+                    (list
+                     'Depth2-Component
+                     (create-ast-list ;Impl*
+                      (list part-impl2a))
+                     (create-ast-list (list)) ;ReqComps
+                     part-impl2a ;selectedimpl of Depth2-Component
+                     ))))
+                 sample-impl1a ;selectedimpl of Example-Component
+                 ))])
      (create-ast
       'Root
       (list
@@ -342,26 +394,7 @@
         'SWRoot
         (list
          (create-ast-list ;Comp*
-          (list
-           (create-ast
-            'Comp
-            (list
-             'Example-Component ;name of Comp
-             (create-ast-list ;Impl*
-              (list sample-impl1a sample-impl1b))
-             (create-ast-list ;ReqComps
-              (list
-               (create-ast
-                'Comp
-                (list
-                 'Depth2-Component
-                 (create-ast-list ;Impl*
-                  (list part-impl2a))
-                 (create-ast-list (list)) ;ReqComps
-                 part-impl2a ;selectedimpl of Depth2-Component
-                 ))))
-             sample-impl1a ;selectedimpl of Example-Component
-             ))))))
+          (list comp1))))
        (create-ast-list ;Property*
         (list load energy))
        (create-ast
@@ -372,8 +405,13 @@
            (make-mp-size 50)))
          (create-ast-list ;Constraints
           (list
-           ;TODO: define a constraint on prop-load
-           ))
+           (create-ast
+            'ReqClause
+            (list
+             rt-C1
+             comp-max-eq
+             (lambda (n) 0.3)
+             comp1))))
          (create-ast
           'Property
           (list
@@ -431,14 +469,14 @@
 
 (define display-ast (lambda () (display-part ast)))
 
+(define comp->string
+  (lambda (comp)
+    (let ([entry (assq comp comp-names)])
+      (if entry
+          (cadr entry)
+          '?~))))
+
 (define clauses-to-list
-  (let
-      ([comp->string
-        (lambda (comp)
-          (let ([entry (assq comp comp-names)])
-            (if entry
-                (cadr entry)
-                '?~)))])
     (lambda (loc)
       (fold-left
        (lambda (result clause)
@@ -457,7 +495,7 @@
                  compName
                  (att-value 'actual-value clause)))
             result)))
-       (list) loc))))
+       (list) loc)))
 
 ; [Debugging] returns a list of the components, implementations and modes
 ; Form: (compI ((implI1 deployedon-I1 (mode-to-use-I1 ((propName min|max actual-value) ... ))) ...) ...)
