@@ -35,9 +35,7 @@
    (define comp-min-eq (lambda (req act) (<= req act)))
    (define comp-max-eq (lambda (req act) (>= req act)))
    (define comp-eq (lambda (req act) (= req act)))
-   (define f-comp-max-diff-eq
-     (lambda (diff)
-       (lambda (req act) (<= (- req act) diff))))
+   (define f-comp-max-diff-eq (lambda (diff) (lambda (req act) (<= (- req act) diff))))
    
    (set! comp-names
          (list
@@ -186,11 +184,7 @@
          (G (ast-children n)))))
    
    ; Given a metaparameter name, return the value of the according metaparameter
-   (ag-rule
-    value-of
-    (Request
-     (lambda (n name)
-       (get-val (ast-child 'MetaParameter* n) name #f))))
+   (ag-rule value-of (Request (lambda (n name) (get-val (ast-child 'MetaParameter* n) name #f))))
    
    (ag-rule is-selected? (Impl (lambda (n) (eq? (ast-child 'selectedimpl (ast-parent (ast-parent n))) n))))
    
@@ -266,8 +260,7 @@
                   (ast-children (ast-child 'Impl* reqC)))
                  (append (att-value 'to-ilp reqC) result)))
          (list)
-         (att-value 'reqComps n))
-        )))
+         (att-value 'reqComps n)))))
     (HWRoot
      (lambda (n)
        (fold-left
@@ -291,9 +284,7 @@
           (cons* "+" (att-value 'ilp-objective mode) (att-value 'ilp-varname mode) result))
         (list)
         (att-value 'every-mode n))))
-    (Mode
-     (lambda (n)
-       (att-value 'actual-value (att-value 'provided-clause n pn-energy)))))
+    (Mode (lambda (n) (att-value 'actual-value (att-value 'provided-clause n pn-energy)))))
    
    (ag-rule reqComps (Comp (lambda (n) (ast-children (ast-child 'ReqComps n)))))
    
@@ -364,11 +355,7 @@
              (string-append (symbol->string (ast-child 'name pp)) "#" rpname) ; Resource
              (string-append (symbol->string (ast-child 'name (att-value 'get-impl pp))) "#" rpname)))))) ; Mode
            
-   (ag-rule
-    every-pe
-    (Root
-     (lambda (n)
-       (att-value 'res* (ast-child 'HWRoot n)))))
+   (ag-rule every-pe (Root (lambda (n) (att-value 'res* (ast-child 'HWRoot n)))))
    
    (ag-rule
     res*
@@ -385,11 +372,7 @@
         (list n)
         (ast-children (ast-child 'SubResources n))))))
 
-   (ag-rule
-    every-mode
-    (Root
-     (lambda (n)
-       (att-value 'mode* (ast-child 'SWRoot n)))))
+   (ag-rule every-mode (Root (lambda (n) (att-value 'mode* (ast-child 'SWRoot n)))))
    
    (ag-rule
     mode*
@@ -408,27 +391,10 @@
           (list)
           (ast-children (ast-child 'ReqComps n)))
         (ast-children (ast-child 'Impl* n)))))
-    (Impl
-     (lambda (n)
-       (ast-children (ast-child 'Mode* (ast-child 'Contract n))))))
+    (Impl (lambda (n) (ast-children (ast-child 'Mode* (ast-child 'Contract n))))))
 
 
    ;; Misc functions
-   
-   ; Source = http://rosettacode.org/wiki/List_Flattening#Scheme
-   (define (flatten x)
-     (cond ((null? x) '())
-           ((not (pair? x)) (list x))
-           (else (append (flatten (car x))
-                         (flatten (cdr x))))))
-   
-   ; Flatten a list up to depth k
-   (define (flatten-k x k)
-     (cond ((zero? k) x)
-           ((null? x) '())
-           ((not (pair? x)) (list x))
-           (else (append (flatten-k (car x) k)
-                         (flatten-k (cdr x) (- k 1))))))
    
    (define (debug . args)
      (letrec
@@ -450,49 +416,27 @@
                    (D (cdr loa)))))))])
        (display (D args))))
    
-   
    (compile-ag-specifications)
    
    ;; Concrete AST
    (let*
        ([make-simple-prop ; kind=runtime, direction=decreasing
-         (lambda (name unit)
-           (create-ast
-            'Property
-            (list name unit 'runtime 'decreasing)))]
+         (lambda (name unit) (create-ast 'Property (list name unit 'runtime 'decreasing)))]
         [load (make-simple-prop 'server-load '%)]
         [energy (make-simple-prop pn-energy 'Joule)]
         [rt-C1 (make-simple-prop 'response-time-C1 'ms)]
         [rt-C2 (make-simple-prop 'response-time-C2 'ms)]
-        [Cubieboard
-         (create-ast
-          'ResourceType
-          (list 'Cubieboard))]
+        [Cubieboard (create-ast 'ResourceType (list 'Cubieboard))]
         [make-cubie
          (lambda (name f-load)
            (create-ast
             'Resource
-            (list
-             name
-             Cubieboard ;type
-             (create-ast-list (list)) ;Subresources
-             (create-ast-list
-              (list
-               (create-ast
-                'ProvClause
-                (list
-                 load ; returntype
-                 comp-eq ; comp
-                 f-load)))))))] ; value
+            (list name Cubieboard ;type
+                  (create-ast-list (list)) ;Subresources
+                  (create-ast-list (list (create-ast 'ProvClause (list load comp-eq f-load)))))))] ;ProvClause*
         [cubie1 (make-cubie 'Cubie1 (lambda (lomp) 0.7))]
         [cubie2 (make-cubie 'Cubie2 (lambda (lomp) 0.4))]
-        [make-mp-size
-         (lambda (value)
-           (create-ast
-            'MetaParameter
-            (list
-             'size ;name
-             value)))] ;value
+        [make-mp-size (lambda (value) (create-ast 'MetaParameter (list 'size value)))]
         [make-simple-mode
          (lambda (req-f other-reqs prov-e-f rt prov-rt-f mode-name)
            (create-ast
@@ -503,35 +447,13 @@
               (append
                other-reqs
                (list
-                (create-ast
-                 'ReqClause
-                 (list
-                  load
-                  comp-max-eq ;comp
-                  req-f ;function
-                  Cubieboard)) ;target
-                (create-ast
-                 'ProvClause
-                 (list
-                  energy
-                  comp-eq ;comp
-                  prov-e-f))
-                (create-ast
-                 'ProvClause
-                 (list
-                  rt
-                  comp-eq ;comp
-                  prov-rt-f))))))))] ;function
-        [make-simple-contract
-         (lambda (mode)
-           (create-ast
-            'Contract
-            (list
-             (create-ast-list ;Mode*
-              (list mode)))))]
+                (create-ast 'ReqClause (list load comp-max-eq req-f Cubieboard))
+                (create-ast 'ProvClause (list energy comp-eq prov-e-f))
+                (create-ast 'ProvClause (list rt comp-eq prov-rt-f))))))))]
+        [make-simple-contract (lambda (mode) (create-ast 'Contract (list (create-ast-list (list mode)))))]
         [part-impl2a
          (let
-             [(mode
+             [(mode2a
                (make-simple-mode
                 (lambda (lomp) ;static value of 0.5 for prop-load
                   0.5)
@@ -548,25 +470,21 @@
                 rt-C2 (lambda (lomp) 0.5) ;always return 0.5 for response-time
                 'dynamic-mode-2a))] ;name of Mode
            (create-ast
-            'Impl
-            (list
-             'Part-Implementation2a ;name of Impl
-             (make-simple-contract mode) ;Contract = dynamic value, either 0.2 or 0.8
-             cubie1 ;deployedon
-             mode)))] ;selectedmode
+            'Impl (list 'Part-Impl2a (make-simple-contract mode2a)
+                        cubie1 ;deployedon
+                        mode2a)))] ;selectedmode
         [comp2
          (create-ast
-                    'Comp
-                    (list
-                     'Depth2-Component
-                     (create-ast-list ;Impl*
-                      (list part-impl2a))
-                     (create-ast-list (list)) ;ReqComps
-                     part-impl2a ;selectedimpl of Depth2-Component
-                     ))]
+          'Comp
+          (list
+           'Depth2-Component
+           (create-ast-list (list part-impl2a)) ;Impl*
+           (create-ast-list (list)) ;ReqComps
+           part-impl2a ;selectedimpl of Depth2-Component
+           ))]
         [sample-impl1a
          (let
-             [(mode (make-simple-mode
+             [(mode1a (make-simple-mode
                      (lambda (lomp) 0.5) ;always return 0.5 for prop-load
                      (list
                       (create-ast
@@ -577,89 +495,56 @@
                      'static-mode-1a))] ;name of Mode
            (create-ast
             'Impl
-            (list
-             'Sample-Implementation1a ;name of Impl
-             (make-simple-contract mode) ;Contract = static value of 0.5
+            (list 'Sample-Impl1a (make-simple-contract mode1a)
              cubie1 ;deployedon
-             mode)))]
+             mode1a)))] ;selectedmode
         [sample-impl1b
-         (let
-             [(mode
-               (make-simple-mode
-                (lambda (lomp) ;dynamic value for prop-load
-                  (let
-                      ([mp-size (att-value 'value-of lomp 'size)])
-                    (if (>= mp-size 100)
-                        0.2
-                        0.8)))
-                (list)
-                (lambda (lomp) ;dynamic value for energy
-                  (let
-                      ([mp-size (att-value 'value-of lomp 'size)]
+         (create-ast
+          'Impl ; impl-1b is not deployed, default selected mode
+          (list 'The-Sample-Impl1b
+                (make-simple-contract
+                 (make-simple-mode
+                  (lambda (lomp) ;dynamic value for prop-load
+                    (let
+                        ([mp-size (att-value 'value-of lomp 'size)])
+                      (if (>= mp-size 100)
+                          0.2
+                          0.8)))
+                  (list)
+                  (lambda (lomp) ;dynamic value for energy
+                    (let
+                        ([mp-size (att-value 'value-of lomp 'size)]
 ;                       [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))]
-                       )
+                         )
 ;                    (if (eq? deployed-kind Cubieboard)
-                        (* 10 (log mp-size))
+                      (* 10 (log mp-size))
 ;                        (* 2 mp-size))
-                    ))
-                rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
-                'dynamic-mode-1b))] ;name of Mode
-           (create-ast
-            'Impl
-            (list
-             'Another-Sample-Implementation1b ;name of Impl
-             (make-simple-contract mode) ;Contract = dynamic value, either 0.2 or 0.8
-             #f ;deployedon
-             #f)))] ;selectedmode
-        [comp1 (create-ast
-                'Comp
-                (list
-                 'Example-Component ;name of Comp
-                 (create-ast-list ;Impl*
-                  (list sample-impl1a sample-impl1b))
-                 (create-ast-list (list comp2)) ;ReqComps
-                 sample-impl1a ;selectedimpl of Example-Component
-                 ))])
+                      ))
+                  rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
+                  'dynamic-mode-1b)) #f #f))]
+        [comp1
+         (create-ast
+          'Comp
+          (list
+           'Example-Component ;name of Comp
+           (create-ast-list (list sample-impl1a sample-impl1b)) ;Impl*
+           (create-ast-list (list comp2)) ;ReqComps
+           sample-impl1a ;selectedimpl of Example-Component
+           ))])
      (create-ast
       'Root
       (list
-       (create-ast
-        'HWRoot
-        (list
-         (create-ast-list
-          (list Cubieboard))
-         (create-ast-list
-          (list cubie1 cubie2))))
-       (create-ast
-        'SWRoot
-        (list
-         (create-ast-list ;Comp*
-          (list comp1))))
-       (create-ast-list ;Property*
-        (list load energy rt-C1 rt-C2))
+       (create-ast 'HWRoot (list
+                            (create-ast-list (list Cubieboard))
+                            (create-ast-list (list cubie1 cubie2))))
+       (create-ast 'SWRoot (list (create-ast-list (list comp1))))
+       (create-ast-list (list load energy rt-C1 rt-C2)) ;Property*
        (create-ast
         'Request
         (list
-         (create-ast-list ;MetaParameter*
-          (list
-           (make-mp-size 50)))
-         (create-ast-list ;Constraints
-          (list
-           (create-ast
-            'ReqClause
-            (list
-             rt-C1
-             comp-max-eq
-             (lambda (n) 0.3)
-             comp1))))
-         (create-ast
-          'Property
-          (list
-           'Requested-property
-           'unit
-           'static
-           'decreasing
-           )))))))))
+         (create-ast-list (list (make-mp-size 50))) ;MetaParameter*
+         (create-ast-list (list (create-ast 'ReqClause (list rt-C1 comp-max-eq (lambda (n) 0.3) comp1))))
+         #f))))))) ;default objective
 
 ;; Misc and UI
 
@@ -677,9 +562,7 @@
 ; of the given component (or the given impl) to the given resource, returning the old resource
 (define deploy-on
   (lambda (x new-pe)
-    (let
-        ([impl (if (ast-subtype? x 'Comp) (ast-child 'selectedimpl x) x)])
-      (rewrite-terminal 'deployedon impl new-pe))))
+    (rewrite-terminal 'deployedon (if (ast-subtype? x 'Comp) (ast-child 'selectedimpl x) x) new-pe)))
 
 (define use-next-impl
   (lambda (comp)
@@ -702,21 +585,15 @@
 
 (define (display-part node)
   (define (print name) (cons name (lambda (v) v)))
-  (define printer
-    (list (print 'eval)))
-  (print-ast
-   node
-   printer
-   (current-output-port)))
+  (define printer (list (print 'eval)))
+  (print-ast node printer (current-output-port)))
 
 (define display-ast (lambda () (display-part ast)))
 
 (define comp->string
   (lambda (comp)
     (let ([entry (assq comp comp-names)])
-      (if entry
-          (cadr entry)
-          '?~))))
+      (if entry (cadr entry) '?~))))
 
 (define clauses-to-list
   (lambda (loc)
@@ -780,12 +657,11 @@
                  (I (cdr loi))))))])
     (lambda ()
       (fold-left
-       (lambda (result comp)
-         (cons (C comp) result))
+       (lambda (result comp) (cons (C comp) result))
        (list)
        (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast)))))))
 
-; [Debuggin] Returns a list of hardware resources along with their provided properties
+; [Debugging] Returns a list of hardware resources along with their provided properties
 ; Form: (res1-type res1-name ((provClause1a-name -comp->string -actualValue) ... (res1-subresources ... )) ... )
 (define hw
   (lambda ()
