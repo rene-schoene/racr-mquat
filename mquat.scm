@@ -41,9 +41,9 @@
    
    (set! comp-names
          (list
+          (list comp-eq '=)
           (list comp-min-eq '<=)
-          (list comp-max-eq '>=)
-          (list comp-eq '=)))
+          (list comp-max-eq '>=)))
    
    (compile-ast-specifications 'Root)
    
@@ -217,7 +217,8 @@
         "Subject To"
          (append
           (att-value 'to-ilp (ast-child 'Request n)) ; request-constraints
-          (att-value 'to-ilp (ast-child 'SWRoot n))) ; contract- + archtitecture-constraints
+          (att-value 'to-ilp (ast-child 'SWRoot n)) ; archtitecture-constraints
+          (att-value 'ilp-nego n)) ; NFP-negotiation
         "Bounds"
         (att-value 'to-ilp (ast-child 'HWRoot n))
         "Generals"
@@ -257,22 +258,16 @@
          (lambda (result pe) (cons* "+" (att-value 'ilp-varname-deployed n pe) result))
          (list "-" (att-value 'ilp-varname n) "=" 0)
          (att-value 'every-pe n))
-;        (append
-         (fold-left
-          (lambda (result reqC)
-            (cons (fold-left ; if use this impl, also use one of the impls per required component
-                   (lambda (result rci) (cons* "+" (att-value 'ilp-varname rci) result))
-                   (list "-" (att-value 'ilp-varname n) "=" 0)
-                   (ast-children (ast-child 'Impl* reqC)))
-                  (append (att-value 'to-ilp reqC) result)))
-          (list)
-          (att-value 'reqComps n))
-;         (let
-;             ([eqs (list)]
-;              [mins (list)]
-;              [maxs (list)])
-;           (fold-left ; preparation: nfp negotiation
-         )))
+        (fold-left
+         (lambda (result reqC)
+           (cons (fold-left ; if use this impl, also use one of the impls per required component
+                  (lambda (result rci) (cons* "+" (att-value 'ilp-varname rci) result))
+                  (list "-" (att-value 'ilp-varname n) "=" 0)
+                  (ast-children (ast-child 'Impl* reqC)))
+                 (append (att-value 'to-ilp reqC) result)))
+         (list)
+         (att-value 'reqComps n))
+        )))
     (HWRoot
      (lambda (n)
        (fold-left
@@ -307,26 +302,21 @@
     ilp-nego
     (Root
      (lambda (n)
-       (fold-left
-        (lambda (result prop)
-          (let*
-              ([pcs (att-value 'ilp-nego prop)]
-               [eqs (car pcs)]
-               [mins (cadr pcs)]
-               [maxs (caddr pcs)])
-            (append
-             (ilp-build-list prop eqs "=")
-             (ilp-build-list prop mins ">=")
-             (ilp-build-list prop max "<=")
-             result)))
-        (list)
-        (ast-children (ast-child 'Property* n)))))
+       (remove (list) ; remove empty constraints
+               (fold-left
+                (lambda (result prop) (append (att-value 'ilp-nego prop) result))
+                (list)
+                (ast-children (ast-child 'Property* n))))))
     (Property
      (lambda (n)
-       (fold-left
-        (lambda (result mode) (merge-list (att-value 'ilp-nego mode n) result)) ;TODO add property name with "=", ">=" and "<=" resp.
-        (list (list) (list) (list))
-        (att-value 'every-mode n))))
+       (let*
+           ([pname (att-value 'ilp-varname n)]
+            [append-if-constrained (lambda (comp loc) (debug loc) (if (null? loc) (list) (cons* pname comp loc)))]) ; add property name and "=", ">=" and "<=" resp.
+         (map append-if-constrained (list "=" "<=" ">=")
+              (fold-left
+               (lambda (result mode) (merge-list (att-value 'ilp-nego mode n) result))
+               (list (list) (list) (list))
+               (att-value 'every-mode n))))))
     (Mode
      (lambda (n prop)
        (debug "ilp-nego:" (ast-child 'name n) ",prop:" (ast-child 'name prop))
@@ -354,6 +344,7 @@
    
    (ag-rule
     ilp-varname
+    (Property (lambda (n) (symbol->string (ast-child 'name n))))
     (Impl (lambda (n) (string-append "b#" (symbol->string (ast-child 'name n)))))
     (Mode (lambda (n) (string-append (att-value 'ilp-varname (att-value 'get-impl n))
                                      "#" (symbol->string (ast-child 'name n))))))
