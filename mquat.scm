@@ -4,6 +4,7 @@
 
 (define spec (create-specification))
 
+(define debugging #f)
 (define comp-names (list))
 (define pn-energy 'energy-consumption) ; Property-Name of energy-consumption used for all properties and the default objective function
 
@@ -205,19 +206,23 @@
     to-ilp
     (Root
      (lambda (n)
-       (list
-        "Minimize"
-        (att-value 'ilp-objective n)
-        "Subject To"
-         (append
-          (att-value 'to-ilp (ast-child 'Request n)) ; request-constraints
-          (att-value 'to-ilp (ast-child 'SWRoot n)) ; archtitecture-constraints
-          (att-value 'ilp-nego n)) ; NFP-negotiation
-        "Bounds"
-        (att-value 'to-ilp (ast-child 'HWRoot n))
-        "Generals"
-        (list) ; TODO
-        "End")))
+       (let
+           ([binary-vars (att-value 'ilp-binary-vars n)])
+         (list
+          (list "Minimize")
+          (att-value 'ilp-objective n)
+          (list "Subject To")
+          (append
+           (att-value 'to-ilp (ast-child 'Request n)) ; request-constraints
+           (att-value 'to-ilp (ast-child 'SWRoot n)) ; archtitecture-constraints
+           (att-value 'ilp-nego n)) ; NFP-negotiation
+          (list "Bounds")
+          (append
+           (att-value 'to-ilp (ast-child 'HWRoot n))
+           (map (lambda (var) (list 0 "<=" var "<=" 1)) binary-vars))
+          (list "Generals")
+          binary-vars
+         (list "End")))))
     (Request
      (lambda (n)
        (fold-left
@@ -334,16 +339,35 @@
 ;   eq-c1: (0 "=" "+" var "+" var2)
    
    (ag-rule
+    ilp-binary-vars
+    (Root
+     (lambda (n)
+       (map (lambda (x) (att-value 'ilp-varname x))
+            (append (att-value 'every-impl n) (att-value 'every-mode n))))))
+   
+   ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
+   (define subs (list (list #\- #\_) (list #\+ #\_)))
+   (define (ilp-conform-name name)
+     (list->string
+      (map
+       (lambda (c)
+         (let ([entry (assq c subs)])
+           (if entry (cadr entry) c)))
+       (string->list name))))
+   
+   (ag-rule
     ilp-varname
-    (Property (lambda (n) (symbol->string (ast-child 'name n))))
-    (Impl (lambda (n) (string-append "b#" (symbol->string (ast-child 'name n)))))
-    (Mode (lambda (n) (string-append (att-value 'ilp-varname (att-value 'get-impl n))
-                                     "#" (symbol->string (ast-child 'name n))))))
+    (Property (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
+    (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name n))))))
+    (Mode (lambda (n) (ilp-conform-name
+                       (string-append (att-value 'ilp-varname (att-value 'get-impl n))
+                                      "#" (symbol->string (ast-child 'name n)))))))
 
    (ag-rule
     ilp-varname-deployed
-    (Impl (lambda (n pe) (string-append "b#" (symbol->string (ast-child 'name n))
-                                        "#" (symbol->string (ast-child 'name pe))))))
+    (Impl (lambda (n pe) (ilp-conform-name
+                          (string-append "b#" (symbol->string (ast-child 'name n))
+                                         "#" (symbol->string (ast-child 'name pe)))))))
    
    (ag-rule
     ilp-propname
@@ -351,9 +375,10 @@
      (lambda (n)
        (let ([pp (ast-parent (ast-parent n))]
              [rpname (symbol->string (ast-child 'name (ast-child 'returntype n)))])
-         (if (ast-subtype? pp 'Resource)
-             (string-append (symbol->string (ast-child 'name pp)) "#" rpname) ; Resource
-             (string-append (symbol->string (ast-child 'name (att-value 'get-impl pp))) "#" rpname)))))) ; Mode
+         (ilp-conform-name (if (ast-subtype? pp 'Resource)
+                               (string-append (symbol->string (ast-child 'name pp)) "#" rpname) ; Resource
+                               (string-append (symbol->string (ast-child 'name (att-value 'get-impl pp)))
+                                              "#" rpname))))))) ; Mode
            
    (ag-rule every-pe (Root (lambda (n) (att-value 'res* (ast-child 'HWRoot n)))))
    
@@ -372,26 +397,32 @@
         (list n)
         (ast-children (ast-child 'SubResources n))))))
 
-   (ag-rule every-mode (Root (lambda (n) (att-value 'mode* (ast-child 'SWRoot n)))))
+   (ag-rule every-mode (Root (lambda (n) (att-value 'sw* (ast-child 'SWRoot n) 0))))
+   (ag-rule every-impl (Root (lambda (n) (att-value 'sw* (ast-child 'SWRoot n) 1))))
    
+   ; Search through AST and find either Impls (what = 0) or Modes (what = 1)
    (ag-rule
-    mode*
+    sw*
     (SWRoot
-     (lambda (n)
+     (lambda (n what)
        (fold-left
-        (lambda (result comp) (append (att-value 'mode* comp) result))
+        (lambda (result comp) (append (att-value 'sw* comp what) result))
         (list)
         (ast-children (ast-child 'Comp* n)))))
     (Comp
-     (lambda (n)
+     (lambda (n what)
        (fold-left
-        (lambda (result impl) (append (att-value 'mode* impl) result))
+        (lambda (result impl) (append (att-value 'sw* impl what) result))
         (fold-left
-          (lambda (result reqC) (append (att-value 'mode* reqC) result))
+          (lambda (result reqC) (append (att-value 'sw* reqC what) result))
           (list)
           (ast-children (ast-child 'ReqComps n)))
         (ast-children (ast-child 'Impl* n)))))
-    (Impl (lambda (n) (ast-children (ast-child 'Mode* (ast-child 'Contract n))))))
+    (Impl
+     (lambda (n what)
+       (case what
+         [(0) (ast-children (ast-child 'Mode* (ast-child 'Contract n)))]
+         [(1) (list n)]))))
 
 
    ;; Misc functions
@@ -414,7 +445,7 @@
                      ((procedure? s) "proc")
                      (else "?"))
                    (D (cdr loa)))))))])
-       (display (D args))))
+       (when debugging (display (D args)))))
    
    (compile-ag-specifications)
    
@@ -546,7 +577,7 @@
          (create-ast-list (list (create-ast 'ReqClause (list rt-C1 comp-max-eq (lambda (n) 0.3) comp1))))
          #f))))))) ;default objective
 
-;; Misc and UI
+;;; Misc and UI ;;;
 
 (define comp1 (ast-child 1 (ast-child 'Comp* (ast-child 'SWRoot ast))))
 (define impl1a (ast-child 1 (ast-child 'Impl* comp1)))
@@ -709,3 +740,26 @@
 (define clauses-met? (lambda () (att-value 'clauses-met? ast)))
 (define obj (lambda () (att-value 'objective-value ast)))
 (define comp1-next-impl (lambda () (use-next-impl comp1)))
+
+;; Text save
+(define (print-per-line x)
+  (cond
+    ((null? x) (newline))
+    ((list? x)
+     (if (list? (car x))
+         (begin
+           (print-per-line (car x))
+           ;(newline)
+           (print-per-line (cdr x)))
+         (begin
+           (print-per-line (car x))
+           (print-per-line (cdr x)))))
+    (else (display x) (display " "))))
+
+(define (save-to-file path values)
+  (if (file-exists? path) (delete-file path))
+  (with-output-to-file path
+    (lambda () (for-each print-per-line values) (newline))))
+
+(define (save-ilp path)
+  (save-to-file path (att-value 'to-ilp ast)))
