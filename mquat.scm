@@ -5,7 +5,7 @@
 (define spec (create-specification))
 
 (define debugging #f)
-(define comp-names (list))
+(define comp-names (list)) (define rev-comp-names (list))
 (define pn-energy 'energy-consumption) ; Property-Name of energy-consumption used for all properties and the default objective function
 
 (define ast
@@ -15,7 +15,7 @@
    (ast-rule 'Root->HWRoot-SWRoot-Property*-Request)
    (ast-rule 'SWRoot->Comp*)
    (ast-rule 'Comp->name-Impl*-Comp*<ReqComps-selectedimpl)
-   (ast-rule 'Impl->name-Contract-deployedon-selectedmode)
+   (ast-rule 'Impl->name-Contract-Comp*<AddReqComps-deployedon-selectedmode)
    (ast-rule 'Contract->Mode*)
    (ast-rule 'Mode->name-Clause*)
    ;value is a lambda expecting an AST-List-Node with MetaParameters, returning the value
@@ -40,9 +40,14 @@
    
    (set! comp-names
          (list
-          (list comp-eq '=)
-          (list comp-min-eq '<=)
-          (list comp-max-eq '>=)))
+          (list comp-eq '=)         ; property =  forumla
+          (list comp-min-eq '<=)    ; property <= formula
+          (list comp-max-eq '>=)))  ; property >= formula
+   (set! rev-comp-names
+         (list
+          (list comp-eq '=)         ; forumla =  property
+          (list comp-min-eq '>=)    ; forumla <= property
+          (list comp-max-eq '<=)))  ; forumla >= property
    
    (compile-ast-specifications 'Root)
    
@@ -228,9 +233,9 @@
        (fold-left
         (lambda (result c)
           (cons (list
-                 (att-value 'eval c)
-                 (comp->string (ast-child 'comp c))
-                 (ast-child 'name (ast-child 'returntype c)))
+                 (ast-child 'name (ast-child 'returntype c))
+                 (comp->rev-string (ast-child 'comp c))
+                 (att-value 'eval c))
                 result))
         (list)
         (ast-children (ast-child 'Constraints n)))))
@@ -243,18 +248,23 @@
     (Comp
      (lambda (n)
        (debug "Comp:" (ast-child 'name n))
-       (fold-left
-        (lambda (result impl) (cons
-                               (list "1" "=" "+" (att-value 'ilp-varname impl))
-                               (append (att-value 'to-ilp impl) result)))
-        (list)
-        (ast-children (ast-child 'Impl* n)))))
+       (let
+           ([result (fold-left
+                     (lambda (result impl)
+                       (cons
+                        (cons* "+" (att-value 'ilp-varname impl) (car result))
+                        (append (att-value 'to-ilp impl) (cdr result))))
+                     (list (list "=" "1") (list))
+                     (ast-children (ast-child 'Impl* n)))])
+         (if (att-value 'is-toplevel? n) result (cdr result)))))
     (Impl
      (lambda (n)
        (debug "Impl:" (ast-child 'name n))
        (cons
-        (fold-left ; deploy the same impl only on one pe
-         (lambda (result pe) (cons* "+" (att-value 'ilp-varname-deployed n pe) result))
+        (fold-left ; deploy the same mode only on one pe
+         (lambda (result pe) (cons* "+" (append (map (lambda (mode) (att-value 'ilp-varname-deployed mode pe))
+                                                     (ast-children (ast-child 'Mode* (ast-child 'Contract n))))
+                                                result)))
          (list "-" (att-value 'ilp-varname n) "=" 0)
          (att-value 'every-pe n))
         (fold-left
@@ -292,7 +302,10 @@
     (Mode (lambda (n) (att-value 'actual-value (att-value 'provided-clause n pn-energy)))))
    
    (ag-rule reqComps (Comp (lambda (n) (ast-children (ast-child 'ReqComps n)))))
-   
+   (ag-rule is-toplevel? (Comp (lambda (n) (ast-subtype? (ast-parent (ast-parent n)) 'SWRoot))))
+
+   (ag-rule reqCompsMap (Comp (lambda (n) (ast-children (ast-child 'ReqComps n))))) ;TODO
+
    ; Creates a list of NFP-negotiation constraints
    (ag-rule
     ilp-nego
@@ -307,8 +320,8 @@
      (lambda (n)
        (let*
            ([pname (att-value 'ilp-varname n)]
-            [append-if-constrained (lambda (comp loc) (debug loc) (if (null? loc) (list) (cons* pname comp loc)))]) ; add property name and "=", ">=" and "<=" resp.
-         (map append-if-constrained (list "=" "<=" ">=")
+            [append-if-constrained (lambda (comp loc) (debug loc) (if (null? loc) (list) (append loc (list "-" pname comp 0))))])
+         (map append-if-constrained (assq-values rev-comp-names) ; add "-" property name, ("=", ">=" or "<=" resp.) and "0"
               (fold-left
                (lambda (result mode) (merge-list (att-value 'ilp-nego mode n) result))
                (list (list) (list) (list))
@@ -327,6 +340,8 @@
            ((eq? comp comp-max-eq) (list (list) (list) (list "+" value name))) ; max-eq = 3rd
            (else (list (list) (list) (list)))))))) ; not found = three empty lists
    
+   (define (assq-values loe)
+     (if (null? loe) (list) (cons (cadar loe) (assq-values (cdr loe)))))
    (define ilp-build-list
      (lambda (prop var-list comp)
        (if (null? var-list) (list)
@@ -335,15 +350,15 @@
    ; (merge-list ((eq1 eq2) (min1 min2) (max1 max2)) ((eqA) (minA) (maxA)) = ((eq1 eq2 eqA) (min1 min2 minA) (max1 max2 maxA))
    (define (merge-list loc1 loc2) (debug loc1) (debug loc2) (map append loc1 loc2)) ; [l]ist [o]f [c]onstraints
    
-;   props: (("prop-A" ((eq-c1,eq-c2) (min-c1,min-c2,…) (max-c1))) ("prop-B" (…)))
-;   eq-c1: (0 "=" "+" var "+" var2)
-   
    (ag-rule
     ilp-binary-vars
     (Root
      (lambda (n)
-       (map (lambda (x) (att-value 'ilp-varname x))
-            (append (att-value 'every-impl n) (att-value 'every-mode n))))))
+       (append
+        (map (lambda (impl) (att-value 'ilp-varname impl)) (att-value 'every-impl n))
+        (fold-left (lambda (result mode) (append (map (lambda (pe) (att-value 'ilp-varname-deployed mode pe))
+                                                      (att-value 'every-pe n)) result))
+                   (list) (att-value 'every-mode n))))))
    
    ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
    (define subs (list (list #\- #\_) (list #\+ #\_)))
@@ -365,9 +380,14 @@
 
    (ag-rule
     ilp-varname-deployed
-    (Impl (lambda (n pe) (ilp-conform-name
-                          (string-append "b#" (symbol->string (ast-child 'name n))
+;    (Impl (lambda (n pe) (ilp-conform-name
+;                          (string-append "b#" (symbol->string (ast-child 'name n))
+;                                         "#" (symbol->string (ast-child 'name pe))))))
+    (Mode (lambda (n pe) (ilp-conform-name ;TODO: Prepend Comp-Name?
+                          (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-impl n)))
+                                         "#" (symbol->string (ast-child 'name n))
                                          "#" (symbol->string (ast-child 'name pe)))))))
+   
    
    (ag-rule
     ilp-propname
@@ -502,6 +522,7 @@
                 'dynamic-mode-2a))] ;name of Mode
            (create-ast
             'Impl (list 'Part-Impl2a (make-simple-contract mode2a)
+                        (create-ast-list (list)) ;AddReqComps
                         cubie1 ;deployedon
                         mode2a)))] ;selectedmode
         [comp2
@@ -527,8 +548,9 @@
            (create-ast
             'Impl
             (list 'Sample-Impl1a (make-simple-contract mode1a)
-             cubie1 ;deployedon
-             mode1a)))] ;selectedmode
+                  (create-ast-list (list)) ;AddReqComps
+                  cubie1 ;deployedon
+                  mode1a)))] ;selectedmode
         [sample-impl1b
          (create-ast
           'Impl ; impl-1b is not deployed, default selected mode
@@ -552,7 +574,9 @@
 ;                        (* 2 mp-size))
                       ))
                   rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
-                  'dynamic-mode-1b)) #f #f))]
+                  'dynamic-mode-1b))
+                (create-ast-list (list)) ;AddReqComps
+                #f #f))]
         [comp1
          (create-ast
           'Comp
@@ -624,6 +648,11 @@
 (define comp->string
   (lambda (comp)
     (let ([entry (assq comp comp-names)])
+      (if entry (cadr entry) '?~))))
+
+(define comp->rev-string
+  (lambda (comp)
+    (let ([entry (assq comp rev-comp-names)])
       (if entry (cadr entry) '?~))))
 
 (define clauses-to-list
@@ -742,24 +771,24 @@
 (define comp1-next-impl (lambda () (use-next-impl comp1)))
 
 ;; Text save
-(define (print-per-line x)
+(define (print-per-line x nl)
   (cond
-    ((null? x) (newline))
+    ((null? x) (if nl (newline)))
     ((list? x)
      (if (list? (car x))
          (begin
-           (print-per-line (car x))
+           (print-per-line (car x) #f)
            ;(newline)
-           (print-per-line (cdr x)))
+           (print-per-line (cdr x) #f))
          (begin
-           (print-per-line (car x))
-           (print-per-line (cdr x)))))
+           (print-per-line (car x) #f)
+           (print-per-line (cdr x) #t))))
     (else (display x) (display " "))))
 
 (define (save-to-file path values)
   (if (file-exists? path) (delete-file path))
   (with-output-to-file path
-    (lambda () (for-each print-per-line values) (newline))))
+    (lambda () (for-each (lambda (x) (print-per-line x #t)) values) (newline))))
 
 (define (save-ilp path)
   (save-to-file path (att-value 'to-ilp ast)))
