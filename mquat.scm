@@ -14,9 +14,8 @@
    ;; AST rules
    (ast-rule 'Root->HWRoot-SWRoot-Property*-Request)
    (ast-rule 'SWRoot->Comp*)
-   (ast-rule 'Comp->name-Impl*-Comp*<ReqComps-selectedimpl)
-   (ast-rule 'Impl->name-Contract-Comp*<AddReqComps-deployedon-selectedmode)
-   (ast-rule 'Contract->Mode*)
+   (ast-rule 'Comp->name-Impl*-selectedimpl)
+   (ast-rule 'Impl->name-Mode*-reqcomps-deployedon-selectedmode)
    (ast-rule 'Mode->name-Clause*)
    ;value is a lambda expecting an AST-List-Node with MetaParameters, returning the value
    ;comp is a lambda expecting two values, required and actual, returning #t or #f
@@ -30,8 +29,8 @@
    (ast-rule 'Resource->name-type-Resource*<SubResources-ProvClause*)
    (ast-rule 'Request->MetaParameter*-ReqClause*<Constraints-objective)
    (ast-rule 'MetaParameter->name-value)
-   ; kind=static|runtime|derived. direction=decreasing|increasing
-   (ast-rule 'Property->name-unit-kind-direction)
+   ; kind=static|runtime|derived. direction=decreasing|increasing. agg = sum|max
+   (ast-rule 'Property->name-unit-kind-direction-agg)
    
    (define comp-min-eq (lambda (req act) (<= req act)))
    (define comp-max-eq (lambda (req act) (>= req act)))
@@ -52,6 +51,28 @@
    (compile-ast-specifications 'Root)
    
    ;; AG rules
+   (ag-rule
+    req-comp-map
+    (Comp ; { (requiredComponent { impl-requiring-this-component ... }) ... }
+     (lambda (n)
+       (fold-left
+        (lambda (result impl)
+          (fold-left (lambda (result req) (add-to-al result req impl))
+                     (list)
+                     (att-value 'req-comp-map impl)))
+        (list) (ast-children (ast-child 'Impl*))))))
+   
+   ; Either add val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
+   (define add-to-al
+     (lambda (al key val)
+       (if (null? al) (list (list key (list val))) ; make new entry
+           (let ([entry (car al)])
+             (debug entry)
+             (debug (cadr entry))
+             (if (eq? (car entry) key)
+                 (cons (list key (cons val (cadr entry))) (cdr al)) ; add to entry and return
+                 (cons entry (add-to-al (cdr al) key val))))))) ; recur
+   
    (ag-rule
     objective-value
     (Root ; sum of objective value of all software components (skipping SWRoot)
@@ -201,7 +222,7 @@
     mode-to-use
     (Impl
      (lambda (n)
-       (or (ast-child 'selectedmode n) (ast-child 1 (ast-child 'Mode* (ast-child 'Contract n)))))))
+       (or (ast-child 'selectedmode n) (ast-child 1 (ast-child 'Mode* n))))))
    
    ;;; ILP-Creation rules
 
@@ -264,7 +285,7 @@
        (cons
         (fold-left ; deploy the same mode only on one pe
          (lambda (result pe) (cons* "+" (append (map (lambda (mode) (att-value 'ilp-varname-deployed mode pe))
-                                                     (ast-children (ast-child 'Mode* (ast-child 'Contract n))))
+                                                     (ast-children (ast-child 'Mode* n)))
                                                 result)))
          (list "-" (att-value 'ilp-varname n) "=" 0)
          (att-value 'every-pe n))
@@ -442,7 +463,7 @@
     (Impl
      (lambda (n what)
        (case what
-         [(0) (ast-children (ast-child 'Mode* (ast-child 'Contract n)))]
+         [(0) (ast-children (ast-child 'Mode* n))]
          [(1) (list n)]))))
 
 
@@ -502,7 +523,6 @@
                 (create-ast 'ReqClause (list load comp-max-eq req-f Cubieboard))
                 (create-ast 'ProvClause (list energy comp-eq prov-e-f))
                 (create-ast 'ProvClause (list rt comp-eq prov-rt-f))))))))]
-        [make-simple-contract (lambda (mode) (create-ast 'Contract (list (create-ast-list (list mode)))))]
         [part-impl2a
          (let
              [(mode2a
@@ -522,7 +542,7 @@
                 rt-C2 (lambda (lomp) 0.5) ;always return 0.5 for response-time
                 'dynamic-mode-2a))] ;name of Mode
            (create-ast
-            'Impl (list 'Part-Impl2a (make-simple-contract mode2a)
+            'Impl (list 'Part-Impl2a (create-ast-list (list mode2a))
                         (create-ast-list (list)) ;AddReqComps
                         cubie1 ;deployedon
                         mode2a)))] ;selectedmode
@@ -548,7 +568,7 @@
                      'static-mode-1a))] ;name of Mode
            (create-ast
             'Impl
-            (list 'Sample-Impl1a (make-simple-contract mode1a)
+            (list 'Sample-Impl1a (create-ast-list (list mode1a))
                   (create-ast-list (list)) ;AddReqComps
                   cubie1 ;deployedon
                   mode1a)))] ;selectedmode
@@ -556,24 +576,25 @@
          (create-ast
           'Impl ; impl-1b is not deployed, default selected mode
           (list 'The-Sample-Impl1b
-                (make-simple-contract
-                 (make-simple-mode
-                  (lambda (lomp) ;dynamic value for prop-load
-                    (let
-                        ([mp-size (att-value 'value-of lomp 'size)])
-                      (if (>= mp-size 100)
-                          0.2
-                          0.8)))
-                  (list)
-                  (lambda (lomp) ;dynamic value for energy
-                    (let
-                        ([mp-size (att-value 'value-of lomp 'size)]
-;                       [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))]
-                         )
-;                    (if (eq? deployed-kind Cubieboard)
-                      (* 10 (log mp-size))
-;                        (* 2 mp-size))
-                      ))
+                (create-ast-list
+                 (list
+                  (make-simple-mode
+                   (lambda (lomp) ;dynamic value for prop-load
+                     (let
+                         ([mp-size (att-value 'value-of lomp 'size)])
+                       (if (>= mp-size 100)
+                           0.2
+                           0.8)))
+                   (list)
+                   (lambda (lomp) ;dynamic value for energy
+                     (let
+                         ([mp-size (att-value 'value-of lomp 'size)]
+;                        [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))]
+                          )
+;                     (if (eq? deployed-kind Cubieboard)
+                       (* 10 (log mp-size))
+;                         (* 2 mp-size))
+                       )))
                   rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
                   'dynamic-mode-1b))
                 (create-ast-list (list)) ;AddReqComps
@@ -629,7 +650,7 @@
          [former-deployed (ast-child 'deployedon former-impl)]
          [new-index (+ (mod former-index num-impls) 1)]
          [new-impl (ast-sibling new-index former-impl)]
-         [first-new-mode (car (ast-children (ast-child 'Mode* (ast-child 'Contract new-impl))))])
+         [first-new-mode (car (ast-children (ast-child 'Mode* new-impl)))])
       (rewrite-terminal 'deployedon former-impl #f)
       (rewrite-terminal 'selectedmode former-impl #f)
       (rewrite-terminal 'selectedimpl comp new-impl)
