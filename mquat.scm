@@ -27,7 +27,7 @@
    (ast-rule 'ResourceType->name)
    ; type is a ResourceType
    (ast-rule 'Resource->name-type-Resource*<SubResources-ProvClause*)
-   (ast-rule 'Request->MetaParameter*-ReqClause*<Constraints-objective)
+   (ast-rule 'Request->MetaParameter*-target-ReqClause*<Constraints-objective)
    (ast-rule 'MetaParameter->name-value)
    ; kind=static|runtime|derived. direction=decreasing|increasing. agg = sum|max
    (ast-rule 'Property->name-unit-kind-direction-agg)
@@ -112,21 +112,18 @@
                            ((memq (car set2) set1) (U (cdr set2)))
                            (else (cons (car set2) (U (cdr set2))))))])
          (U set2))))
-  
+   
    (ag-rule
     objective-value
     (Root ; sum of objective value of all software components (skipping SWRoot)
      (lambda (n)
        (fold-left
-        ; call the same attribute on all childs
         (lambda (totalValue comp) (+ totalValue (att-value 'objective-value comp)))
         0 (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
-    (Comp ; sum of objective value of selected impl and all objective value of required components
+    (Comp ; objective value of selected impl
      (lambda (n)
-       (fold-left (lambda (totalValue reqComp) (+ totalValue (att-value 'objective-value reqComp)))
-                  (att-value 'objective-value (ast-child 'selectedimpl n))
-                  (ast-children (ast-child 'ReqComps n)))))
-    (Impl ; call the same attribute on the mode to use
+       (att-value 'objective-value (ast-child 'selectedimpl n))))
+    (Impl ; objective value of the mode to use
      (lambda (n)
        (att-value 'objective-value (att-value 'mode-to-use n))))
     (Mode ; find and evaluate the energy-consumption provClause
@@ -140,11 +137,9 @@
        (fold-left (lambda (result comp) (and result (att-value 'clauses-met? comp)))
                   (att-value 'objective-value (ast-child 'Request n))
                   (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
-    (Comp ; clauses-met for selected impl and for all required components?
+    (Comp ; clauses-met for the selected impl
      (lambda (n)
-       (fold-left (lambda (result reqComp) (and result (att-value 'clauses-met? reqComp)))
-                  (att-value 'clauses-met? (ast-child 'selectedimpl n))
-                  (ast-children (ast-child 'ReqComps n)))))
+       (att-value 'clauses-met? (ast-child 'selectedimpl n))))
     (Impl ; clauses-met for mode to use?
      (lambda (n)
        (att-value 'clauses-met? (att-value 'mode-to-use n))))
@@ -318,15 +313,17 @@
                         (append (att-value 'to-ilp impl) (cdr result))))
                      (list (list "=" "1") (list))
                      (ast-children (ast-child 'Impl* n)))])
-         (if (att-value 'is-toplevel? n) result (cdr result)))))
+         (if (att-value 'request-target? n) result (cdr result)))))
     (Impl
      (lambda (n)
        (debug "Impl:" (ast-child 'name n))
        (cons
         (fold-left ; deploy the same mode only on one pe
-         (lambda (result pe) (cons* "+" (append (map (lambda (mode) (att-value 'ilp-varname-deployed mode pe))
-                                                     (ast-children (ast-child 'Mode* n)))
-                                                result)))
+         (lambda (result pe)
+           (append (fold-left (lambda (inner mode) (cons* "+" (att-value 'ilp-varname-deployed mode pe) inner))
+                              (list)
+                              (ast-children (ast-child 'Mode* n)))
+                   result))
          (list "-" (att-value 'ilp-varname n) "=" 0)
          (att-value 'every-pe n))
         (fold-left
@@ -352,22 +349,20 @@
         (list)
         (ast-children (ast-child 'ProvClause* n))))))
    
+   (ag-rule request-target? (Comp (lambda (n) (eq? (ast-child 'target (att-value 'get-request n)) n))))
+   (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val))))) ;TODO check if space need between +/- and value
+   
    (ag-rule
     ilp-objective
     (Root
      (lambda (n)
        (fold-left
         (lambda (result mode)
-          (cons* "+" (att-value 'ilp-objective mode) (att-value 'ilp-varname mode) result))
+          (cons* (prepend-sign (att-value 'ilp-objective mode)) (att-value 'ilp-varname mode) result))
         (list)
         (att-value 'every-mode n))))
     (Mode (lambda (n) (att-value 'actual-value (att-value 'provided-clause n pn-energy)))))
    
-   ;(ag-rule reqComps (Comp (lambda (n) (ast-children (ast-child 'ReqComps n)))))
-   (ag-rule is-toplevel? (Comp (lambda (n) (ast-subtype? (ast-parent (ast-parent n)) 'SWRoot))))
-
-   (ag-rule reqCompsMap (Comp (lambda (n) (ast-children (ast-child 'ReqComps n))))) ;TODO
-
    ; Creates a list of NFP-negotiation constraints
    (ag-rule
     ilp-nego
@@ -397,9 +392,9 @@
             [name (att-value 'ilp-varname n)]
             [comp (and found (ast-child 'comp found))])
          (cond ; Did not work with 'case' :|
-           ((eq? comp comp-eq) (list (list "+" value name) (list) (list))) ; eq = 1st
-           ((eq? comp comp-min-eq) (list (list) (list "+" value name) (list))) ; min-eq = 2nd
-           ((eq? comp comp-max-eq) (list (list) (list) (list "+" value name))) ; max-eq = 3rd
+           ((eq? comp comp-eq) (list (list (prepend-sign value) name) (list) (list))) ; eq = 1st
+           ((eq? comp comp-min-eq) (list (list) (list (prepend-sign value) name) (list))) ; min-eq = 2nd
+           ((eq? comp comp-max-eq) (list (list) (list) (list (prepend-sign value) name))) ; max-eq = 3rd
            (else (list (list) (list) (list)))))))) ; not found = three empty lists
    
    (define (assq-values loe)
@@ -569,7 +564,7 @@
            (create-ast-list (list part-impl2a)) ;Impl*
            part-impl2a ;selectedimpl of Depth2-Component
            ))]
-        [sample-impl1a
+        [c1-impl1a
          (let
              [(mode1a (make-simple-mode
                      (lambda (lomp) 0.5) ;always return 0.5 for prop-load
@@ -586,7 +581,7 @@
                   (list comp2) ;reqcomps
                   cubie1 ;deployedon
                   mode1a)))] ;selectedmode
-        [sample-impl1b
+        [c1-impl1b
          (create-ast
           'Impl ; impl-1b is not deployed, default selected mode
           (list 'The-Sample-Impl1b
@@ -594,32 +589,39 @@
                  (list
                   (make-simple-mode
                    (lambda (lomp) ;dynamic value for prop-load
-                     (let
-                         ([mp-size (att-value 'value-of lomp 'size)])
-                       (if (>= mp-size 100)
-                           0.2
-                           0.8)))
+                     (let ([mp-size (att-value 'value-of lomp 'size)])
+                       (if (>= mp-size 100) 0.2 0.8)))
                    (list)
                    (lambda (lomp) ;dynamic value for energy
-                     (let
-                         ([mp-size (att-value 'value-of lomp 'size)]
-;                        [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))]
-                          )
-;                     (if (eq? deployed-kind Cubieboard)
-                       (* 10 (log mp-size))
-;                         (* 2 mp-size))
-                       ))
+                     (let ([mp-size (att-value 'value-of lomp 'size)])
+;                           [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))])
+;                       (if (eq? deployed-kind Cubieboard)
+                       (* 10 (log mp-size))))
+;                         (* 2 mp-size))))
                    rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
                    'dynamic-mode-1b)))
                 (list) ;reqcomps
                 #f #f))] ;deployedon + selectedmode
+        [c1-impl1c
+         (create-ast
+          'Impl
+          (list 'Useless-Impl1c
+                (create-ast-list
+                 (list
+                  (make-simple-mode
+                   (lambda (lomp) 0) ;propload
+                   (list (create-ast 'ReqClause (list rt-C2 comp-max-eq (lambda (lomp) -1) comp2)))
+                   (lambda (lomp) 100) ;energy
+                   rt-C1 (lambda (lomp) 0.2) ;response-time
+                   'default-mode-1c)))
+                (list comp2) #f #f))]
         [comp1
          (create-ast
           'Comp
           (list
            'Example-Component ;name of Comp
-           (create-ast-list (list sample-impl1a sample-impl1b)) ;Impl*
-           sample-impl1a ;selectedimpl of Example-Component
+           (create-ast-list (list c1-impl1a c1-impl1b c1-impl1c)) ;Impl*
+           c1-impl1a ;selectedimpl of Example-Component
            ))])
      (create-ast
       'Root
@@ -633,6 +635,7 @@
         'Request
         (list
          (create-ast-list (list (make-mp-size 50))) ;MetaParameter*
+         comp1
          (create-ast-list (list (create-ast 'ReqClause (list rt-C1 comp-max-eq (lambda (n) 0.3) comp1))))
          #f))))))) ;default objective
 
@@ -640,24 +643,29 @@
    
 (define (debug . args)
   (letrec
-      ([D
-        (lambda (loa) ; [l]ist [o]f [a]rgs
-          (cond
-            ((= (length loa) 0) "") ;no arguments given
-            ((null? (car loa)) "") ;end of recursion
-            (else ;recure with cdr
-             (let ([s (car loa)])
-               (string-append
-                (cond
-                  ((string? s) s)
-                  ((symbol? s) (symbol->string s))
-                  ((number? s) (number->string s))
-                  ((list? s) (string-append "(" (D s) ")"))
-                  ((procedure? s) "<proc>")
-                  ((ast-node? s) (if (ast-has-child? 'name s) (symbol->string (ast-child 'name s)) "<node>"))
-                  (else "?"))
-                (D (cdr loa)))))))])
+      ([D (lambda (loa) ; [l]ist [o]f [a]rgs
+            (cond
+              ((= (length loa) 0) "") ;no arguments given
+              ((null? (car loa)) "") ;end of recursion
+              (else ;recure with cdr
+               (let ([s (car loa)])
+                 (string-append
+                  (cond
+                    ((string? s) s)
+                    ((symbol? s) (symbol->string s))
+                    ((number? s) (number->string s))
+                    ((list? s) (string-append "(" (D s) ")"))
+                    ((procedure? s) "<proc>")
+                    ((ast-node? s) (if (ast-has-child? 'name s) (symbol->string (ast-child 'name s)) "<node>"))
+                    (else "?")) " "
+                  (D (cdr loa)))))))])
     (when debugging (display (D args)) (display "\n"))))
+
+(define (print . args)
+  (let* ([old-d debugging])
+    (set! debugging #t)
+    (debug args)
+    (set! debugging old-d)))
 
 (define comp1 (ast-child 1 (ast-child 'Comp* (ast-child 'SWRoot ast))))
 (define impl1a (ast-child 1 (ast-child 'Impl* comp1)))
@@ -677,14 +685,13 @@
 
 (define use-next-impl
   (lambda (comp)
-    (let*
-        ([former-impl (ast-child 'selectedimpl comp)]
-         [former-index (ast-child-index former-impl)]
-         [num-impls (ast-num-children (ast-child 'Impl* comp))]
-         [former-deployed (ast-child 'deployedon former-impl)]
-         [new-index (+ (mod former-index num-impls) 1)]
-         [new-impl (ast-sibling new-index former-impl)]
-         [first-new-mode (car (ast-children (ast-child 'Mode* new-impl)))])
+    (let* ([former-impl (ast-child 'selectedimpl comp)]
+           [former-index (ast-child-index former-impl)]
+           [num-impls (ast-num-children (ast-child 'Impl* comp))]
+           [former-deployed (ast-child 'deployedon former-impl)]
+           [new-index (+ (mod former-index num-impls) 1)]
+           [new-impl (ast-sibling new-index former-impl)]
+           [first-new-mode (car (ast-children (ast-child 'Mode* new-impl)))])
       (rewrite-terminal 'deployedon former-impl #f)
       (rewrite-terminal 'selectedmode former-impl #f)
       (rewrite-terminal 'selectedimpl comp new-impl)
@@ -700,131 +707,89 @@
   (print-ast node printer (current-output-port)))
 
 (define display-ast (lambda () (display-part ast)))
-
-(define comp->string
-  (lambda (comp)
-    (let ([entry (assq comp comp-names)])
-      (if entry (cadr entry) '?~))))
-
-(define comp->rev-string
-  (lambda (comp)
-    (let ([entry (assq comp rev-comp-names)])
-      (if entry (cadr entry) '?~))))
+(define comp->string (lambda (comp) (let ([entry (assq comp comp-names)]) (if entry (cadr entry) '?~))))
+(define comp->rev-string (lambda (comp) (let ([entry (assq comp rev-comp-names)]) (if entry (cadr entry) '?~))))
 
 (define clauses-to-list
   (lambda (loc)
     (fold-left
      (lambda (result clause)
-       (let
-           ([returnType (ast-child 'name (ast-child 'returntype clause))]
-            [evalValue (att-value 'eval clause)]
-            [compName (comp->string (ast-child 'comp clause))])
+       (let ([returnType (ast-child 'name (ast-child 'returntype clause))]
+             [evalValue (att-value 'eval clause)]
+             [compName (comp->string (ast-child 'comp clause))])
          (cons
-          (if (ast-subtype? clause 'ProvClause)
-              (list returnType compName evalValue)
-              (list
-               returnType
-               'on
-               (ast-child 'name (ast-child 'target clause))
-               evalValue
-               compName
-               (att-value 'actual-value clause)))
+          (if (ast-subtype? clause 'ProvClause) (list returnType compName evalValue)
+              (list returnType 'on (ast-child 'name (ast-child 'target clause))
+                    evalValue compName (att-value 'actual-value clause)))
           result)))
      (list) loc)))
 
 ; [Debugging] returns a list of the components, implementations and modes
 ; Form: (compI ((implI1 deployedon-I1 (mode-to-use-I1 ((propName min|max actual-value) ... ))) ...) ...)
-(define cim
+(define (cim)
   (letrec
-      ([C
-        (lambda (comp)
-          (list
-           (ast-child 'name comp)
-           (I (ast-children (ast-child 'Impl* comp)))
-           (fold-left
-            (lambda (result reqComp)
-              (cons (C reqComp) result))
-            (list)
-            (ast-children (ast-child 'ReqComps comp)))))]
-       [M
-        (lambda (mode)
-          (list
-           (ast-child 'name mode)
-           (clauses-to-list
-            (ast-children (ast-child 'Clause* mode)))))]
-       [I
-        (lambda (loi) ; [l]ist [o]f [i]mpls
-          (if (null? loi)
-              (list)
-              (let*
-                  ([impl (car loi)]
-                   [name (ast-child 'name impl)])
-                (cons
-                 (list
-                  (if (att-value 'is-selected? (car loi))
-                      (string-append "*" (symbol->string name))
-                      name)
-                  (if (att-value 'is-deployed? impl)
-                      (ast-child 'name (ast-child 'deployedon impl))
-                      #f)
-                  (if (att-value 'is-selected? impl)
-                      (M (att-value 'mode-to-use impl))
-                      #f))
-                 (I (cdr loi))))))])
-    (lambda ()
-      (fold-left
-       (lambda (result comp) (cons (C comp) result))
-       (list)
-       (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast)))))))
+      ([C (lambda (comp)
+            (list (ast-child 'name comp) (I (ast-children (ast-child 'Impl* comp)))))]
+       [M (lambda (mode)
+            (list
+             (ast-child 'name mode)
+             (clauses-to-list (ast-children (ast-child 'Clause* mode)))))]
+       [I (lambda (loi) ; [l]ist [o]f [i]mpls
+            (if (null? loi) (list)
+                (let* ([impl (car loi)]
+                       [name (ast-child 'name impl)])
+                  (cons
+                   (list
+                    (map (lambda (c) (ast-child 'name c)) (ast-child 'reqcomps impl))
+                    (if (att-value 'is-selected? impl) (string-append "*" (symbol->string name)) name)
+                    (if (att-value 'is-deployed? impl) (ast-child 'name (ast-child 'deployedon impl)) #f)
+                    (if (att-value 'is-selected? impl) (M (att-value 'mode-to-use impl)) #f))
+                   (I (cdr loi))))))])
+    (fold-left
+     (lambda (result comp) (cons (C comp) result))
+     (list)
+     (ast-children (ast-child 'Comp* (ast-child 'SWRoot ast))))))
 
 ; [Debugging] Returns a list of hardware resources along with their provided properties
 ; Form: (res1-type res1-name ((provClause1a-name -comp->string -actualValue) ... (res1-subresources ... )) ... )
-(define hw
-  (lambda ()
-    (letrec
-        ([R
-          (lambda (lor) ; [l]ist [o]f [r]esources
-            (if (null? lor)
-                (list)
-                (let
-                    ([subs (R (ast-children (ast-child 'SubResources (car lor))))]
-                     [rest (R (cdr lor))])
+(define (hw)
+  (letrec
+      ([R (lambda (lor) ; [l]ist [o]f [r]esources
+            (if (null? lor) (list)
+                (let ([subs (R (ast-children (ast-child 'SubResources (car lor))))]
+                      [rest (R (cdr lor))])
                   (cons
                    (list
                     (ast-child 'name (ast-child 'type (car lor))) ; resource type name
                     (ast-child 'name (car lor)) ; resource name
-                    (clauses-to-list
-                     (ast-children (ast-child 'ProvClause* (car lor))))) ; list of clauses
-                   (if (null? subs)
-                       rest
-                       (cons subs rest))))))])
-      (R (ast-children (ast-child 'Resource* (ast-child 'HWRoot ast)))))))
+                    (clauses-to-list (ast-children (ast-child 'ProvClause* (car lor))))) ; list of clauses
+                   (if (null? subs) rest (cons subs rest))))))])
+    (R (ast-children (ast-child 'Resource* (ast-child 'HWRoot ast))))))
 
 ; [Debugging] Returns a list of the request
 ; Form: (((metaparam1-name -value) ... ) ((constraint1-name -comp->string -requiredValue) ... ) objective)
-(define req
-  (lambda ()
-    (letrec
-        ([r (att-value 'get-request ast)]
-         [MP
-          (lambda (lomp) ; [l]ist [o]f [m]eta[p]arameter
-            (if (null? lomp)
-                (list)
-                (cons
-                 (list
-                  (ast-child 'name (car lomp))
-                  (ast-child 'value (car lomp)))
-                 (MP (cdr lomp)))))])
+(define (req)
+  (letrec
+      ([MP
+        (lambda (lomp) ; [l]ist [o]f [m]eta[p]arameter
+          (if (null? lomp) (list)
+              (cons
+               (list
+                (ast-child 'name (car lomp))
+                (ast-child 'value (car lomp)))
+               (MP (cdr lomp)))))])
+    (let* ([r (att-value 'get-request ast)]
+           [o (ast-child 'objective r)])
       (list
        (MP (ast-children (ast-child 'MetaParameter* r))) ; metaparams
        (clauses-to-list (ast-children (ast-child 'Constraints r))) ; constraints
-       (ast-child 'name (ast-child 'objective r)))))) ; objective
+       (if o (ast-child 'name o) "default"))))) ; objective
 
 ;; Shortcuts
 
-(define clauses-met? (lambda () (att-value 'clauses-met? ast)))
-(define obj (lambda () (att-value 'objective-value ast)))
-(define comp1-next-impl (lambda () (use-next-impl comp1)))
+(define (clauses-met?) (att-value 'clauses-met? ast))
+(define (obj) (att-value 'objective-value ast))
+(define (comp1-next-impl) (use-next-impl comp1))
 
 ;; Text save
 (define (print-per-line x nl)
