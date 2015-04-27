@@ -233,7 +233,8 @@
        (fold-left
         (lambda (result c)
           (cons (list
-                 (ast-child 'name (ast-child 'returntype c))
+                 (string-append " req" (number->string (ast-child-index c)) ":")
+                 (att-value 'ilp-varname (ast-child 'returntype c))
                  (comp->rev-string (ast-child 'comp c))
                  (att-value 'eval c))
                 result))
@@ -321,7 +322,7 @@
        (let*
            ([pname (att-value 'ilp-varname n)]
             [append-if-constrained (lambda (comp loc) (debug loc) (if (null? loc) (list) (append loc (list "-" pname comp 0))))])
-         (map append-if-constrained (assq-values rev-comp-names) ; add "-" property name, ("=", ">=" or "<=" resp.) and "0"
+         (map append-if-constrained (assq-values comp-names) ; add "-" property name, ("=", ">=" or "<=" resp.) and "0"
               (fold-left
                (lambda (result mode) (merge-list (att-value 'ilp-nego mode n) result))
                (list (list) (list) (list))
@@ -790,5 +791,5 @@
   (with-output-to-file path
     (lambda () (for-each (lambda (x) (print-per-line x #t)) values) (newline))))
 
-(define (save-ilp path)
-  (save-to-file path (att-value 'to-ilp ast)))
+(define (save-ilp path) (save-to-file path (att-value 'to-ilp ast)))
+(define (make) (save-ilp "gen/ilp.txt"))
