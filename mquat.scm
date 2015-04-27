@@ -4,7 +4,7 @@
 
 (define spec (create-specification))
 
-(define debugging #f)
+(define debugging #t)
 (define comp-names (list)) (define rev-comp-names (list))
 (define pn-energy 'energy-consumption) ; Property-Name of energy-consumption used for all properties and the default objective function
 
@@ -48,6 +48,8 @@
           (list comp-min-eq '>=)    ; forumla <= property
           (list comp-max-eq '<=)))  ; forumla >= property
    
+   (define agg-max 1) (define agg-sum 2)
+   
    (compile-ast-specifications 'Root)
    
    ;; AG rules
@@ -55,12 +57,16 @@
     req-comp-map
     (Comp ; { (requiredComponent { impl-requiring-this-component ... }) ... }
      (lambda (n)
+       (debug "c: " (ast-child 'name n))
        (fold-left
-        (lambda (result impl)
-          (fold-left (lambda (result req) (add-to-al result req impl))
-                     (list)
-                     (att-value 'req-comp-map impl)))
-        (list) (ast-children (ast-child 'Impl*))))))
+        (lambda (result-for-comp impl)
+          (debug "out: impl=" (ast-child 'name impl) ",result=" result-for-comp)
+          (fold-left (lambda (result-for-impl req) (debug "inner: impl=" (ast-child 'name impl) ",req=" (ast-child 'name req)) (add-to-al result-for-impl req impl))
+                     result-for-comp (att-value 'req-comp-map impl))) ;fold over reqs of impl
+        (list) (ast-children (ast-child 'Impl* n))))) ;fold over impls
+    (Impl
+     (lambda (n)
+       (ast-child 'reqcomps n))))
    
    ; Either add val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
    (define add-to-al
@@ -73,6 +79,40 @@
                  (cons (list key (cons val (cadr entry))) (cdr al)) ; add to entry and return
                  (cons entry (add-to-al (cdr al) key val))))))) ; recur
    
+   (ag-rule
+    req-comp-min
+    (Comp
+     (lambda (n)
+       (fold-left
+        (lambda (result impl) (intersect-b #f result (ast-child 'reqcomps impl)))
+        #f (ast-children (ast-child 'Impl* n))))))
+   
+   (define intersect-b
+     (lambda (start set1 set2)
+       (debug "set1=" set1 ",set2=" set2)
+       (letrec([I (lambda (set2)
+                    (cond ((null? set2) set2)
+                          ((memq (car set2) set1) (cons (car set2) (I (cdr set2))))
+                          (else (I (cdr set2)))))])
+         (if (eq? start set1) set2 (I set2)))))
+    
+   (ag-rule
+    req-comp-all
+    (Comp
+     (lambda (n)
+       (fold-left
+        (lambda (result impl)
+          (union result (ast-child 'reqcomps impl)))
+        (list) (ast-children (ast-child 'Impl* n))))))
+   
+   (define union
+     (lambda (set1 set2)
+       (letrec ([U (lambda (set2)
+                     (cond ((null? set2) set1)
+                           ((memq (car set2) set1) (U (cdr set2)))
+                           (else (cons (car set2) (U (cdr set2))))))])
+         (U set2))))
+  
    (ag-rule
     objective-value
     (Root ; sum of objective value of all software components (skipping SWRoot)
@@ -297,7 +337,7 @@
                   (ast-children (ast-child 'Impl* reqC)))
                  (append (att-value 'to-ilp reqC) result)))
          (list)
-         (att-value 'reqComps n)))))
+         (ast-child 'reqcomps n)))))
     (HWRoot
      (lambda (n)
        (fold-left
@@ -323,7 +363,7 @@
         (att-value 'every-mode n))))
     (Mode (lambda (n) (att-value 'actual-value (att-value 'provided-clause n pn-energy)))))
    
-   (ag-rule reqComps (Comp (lambda (n) (ast-children (ast-child 'ReqComps n)))))
+   ;(ag-rule reqComps (Comp (lambda (n) (ast-children (ast-child 'ReqComps n)))))
    (ag-rule is-toplevel? (Comp (lambda (n) (ast-subtype? (ast-parent (ast-parent n)) 'SWRoot))))
 
    (ag-rule reqCompsMap (Comp (lambda (n) (ast-children (ast-child 'ReqComps n))))) ;TODO
@@ -455,10 +495,7 @@
      (lambda (n what)
        (fold-left
         (lambda (result impl) (append (att-value 'sw* impl what) result))
-        (fold-left
-          (lambda (result reqC) (append (att-value 'sw* reqC what) result))
-          (list)
-          (ast-children (ast-child 'ReqComps n)))
+        (list)
         (ast-children (ast-child 'Impl* n)))))
     (Impl
      (lambda (n what)
@@ -466,39 +503,17 @@
          [(0) (ast-children (ast-child 'Mode* n))]
          [(1) (list n)]))))
 
-
-   ;; Misc functions
-   
-   (define (debug . args)
-     (letrec
-         ([D
-           (lambda (loa) ; [l]ist [o]f [a]rgs
-             (cond
-               ((= (length loa) 0) "\n") ;no arguments given
-               ((null? (car loa)) "\n") ;end of recursion
-               (else ;recure with cdr
-                (let ([s (car loa)])
-                  (string-append
-                   (cond
-                     ((string? s) s)
-                     ((symbol? s) (symbol->string s))
-                     ((number? s) (number->string s))
-                     ((list? s) (string-append "(" (D s) ")"))
-                     ((procedure? s) "proc")
-                     (else "?"))
-                   (D (cdr loa)))))))])
-       (when debugging (display (D args)))))
-   
    (compile-ag-specifications)
    
    ;; Concrete AST
    (let*
        ([make-simple-prop ; kind=runtime, direction=decreasing
-         (lambda (name unit) (create-ast 'Property (list name unit 'runtime 'decreasing)))]
-        [load (make-simple-prop 'server-load '%)]
-        [energy (make-simple-prop pn-energy 'Joule)]
-        [rt-C1 (make-simple-prop 'response-time-C1 'ms)]
-        [rt-C2 (make-simple-prop 'response-time-C2 'ms)]
+         (lambda (name unit agg) (create-ast 'Property (list name unit 'runtime 'decreasing agg)))]
+        [load (make-simple-prop 'server-load '% agg-sum)]
+        [freq (make-simple-prop 'cpu-frequency 'Mhz agg-max)] ; TODO add some clauses referencing this
+        [energy (make-simple-prop pn-energy 'Joule agg-sum)]
+        [rt-C1 (make-simple-prop 'response-time-C1 'ms agg-sum)]
+        [rt-C2 (make-simple-prop 'response-time-C2 'ms agg-sum)]
         [Cubieboard (create-ast 'ResourceType (list 'Cubieboard))]
         [make-cubie
          (lambda (name f-load)
@@ -543,7 +558,7 @@
                 'dynamic-mode-2a))] ;name of Mode
            (create-ast
             'Impl (list 'Part-Impl2a (create-ast-list (list mode2a))
-                        (create-ast-list (list)) ;AddReqComps
+                        (list) ;reqcomps
                         cubie1 ;deployedon
                         mode2a)))] ;selectedmode
         [comp2
@@ -552,7 +567,6 @@
           (list
            'Depth2-Component
            (create-ast-list (list part-impl2a)) ;Impl*
-           (create-ast-list (list)) ;ReqComps
            part-impl2a ;selectedimpl of Depth2-Component
            ))]
         [sample-impl1a
@@ -569,7 +583,7 @@
            (create-ast
             'Impl
             (list 'Sample-Impl1a (create-ast-list (list mode1a))
-                  (create-ast-list (list)) ;AddReqComps
+                  (list comp2) ;reqcomps
                   cubie1 ;deployedon
                   mode1a)))] ;selectedmode
         [sample-impl1b
@@ -594,18 +608,17 @@
 ;                     (if (eq? deployed-kind Cubieboard)
                        (* 10 (log mp-size))
 ;                         (* 2 mp-size))
-                       )))
-                  rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
-                  'dynamic-mode-1b))
-                (create-ast-list (list)) ;AddReqComps
-                #f #f))]
+                       ))
+                   rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
+                   'dynamic-mode-1b)))
+                (list) ;reqcomps
+                #f #f))] ;deployedon + selectedmode
         [comp1
          (create-ast
           'Comp
           (list
            'Example-Component ;name of Comp
            (create-ast-list (list sample-impl1a sample-impl1b)) ;Impl*
-           (create-ast-list (list comp2)) ;ReqComps
            sample-impl1a ;selectedimpl of Example-Component
            ))])
      (create-ast
@@ -614,7 +627,7 @@
        (create-ast 'HWRoot (list
                             (create-ast-list (list Cubieboard))
                             (create-ast-list (list cubie1 cubie2))))
-       (create-ast 'SWRoot (list (create-ast-list (list comp1))))
+       (create-ast 'SWRoot (list (create-ast-list (list comp1 comp2))))
        (create-ast-list (list load energy rt-C1 rt-C2)) ;Property*
        (create-ast
         'Request
@@ -624,11 +637,32 @@
          #f))))))) ;default objective
 
 ;;; Misc and UI ;;;
+   
+(define (debug . args)
+  (letrec
+      ([D
+        (lambda (loa) ; [l]ist [o]f [a]rgs
+          (cond
+            ((= (length loa) 0) "") ;no arguments given
+            ((null? (car loa)) "") ;end of recursion
+            (else ;recure with cdr
+             (let ([s (car loa)])
+               (string-append
+                (cond
+                  ((string? s) s)
+                  ((symbol? s) (symbol->string s))
+                  ((number? s) (number->string s))
+                  ((list? s) (string-append "(" (D s) ")"))
+                  ((procedure? s) "<proc>")
+                  ((ast-node? s) (if (ast-has-child? 'name s) (symbol->string (ast-child 'name s)) "<node>"))
+                  (else "?"))
+                (D (cdr loa)))))))])
+    (when debugging (display (D args)) (display "\n"))))
 
 (define comp1 (ast-child 1 (ast-child 'Comp* (ast-child 'SWRoot ast))))
 (define impl1a (ast-child 1 (ast-child 'Impl* comp1)))
 (define impl1b (ast-child 2 (ast-child 'Impl* comp1)))
-(define comp2 (ast-child 1 (ast-child 'ReqComps comp1)))
+(define comp2 (car (ast-child 'reqcomps impl1a)))
 (define impl2a (ast-child 1 (ast-child 'Impl* comp2)))
 (define cb1 (ast-child 1 (ast-child 'Resource* (ast-child 'HWRoot ast))))
 (define cb2 (ast-child 2 (ast-child 'Resource* (ast-child 'HWRoot ast))))
