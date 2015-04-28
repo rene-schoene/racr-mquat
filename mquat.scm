@@ -366,7 +366,7 @@
         (att-value 'every-mode n))))
     (Mode (lambda (n) (att-value 'actual-value (att-value 'provided-clause n pn-energy)))))
    
-   ; Creates a list of NFP-negotiation constraints
+   ; Creates a list of NFP-negotiation constraints ;TODO-wip: old impl. use new nego-sw and nego-hw
    (ag-rule
     ilp-nego
     (Root
@@ -409,46 +409,72 @@
    (ag-rule
     ilp-nego-sw
     (Comp
-     (lambda (n prop)
+     (lambda (n)
        (fold-left ; fold over req-comp-map
         (lambda (result entry)
           (append
-           (fold-left ; fold over Impl* results in "left-hand-side"
-            (lambda (constraint impl)
-              (cons* (prepend-neg-sign (att-value 'eval-unsafe (att-value 'get-provided-clause impl prop)))
-                     (att-value 'ilp-varname impl) constraint))
-            ("0" ">=") ; always ">=" ?
-            (ast-children (ast-child 'Impl* n)))
-           
-           )))
+           (let ([provs (att-value 'ilp-nego-reqc (car entry) 'ProvClause comp-eq)]
+                 [max-reqs (att-value 'ilp-nego-reqc n 'ReqClause comp-max-eq)]
+                 [min-reqs (att-value 'ilp-nego-reqc n 'ReqClause comp-min-eq)])
+             (fold-left
+              (lambda (constraints prov-entry)
+                (let ([max-req-entry (assq (car prov-entry) max-reqs)]
+                      [min-req-entry (assq (car prov-entry) min-reqs)])
+                  (append-if (and max-req-entry (make-constraint (car prov-entry) (cadr prov-entry) (cadr max-req-entry) comp-max-eq))
+                             (append-if (and min-req-entry (make-constraint (car prov-entry) (cadr prov-entry) (cadr min-req-entry) comp-min-eq))
+                                        constraints))))
+              (list)
+              provs))
+           result))
         (list)
-        (att-value 'req-comp-map n))))
+        (att-value 'req-comp-map n)))))
+   
+   (define (make-constraint name prov-entry req-entry comp)
+     (let* ([maximum (+ 1 (fold-left
+                          (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)) 1)]
+            [ f-prov (if (eq? comp comp-max-eq)
+                         (lambda (constraint val name)
+                           (cons* (prepend-sign (- val maximum)) name constraint)) ; prov for max: - (maximum - val) = val - maximum
+                         (lambda (constraint val name)
+                           (cons* (prepend-sign (- val)) name constraint)))] ; prov for other: -val
+            [ f-req (if (eq? comp comp-max-eq)
+                         (lambda (constraint val name)
+                           (cons* (prepend-sign (- maximum val)) name constraint)) ; req for max: (maximum - val)
+                         (lambda (constraint val name)
+                           (cons* (prepend-sign val) name constraint)))]) ; req for other: val
+       (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" name)
+       (append
+        (list "0 >=")
+        (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
+        (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry))))
+   
+   (define (append-if x y) (if x (append x y) y))
    
    (ag-rule
     ilp-nego-reqc
     (Comp ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause in each mode of each impl
-     (lambda (n)
+     (lambda (n clausetype comparator)
        (fold-left
         (lambda (result impl)
-          (merge-al result (att-value 'ilp-nego-reqc impl)))
+          (merge-al result (att-value 'ilp-nego-reqc impl clausetype comparator)))
         (list)
         (ast-children (ast-child 'Impl* n)))))
     (Impl ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause in each mode
-     (lambda (n)
+     (lambda (n clausetype comparator)
        (fold-left
         (lambda (result mode)
-          (merge-al result (att-value 'ilp-nego-reqc mode)))
+          (merge-al result (att-value 'ilp-nego-reqc mode clausetype comparator)))
         (list) (ast-children (ast-child 'Mode* n)))))
     (Mode ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause
-     (lambda (n)
+     (lambda (n clausetype comparator)
        (fold-left
         (lambda (result clause)
-          (if (ast-subtype? clause 'ProvClause)
+          (if (and (ast-subtype? clause clausetype) (eq? (ast-child 'comp clause) comparator))
               (add-to-al result (ast-child 'returntype clause) (list (att-value 'eval-unsafe clause) (att-value 'ilp-varname n)))
               result))
         (list) (ast-children (ast-child 'Clause* n))))))
    
-   (define (merge-al al1 al2) (fold-left (lambda (big-al entry) (add-to-al0 big-al (car entry) (cadr entry) append-d)) al1 al2))
+   (define (merge-al al1 al2) (fold-left (lambda (big-al entry) (add-to-al0 big-al (car entry) (cadr entry) append)) al1 al2))
    (define (append-d a b) (debug a) (debug b) (append a b))
    
    (ag-rule
