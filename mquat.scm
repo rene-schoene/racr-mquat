@@ -12,9 +12,9 @@
   (with-specification
    spec
    ;; AST rules
-   (ast-rule 'Root->HWRoot-SWRoot-Property*-Request)
+   (ast-rule 'Root->HWRoot-SWRoot-Request)
    (ast-rule 'SWRoot->Comp*)
-   (ast-rule 'Comp->name-Impl*-selectedimpl)
+   (ast-rule 'Comp->name-Impl*-selectedimpl-Property*)
    (ast-rule 'Impl->name-Mode*-reqcomps-deployedon-selectedmode)
    (ast-rule 'Mode->name-Clause*)
    ;value is a lambda expecting an AST-List-Node with MetaParameters, returning the value
@@ -24,12 +24,12 @@
    (ast-rule 'ReqClause:Clause->target)
    (ast-rule 'ProvClause:Clause->)
    (ast-rule 'HWRoot->ResourceType*-Resource*)
-   (ast-rule 'ResourceType->name)
+   (ast-rule 'ResourceType->name-Property*)
    ; type is a ResourceType
    (ast-rule 'Resource->name-type-Resource*<SubResources-ProvClause*)
    (ast-rule 'Request->MetaParameter*-target-ReqClause*<Constraints-objective)
    (ast-rule 'MetaParameter->name-value)
-   ; kind=static|runtime|derived. direction=decreasing|increasing. agg = sum|max
+   ; kind=static|runtime|derived. direction=decreasing|increasing. agg = sum|max.
    (ast-rule 'Property->name-unit-kind-direction-agg)
    
    (define comp-min-eq (lambda (req act) (<= req act)))
@@ -68,16 +68,18 @@
      (lambda (n)
        (ast-child 'reqcomps n))))
    
-   ; Either add val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
-   (define add-to-al
-     (lambda (al key val)
-       (if (null? al) (list (list key (list val))) ; make new entry
-           (let ([entry (car al)])
-             (debug entry)
-             (debug (cadr entry))
-             (if (eq? (car entry) key)
-                 (cons (list key (cons val (cadr entry))) (cdr al)) ; add to entry and return
-                 (cons entry (add-to-al (cdr al) key val))))))) ; recur
+   ; Either cons val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
+   (define (add-to-al al key val) (add-to-al0 al key val cons))
+
+   ; Either op val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
+   (define (add-to-al0 al key val op)
+     (if (null? al) (list (list key (op val (list)))) ; make new entry
+         (let ([entry (car al)])
+;           (debug entry)
+;           (debug (cadr entry))
+           (if (eq? (car entry) key)
+               (cons (list key (op val (cadr entry))) (cdr al)) ; add to entry and return
+               (cons entry (add-to-al0 (cdr al) key val op)))))) ; recur
    
    (ag-rule
     req-comp-min
@@ -351,6 +353,7 @@
    
    (ag-rule request-target? (Comp (lambda (n) (eq? (ast-child 'target (att-value 'get-request n)) n))))
    (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val))))) ;TODO check if space need between +/- and value
+   (define prepend-neg-sign (lambda (val) (if (> val 0) (- val) (string-append "+ " (number->string (- val)))))) ;TODO check if space need between +/- and value
    
    (ag-rule
     ilp-objective
@@ -372,7 +375,7 @@
                (fold-left
                 (lambda (result prop) (append (att-value 'ilp-nego prop) result))
                 (list)
-                (ast-children (ast-child 'Property* n))))))
+                (ast-children (ast-child 'Property* n)))))) ;TODO -- wip: implement ag-rule 'all-properties
     (Property
      (lambda (n)
        (let*
@@ -382,7 +385,7 @@
               (fold-left
                (lambda (result mode) (merge-list (att-value 'ilp-nego mode n) result))
                (list (list) (list) (list))
-               (att-value 'every-mode n))))))
+               (att-value 'every-mode n)))))) ;TODO: fold stepwise over components, impls, modes
     (Mode
      (lambda (n prop)
        (debug "ilp-nego:" (ast-child 'name n) ",prop:" (ast-child 'name prop))
@@ -399,13 +402,54 @@
    
    (define (assq-values loe)
      (if (null? loe) (list) (cons (cadar loe) (assq-values (cdr loe)))))
-   (define ilp-build-list
-     (lambda (prop var-list comp)
-       (if (null? var-list) (list)
-           (append (list (ast-child 'name prop) comp) var-list))))
    
    ; (merge-list ((eq1 eq2) (min1 min2) (max1 max2)) ((eqA) (minA) (maxA)) = ((eq1 eq2 eqA) (min1 min2 minA) (max1 max2 maxA))
    (define (merge-list loc1 loc2) (debug loc1) (debug loc2) (map append loc1 loc2)) ; [l]ist [o]f [c]onstraints
+   
+   (ag-rule
+    ilp-nego-sw
+    (Comp
+     (lambda (n prop)
+       (fold-left ; fold over req-comp-map
+        (lambda (result entry)
+          (append
+           (fold-left ; fold over Impl* results in "left-hand-side"
+            (lambda (constraint impl)
+              (cons* (prepend-neg-sign (att-value 'eval-unsafe (att-value 'get-provided-clause impl prop)))
+                     (att-value 'ilp-varname impl) constraint))
+            ("0" ">=") ; always ">=" ?
+            (ast-children (ast-child 'Impl* n)))
+           
+           )))
+        (list)
+        (att-value 'req-comp-map n))))
+   
+   (ag-rule
+    ilp-nego-reqc
+    (Comp ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause in each mode of each impl
+     (lambda (n)
+       (fold-left
+        (lambda (result impl)
+          (merge-al result (att-value 'ilp-nego-reqc impl)))
+        (list)
+        (ast-children (ast-child 'Impl* n)))))
+    (Impl ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause in each mode
+     (lambda (n)
+       (fold-left
+        (lambda (result mode)
+          (merge-al result (att-value 'ilp-nego-reqc mode)))
+        (list) (ast-children (ast-child 'Mode* n)))))
+    (Mode ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause
+     (lambda (n)
+       (fold-left
+        (lambda (result clause)
+          (if (ast-subtype? clause 'ProvClause)
+              (add-to-al result (ast-child 'returntype clause) (list (att-value 'eval-unsafe clause) (att-value 'ilp-varname n)))
+              result))
+        (list) (ast-children (ast-child 'Clause* n))))))
+   
+   (define (merge-al al1 al2) (fold-left (lambda (big-al entry) (add-to-al0 big-al (car entry) (cadr entry) append-d)) al1 al2))
+   (define (append-d a b) (debug a) (debug b) (append a b))
    
    (ag-rule
     ilp-binary-vars
@@ -430,7 +474,7 @@
    (ag-rule
     ilp-varname
     (Property (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
-    (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name n))))))
+    (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name n)))))) ;TODO prepend name of Comp
     (Mode (lambda (n) (ilp-conform-name
                        (string-append (att-value 'ilp-varname (att-value 'get-impl n))
                                       "#" (symbol->string (ast-child 'name n)))))))
@@ -506,10 +550,11 @@
          (lambda (name unit agg) (create-ast 'Property (list name unit 'runtime 'decreasing agg)))]
         [load (make-simple-prop 'server-load '% agg-sum)]
         [freq (make-simple-prop 'cpu-frequency 'Mhz agg-max)] ; TODO add some clauses referencing this
-        [energy (make-simple-prop pn-energy 'Joule agg-sum)]
+        [energy-c1 (make-simple-prop pn-energy 'Joule agg-sum)]
+        [energy-c2 (make-simple-prop pn-energy 'Joule agg-sum)]
         [rt-C1 (make-simple-prop 'response-time-C1 'ms agg-sum)]
         [rt-C2 (make-simple-prop 'response-time-C2 'ms agg-sum)]
-        [Cubieboard (create-ast 'ResourceType (list 'Cubieboard))]
+        [Cubieboard (create-ast 'ResourceType (list 'Cubieboard (create-ast-list (list load freq))))]
         [make-cubie
          (lambda (name f-load)
            (create-ast
@@ -521,18 +566,14 @@
         [cubie2 (make-cubie 'Cubie2 (lambda (lomp) 0.4))]
         [make-mp-size (lambda (value) (create-ast 'MetaParameter (list 'size value)))]
         [make-simple-mode
-         (lambda (req-f other-reqs prov-e-f rt prov-rt-f mode-name)
+         (lambda (req-f other-reqs c-energy prov-e-f rt prov-rt-f mode-name)
            (create-ast
-            'Mode
-            (list
-             mode-name
-             (create-ast-list ;Clause*
-              (append
-               other-reqs
-               (list
-                (create-ast 'ReqClause (list load comp-max-eq req-f Cubieboard))
-                (create-ast 'ProvClause (list energy comp-eq prov-e-f))
-                (create-ast 'ProvClause (list rt comp-eq prov-rt-f))))))))]
+            'Mode (list mode-name
+                        (create-ast-list ;Clause*
+                         (append other-reqs
+                                 (list (create-ast 'ReqClause (list load comp-max-eq req-f Cubieboard))
+                                       (create-ast 'ProvClause (list c-energy comp-eq prov-e-f))
+                                       (create-ast 'ProvClause (list rt comp-eq prov-rt-f))))))))]
         [part-impl2a
          (let
              [(mode2a
@@ -540,6 +581,7 @@
                 (lambda (lomp) ;static value of 0.5 for prop-load
                   0.5)
                 (list) ; other-reqs
+                energy-c2
                 (lambda (lomp) ;dynamic value for energy
                   (let
                       ([mp-size (att-value 'value-of lomp 'size)]
@@ -562,8 +604,7 @@
           (list
            'Depth2-Component
            (create-ast-list (list part-impl2a)) ;Impl*
-           part-impl2a ;selectedimpl of Depth2-Component
-           ))]
+           part-impl2a (create-ast-list (list rt-C2 energy-c2))))] ;selectedimpl and Property*
         [c1-impl1a
          (let
              [(mode1a (make-simple-mode
@@ -572,6 +613,7 @@
                       (create-ast
                        'ReqClause
                        (list rt-C2 comp-max-eq (lambda (lomp) (att-value 'value-of lomp 'size)) comp2)))
+                     energy-c1
                      (lambda (lomp) 20) ;always return 20 for energy
                      rt-C1 (lambda (lomp) 0.2) ;always return 0.2 for response-time
                      'static-mode-1a))] ;name of Mode
@@ -592,6 +634,7 @@
                      (let ([mp-size (att-value 'value-of lomp 'size)])
                        (if (>= mp-size 100) 0.2 0.8)))
                    (list)
+                   energy-c1
                    (lambda (lomp) ;dynamic value for energy
                      (let ([mp-size (att-value 'value-of lomp 'size)])
 ;                           [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))])
@@ -611,6 +654,7 @@
                   (make-simple-mode
                    (lambda (lomp) 0) ;propload
                    (list (create-ast 'ReqClause (list rt-C2 comp-max-eq (lambda (lomp) -1) comp2)))
+                   energy-c1
                    (lambda (lomp) 100) ;energy
                    rt-C1 (lambda (lomp) 0.2) ;response-time
                    'default-mode-1c)))
@@ -621,8 +665,7 @@
           (list
            'Example-Component ;name of Comp
            (create-ast-list (list c1-impl1a c1-impl1b c1-impl1c)) ;Impl*
-           c1-impl1a ;selectedimpl of Example-Component
-           ))])
+           c1-impl1a (create-ast-list (list rt-C1 energy-c1))))]) ;selectedimpl Property*
      (create-ast
       'Root
       (list
@@ -630,7 +673,6 @@
                             (create-ast-list (list Cubieboard))
                             (create-ast-list (list cubie1 cubie2))))
        (create-ast 'SWRoot (list (create-ast-list (list comp1 comp2))))
-       (create-ast-list (list load energy rt-C1 rt-C2)) ;Property*
        (create-ast
         'Request
         (list
@@ -670,6 +712,7 @@
 (define comp1 (ast-child 1 (ast-child 'Comp* (ast-child 'SWRoot ast))))
 (define impl1a (ast-child 1 (ast-child 'Impl* comp1)))
 (define impl1b (ast-child 2 (ast-child 'Impl* comp1)))
+(define impl1c (ast-child 3 (ast-child 'Impl* comp1)))
 (define comp2 (car (ast-child 'reqcomps impl1a)))
 (define impl2a (ast-child 1 (ast-child 'Impl* comp2)))
 (define cb1 (ast-child 1 (ast-child 'Resource* (ast-child 'HWRoot ast))))
