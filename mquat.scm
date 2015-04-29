@@ -5,7 +5,7 @@
 (define spec (create-specification))
 
 (define debugging #t)
-(define comp-names (list)) (define rev-comp-names (list))
+(define comp-names (list))
 (define pn-energy 'energy-consumption) ; Property-Name of energy-consumption used for all properties and the default objective function
 
 (define ast
@@ -17,7 +17,7 @@
    (ast-rule 'Comp->name-Impl*-selectedimpl-Property*)
    (ast-rule 'Impl->name-Mode*-reqcomps-deployedon-selectedmode)
    (ast-rule 'Mode->name-Clause*)
-   ;value is a lambda expecting an AST-List-Node with MetaParameters, returning the value
+   ;value is a lambda expecting two values, an AST-List-Node with MetaParameters and the target resource, returning the value
    ;comp is a lambda expecting two values, required and actual, returning #t or #f
    (ast-rule 'Clause->returntype-comp-value)
    ; target is either a Comp or a ResourceType
@@ -37,16 +37,14 @@
    (define comp-eq (lambda (req act) (= req act)))
    (define f-comp-max-diff-eq (lambda (diff) (lambda (req act) (<= (- req act) diff))))
    
+   ; 1st = op: property op forumla
+   ; 2nd = rev-op: formula rev-op property
+   ; 3rd = name as string
    (set! comp-names
          (list
-          (list comp-eq '=)         ; property =  forumla
-          (list comp-min-eq '<=)    ; property <= formula
-          (list comp-max-eq '>=)))  ; property >= formula
-   (set! rev-comp-names
-         (list
-          (list comp-eq '=)         ; forumla =  property
-          (list comp-min-eq '>=)    ; forumla <= property
-          (list comp-max-eq '<=)))  ; forumla >= property
+          (list comp-eq '= '= "=")
+          (list comp-min-eq '<= '>= "min")
+          (list comp-max-eq '>= '<= "max")))
    
    (define agg-max 1) (define agg-sum 2)
    
@@ -226,14 +224,15 @@
      (lambda (n)
        ; If inside a mode and impl of mode is selected, or outside of a mode ...
        (if (or (not (ast-subtype? (ast-parent (ast-parent n)) 'Mode)) (att-value 'is-selected? (att-value 'get-impl n)))
-           (att-value 'eval-unsafe n) ; ... apply value function with metaparams ...
+           ; ... apply value function with metaparams and deployed-on...
+           (att-value 'eval-on n (att-value 'deployedon (att-value 'get-impl n)))
            #f)))) ; ... else don't evaluate and return false
    
    (ag-rule
-    eval-unsafe
+    eval-on
     (Clause
-     (lambda (n)
-       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n))))))
+     (lambda (n target)
+       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n)) target))))
    
    ; Given a list-node n, search for a MetaParameter with the given name. If none found, return the default value
    (define get-val
@@ -400,8 +399,7 @@
            ((eq? comp comp-max-eq) (list (list) (list) (list (prepend-sign value) name))) ; max-eq = 3rd
            (else (list (list) (list) (list)))))))) ; not found = three empty lists
    
-   (define (assq-values loe)
-     (if (null? loe) (list) (cons (cadar loe) (assq-values (cdr loe)))))
+   (define (assq-values loe) (map cadar loe))
    
    ; (merge-list ((eq1 eq2) (min1 min2) (max1 max2)) ((eqA) (minA) (maxA)) = ((eq1 eq2 eqA) (min1 min2 minA) (max1 max2 maxA))
    (define (merge-list loc1 loc2) (debug loc1) (debug loc2) (map append loc1 loc2)) ; [l]ist [o]f [c]onstraints
@@ -416,35 +414,33 @@
            (let ([provs (att-value 'ilp-nego-reqc (car entry) 'ProvClause comp-eq)]
                  [max-reqs (att-value 'ilp-nego-reqc n 'ReqClause comp-max-eq)]
                  [min-reqs (att-value 'ilp-nego-reqc n 'ReqClause comp-min-eq)])
-             (fold-left
+             (fold-left ; fold over provisions
               (lambda (constraints prov-entry)
                 (let ([max-req-entry (assq (car prov-entry) max-reqs)]
                       [min-req-entry (assq (car prov-entry) min-reqs)])
                   (append-if (and max-req-entry (make-constraint (car prov-entry) (cadr prov-entry) (cadr max-req-entry) comp-max-eq))
                              (append-if (and min-req-entry (make-constraint (car prov-entry) (cadr prov-entry) (cadr min-req-entry) comp-min-eq))
                                         constraints))))
-              (list)
-              provs))
+              (list) provs))
            result))
-        (list)
-        (att-value 'req-comp-map n)))))
+        (list) (att-value 'req-comp-map n)))))
    
-   (define (make-constraint name prov-entry req-entry comp)
+   (define (make-constraint prov prov-entry req-entry comp)
      (let* ([maximum (+ 1 (fold-left
                           (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)) 1)]
-            [ f-prov (if (eq? comp comp-max-eq)
-                         (lambda (constraint val name)
-                           (cons* (prepend-sign (- val maximum)) name constraint)) ; prov for max: - (maximum - val) = val - maximum
-                         (lambda (constraint val name)
-                           (cons* (prepend-sign (- val)) name constraint)))] ; prov for other: -val
-            [ f-req (if (eq? comp comp-max-eq)
-                         (lambda (constraint val name)
-                           (cons* (prepend-sign (- maximum val)) name constraint)) ; req for max: (maximum - val)
-                         (lambda (constraint val name)
-                           (cons* (prepend-sign val) name constraint)))]) ; req for other: val
-       (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" name)
+            [f-prov (if (eq? comp comp-max-eq)
+                        (lambda (constraint val name)
+                          (cons* (prepend-sign (- val maximum)) name constraint)) ; prov for max: - (maximum - val) = val - maximum
+                        (lambda (constraint val name)
+                          (cons* (prepend-sign (- val)) name constraint)))] ; prov for other: -val
+            [f-req (if (eq? comp comp-max-eq)
+                       (lambda (constraint val name)
+                         (cons* (prepend-sign (- maximum val)) name constraint)) ; req for max: (maximum - val)
+                       (lambda (constraint val name)
+                         (cons* (prepend-sign val) name constraint)))]) ; req for other: val
+       (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
        (append
-        (list "0 >=")
+        (list (string-append (symbol->string (ast-child 'name prov)) "-" (comp->name comp) ": ") "0 >=")
         (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
         (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry))))
    
@@ -452,30 +448,39 @@
    
    (ag-rule
     ilp-nego-reqc
-    (Comp ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause in each mode of each impl
+    (Comp ; return a list of (prop ((prop-value deployed-mode-name) ... ))-pairs for each ProvClause in each mode of each impl
      (lambda (n clausetype comparator)
        (fold-left
         (lambda (result impl)
           (merge-al result (att-value 'ilp-nego-reqc impl clausetype comparator)))
         (list)
         (ast-children (ast-child 'Impl* n)))))
-    (Impl ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause in each mode
+    (Impl ; return a list of (prop ((prop-value deployed-mode-name) ... ))-pairs for each ProvClause in each mode
      (lambda (n clausetype comparator)
        (fold-left
         (lambda (result mode)
           (merge-al result (att-value 'ilp-nego-reqc mode clausetype comparator)))
         (list) (ast-children (ast-child 'Mode* n)))))
-    (Mode ; return a list of (prop ((prop-value impl-name) ... ))-pairs for each ProvClause
+    (Mode ; return a list of (prop ((prop-value deployed-mode-name) ... ))-pairs for each ProvClause
      (lambda (n clausetype comparator)
        (fold-left
         (lambda (result clause)
           (if (and (ast-subtype? clause clausetype) (eq? (ast-child 'comp clause) comparator))
-              (add-to-al result (ast-child 'returntype clause) (list (att-value 'eval-unsafe clause) (att-value 'ilp-varname n)))
+              (fold-left ; fold over pe
+               (lambda (inner pe)
+                 (add-to-al inner (ast-child 'returntype clause) (list (att-value 'eval-on clause pe) (att-value 'ilp-varname-deployed n pe))))
+               result (att-value 'every-pe n))
               result))
         (list) (ast-children (ast-child 'Clause* n))))))
    
    (define (merge-al al1 al2) (fold-left (lambda (big-al entry) (add-to-al0 big-al (car entry) (cadr entry) append)) al1 al2))
    (define (append-d a b) (debug a) (debug b) (append a b))
+   
+   (ag-rule ;TODO implement
+    ilp-nego-hw
+    (Comp
+     (lambda (n)
+       #f)))
    
    (ag-rule
     ilp-binary-vars
@@ -588,8 +593,8 @@
             (list name Cubieboard ;type
                   (create-ast-list (list)) ;Subresources
                   (create-ast-list (list (create-ast 'ProvClause (list load comp-eq f-load)))))))] ;ProvClause*
-        [cubie1 (make-cubie 'Cubie1 (lambda (lomp) 0.7))]
-        [cubie2 (make-cubie 'Cubie2 (lambda (lomp) 0.4))]
+        [cubie1 (make-cubie 'Cubie1 (lambda _ 0.7))]
+        [cubie2 (make-cubie 'Cubie2 (lambda _ 0.4))]
         [make-mp-size (lambda (value) (create-ast 'MetaParameter (list 'size value)))]
         [make-simple-mode
          (lambda (req-f other-reqs c-energy prov-e-f rt prov-rt-f mode-name)
@@ -604,20 +609,16 @@
          (let
              [(mode2a
                (make-simple-mode
-                (lambda (lomp) ;static value of 0.5 for prop-load
-                  0.5)
-                (list) ; other-reqs
+                (lambda _ 0.5) ;prop-load
+                (list) ;other-reqs
                 energy-c2
-                (lambda (lomp) ;dynamic value for energy
-                  (let
-                      ([mp-size (att-value 'value-of lomp 'size)]
-;                       [deployed-kind (ast-child 'type (ast-child 'deployedon impl2a))]
-                       )
-;                    (if (eq? deployed-kind Cubieboard)
+                (lambda (lomp target) ;dynamic value for energy
+                  (let ([mp-size (att-value 'value-of lomp 'size)]
+                        [deployed-kind (ast-child 'type target)])
+                    (if (eq? deployed-kind Cubieboard)
                         (* 3 (log mp-size))
-;                        (* 1.5 mp-size))
-                    ))
-                rt-C2 (lambda (lomp) 0.5) ;always return 0.5 for response-time
+                        (* 1.5 mp-size))))
+                rt-C2 (lambda _ 0.5) ;response-time
                 'dynamic-mode-2a))] ;name of Mode
            (create-ast
             'Impl (list 'Part-Impl2a (create-ast-list (list mode2a))
@@ -634,14 +635,14 @@
         [c1-impl1a
          (let
              [(mode1a (make-simple-mode
-                     (lambda (lomp) 0.5) ;always return 0.5 for prop-load
+                     (lambda _ 0.5) ;prop-load
                      (list
                       (create-ast
                        'ReqClause
-                       (list rt-C2 comp-max-eq (lambda (lomp) (att-value 'value-of lomp 'size)) comp2)))
+                       (list rt-C2 comp-max-eq (lambda (lomp target) (att-value 'value-of lomp 'size)) comp2)))
                      energy-c1
-                     (lambda (lomp) 20) ;always return 20 for energy
-                     rt-C1 (lambda (lomp) 0.2) ;always return 0.2 for response-time
+                     (lambda _ 20) ;energy
+                     rt-C1 (lambda _ 0.2) ;response-time
                      'static-mode-1a))] ;name of Mode
            (create-ast
             'Impl
@@ -656,18 +657,18 @@
                 (create-ast-list
                  (list
                   (make-simple-mode
-                   (lambda (lomp) ;dynamic value for prop-load
+                   (lambda (lomp target) ;prop-load
                      (let ([mp-size (att-value 'value-of lomp 'size)])
                        (if (>= mp-size 100) 0.2 0.8)))
                    (list)
                    energy-c1
-                   (lambda (lomp) ;dynamic value for energy
-                     (let ([mp-size (att-value 'value-of lomp 'size)])
-;                           [deployed-kind (ast-child 'type (ast-child 'deployedon impl1b))])
-;                       (if (eq? deployed-kind Cubieboard)
-                       (* 10 (log mp-size))))
-;                         (* 2 mp-size))))
-                   rt-C1 (lambda (lomp) 0.4) ;always return 0.4 for response-time
+                   (lambda (lomp target) ;energy
+                     (let ([mp-size (att-value 'value-of lomp 'size)]
+                           [deployed-kind (ast-child 'type target)])
+                       (if (eq? deployed-kind Cubieboard)
+                           (* 10 (log mp-size))
+                           (* 2 mp-size))))
+                   rt-C1 (lambda _ 0.4) ;response-time
                    'dynamic-mode-1b)))
                 (list) ;reqcomps
                 #f #f))] ;deployedon + selectedmode
@@ -678,11 +679,11 @@
                 (create-ast-list
                  (list
                   (make-simple-mode
-                   (lambda (lomp) 0) ;propload
-                   (list (create-ast 'ReqClause (list rt-C2 comp-max-eq (lambda (lomp) -1) comp2)))
+                   (lambda _ 0) ;propload
+                   (list (create-ast 'ReqClause (list rt-C2 comp-max-eq (lambda _ -1) comp2)))
                    energy-c1
-                   (lambda (lomp) 100) ;energy
-                   rt-C1 (lambda (lomp) 0.2) ;response-time
+                   (lambda _ 100) ;energy
+                   rt-C1 (lambda _ 0.2) ;response-time
                    'default-mode-1c)))
                 (list comp2) #f #f))]
         [comp1
@@ -704,7 +705,7 @@
         (list
          (create-ast-list (list (make-mp-size 50))) ;MetaParameter*
          comp1
-         (create-ast-list (list (create-ast 'ReqClause (list rt-C1 comp-max-eq (lambda (n) 0.3) comp1))))
+         (create-ast-list (list (create-ast 'ReqClause (list rt-C1 comp-max-eq (lambda _ 0.3) comp1))))
          #f))))))) ;default objective
 
 ;;; Misc and UI ;;;
@@ -776,8 +777,10 @@
   (print-ast node printer (current-output-port)))
 
 (define display-ast (lambda () (display-part ast)))
-(define comp->string (lambda (comp) (let ([entry (assq comp comp-names)]) (if entry (cadr entry) '?~))))
-(define comp->rev-string (lambda (comp) (let ([entry (assq comp rev-comp-names)]) (if entry (cadr entry) '?~))))
+(define comp->X (lambda (comp picker default) (let ([entry (assq comp comp-names)]) (if entry (picker entry) default))))
+(define comp->string (lambda (comp) (comp->X comp cadr '?~)))
+(define comp->rev-string (lambda (comp) (comp->X comp caddr '?~)))
+(define comp->name (lambda (comp) (comp->X comp cadddr "error")))
 
 (define clauses-to-list
   (lambda (loc)
