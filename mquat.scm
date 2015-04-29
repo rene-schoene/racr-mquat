@@ -6,7 +6,7 @@
 
 (define debugging #t)
 (define comp-names (list))
-(define pn-energy 'energy-consumption) ; Property-Name of energy-consumption used for all properties and the default objective function
+(define pn-energy 'energy-consumption) ; Name of the property energy-consumption and as default objective function property name
 
 (define ast
   (with-specification
@@ -40,11 +40,9 @@
    ; 1st = op: property op forumla
    ; 2nd = rev-op: formula rev-op property
    ; 3rd = name as string
-   (set! comp-names
-         (list
-          (list comp-eq '= '= "=")
-          (list comp-min-eq '<= '>= "min")
-          (list comp-max-eq '>= '<= "max")))
+   (set! comp-names (list (list comp-eq '= '= "=")
+                          (list comp-min-eq '<= '>= "min")
+                          (list comp-max-eq '>= '<= "max")))
    
    (define agg-max 1) (define agg-sum 2)
    
@@ -62,9 +60,7 @@
           (fold-left (lambda (result-for-impl req) (debug "inner: impl=" (ast-child 'name impl) ",req=" (ast-child 'name req)) (add-to-al result-for-impl req impl))
                      result-for-comp (att-value 'req-comp-map impl))) ;fold over reqs of impl
         (list) (ast-children (ast-child 'Impl* n))))) ;fold over impls
-    (Impl
-     (lambda (n)
-       (ast-child 'reqcomps n))))
+    (Impl (lambda (n) (ast-child 'reqcomps n))))
    
    ; Either cons val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
    (define (add-to-al al key val) (add-to-al0 al key val cons))
@@ -115,91 +111,80 @@
    
    (ag-rule
     objective-value
-    (Root ; sum of objective value of all software components (skipping SWRoot)
-     (lambda (n)
-       (fold-left
-        (lambda (totalValue comp) (+ totalValue (att-value 'objective-value comp)))
-        0 (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
+    (Root (lambda (n) (att-value 'objective-value (ast-child 'SWRoot n))))
+    (SWRoot ; sum of objective value of all software components
+     (lambda (n) (fold-left
+                  (lambda (totalValue comp) (+ totalValue (att-value 'objective-value comp)))
+                  0 (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
     (Comp ; objective value of selected impl
-     (lambda (n)
-       (att-value 'objective-value (ast-child 'selectedimpl n))))
+     (lambda (n) (att-value 'objective-value (ast-child 'selectedimpl n))))
     (Impl ; objective value of the mode to use
-     (lambda (n)
-       (att-value 'objective-value (att-value 'mode-to-use n))))
+     (lambda (n) (att-value 'objective-value (att-value 'mode-to-use n))))
     (Mode ; find and evaluate the energy-consumption provClause
-     (lambda (n)
-       (att-value 'eval (att-value 'provided-clause n pn-energy)))))
+     (lambda (n) (att-value 'eval (att-value 'provided-clause n pn-energy)))))
    
    (ag-rule
     clauses-met?
     (Root ; clauses-met for all software components and for request?
-     (lambda (n)
-       (fold-left (lambda (result comp) (and result (att-value 'clauses-met? comp)))
-                  (att-value 'objective-value (ast-child 'Request n))
-                  (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
+     (lambda (n) (fold-left (lambda (result comp) (and result (att-value 'clauses-met? comp)))
+                            (att-value 'objective-value (ast-child 'Request n))
+                            (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
     (Comp ; clauses-met for the selected impl
-     (lambda (n)
-       (att-value 'clauses-met? (ast-child 'selectedimpl n))))
+     (lambda (n) (att-value 'clauses-met? (ast-child 'selectedimpl n))))
     (Impl ; clauses-met for mode to use?
-     (lambda (n)
-       (att-value 'clauses-met? (att-value 'mode-to-use n))))
+     (lambda (n) (att-value 'clauses-met? (att-value 'mode-to-use n))))
     (Mode ; clauses-met for all clauses?
-     (lambda (n)
-       (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
-                  #t (ast-children (ast-child 'Clause* n)))))
+     (lambda (n) (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
+                            #t (ast-children (ast-child 'Clause* n)))))
     (ReqClause ; comparator function returns true?
-     (lambda (n)
-       ((ast-child 'comp n) (att-value 'eval n) (att-value 'actual-value n))))
+     (lambda (n) ((ast-child 'comp n) (att-value 'eval n) (att-value 'actual-value n))))
     (ProvClause ; Provision clauses are always fulfilled
      (lambda (n) #t))
     (Request ; clauses-met for all constraints
-     (lambda (n)
-       (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
-                  #t (ast-children (ast-child 'Constraints n))))))
+     (lambda (n) (fold-left (lambda (result clause) (and result (att-value 'clauses-met? clause)))
+                            #t (ast-children (ast-child 'Constraints n))))))
    
    (ag-rule
     actual-value
     (ReqClause
      (lambda (n)
-       (let
-           ([propName (ast-child 'name (ast-child 'returntype n))]
-            [target (ast-child 'target n)])
+       (let ([propName (ast-child 'name (ast-child 'returntype n))]
+             [target (ast-child 'target n)])
          ((ast-child
            'value (if (ast-subtype? target 'ResourceType)
-                      (att-value 'provided-clause (ast-child 'deployedon  (att-value 'get-impl n)) propName target) ; hw -> search in deployedon for name and type
-                      (att-value 'provided-clause (att-value 'mode-to-use (ast-child 'selectedimpl target)) propName))) ; sw -> search in target-component
+                      ; hw → search in deployedon for name and type
+                      (att-value 'provided-clause (ast-child 'deployedon  (att-value 'get-impl n)) propName target)
+                      ; sw → search in target-component
+                      (att-value 'provided-clause (att-value 'mode-to-use (ast-child 'selectedimpl target)) propName)))
           (ast-child 'MetaParameter* (att-value 'get-request n)))))) ; Params from request, applied to the value function
-    (ProvClause
-     (lambda (n)
-       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n))))))
+    (ProvClause (lambda (n) (att-value 'eval n))))
+;       ((ast-child 'value n) (ast-child 'MetaParameter* (att-value 'get-request n))))))
    
    ; Given the name of a property (and optionally the type of the resource), get ProvisionClause for this property
    (ag-rule
     provided-clause
-    (Resource ; Search through ProvClauses of this resource and its subresources to find a clause with matching name of a resource with matching type
+    (Resource
+     ; Search through ProvClauses of this resource and its subresources to find a clause
+     ; 1) returning a property with the given name and
+     ; 2) having a target-resource with the given type
      (lambda (n name type)
-       (let
-           ([search-subresources
-             (lambda ()
-               (ast-find-child
-                (lambda (index subres)
-                  (att-value 'provided-clause subres))
-                (ast-child 'SubResources n)))])
+       (let ([search-subresources
+              (lambda ()
+                (ast-find-child
+                 (lambda (index subres) (att-value 'provided-clause subres))
+                 (ast-child 'SubResources n)))])
          (if (eq? (ast-child 'type n) type) ; if n has correct type ...
-             (let
-                 ([found-clause
-                   (ast-find-child ; (1) ... then try to find a child in n ...
-                    (lambda (index clause)
-                      (eq? (ast-child 'name (ast-child 'returntype clause)) name))
-                    (ast-child 'ProvClause* n))])
+             (let ([found-clause
+                    (ast-find-child ; (1) ... then try to find a child in n ...
+                     (lambda (index clause) (eq? (ast-child 'name (ast-child 'returntype clause)) name))
+                     (ast-child 'ProvClause* n))])
                (if found-clause ; (1.q) if a child was found ...
                    found-clause ; (1.1) ... return it
                    (search-subresources))) ; (1.2) ... else search in subresources
              ; (2) ... if not correct type or no child was found, search subresources of n
              (search-subresources)))))
-    (Mode ; Search through Clauses to find a ProvClause with matching name
-     (lambda (n name)
-       (att-value 'search-clause n name 'ProvClause))))
+    ; Search through Clauses to find a ProvClause with matching name
+    (Mode (lambda (n name) (att-value 'search-clause n name 'ProvClause))))
    
    (ag-rule
     search-clause
@@ -225,7 +210,7 @@
        ; If inside a mode and impl of mode is selected, or outside of a mode ...
        (if (or (not (ast-subtype? (ast-parent (ast-parent n)) 'Mode)) (att-value 'is-selected? (att-value 'get-impl n)))
            ; ... apply value function with metaparams and deployed-on...
-           (att-value 'eval-on n (att-value 'deployedon (att-value 'get-impl n)))
+           (att-value 'eval-on n (ast-child 'deployedon (att-value 'get-impl n)))
            #f)))) ; ... else don't evaluate and return false
    
    (ag-rule
@@ -254,11 +239,7 @@
    (ag-rule is-deployed? (Impl (lambda (n) (ast-node? (ast-child 'deployedon n)))))
    
    ; Return either the selected-mode or the first mode
-   (ag-rule
-    mode-to-use
-    (Impl
-     (lambda (n)
-       (or (ast-child 'selectedmode n) (ast-child 1 (ast-child 'Mode* n))))))
+   (ag-rule mode-to-use (Impl (lambda (n) (or (ast-child 'selectedmode n) (ast-child 1 (ast-child 'Mode* n))))))
    
    ;;; ILP-Creation rules
 
@@ -285,18 +266,7 @@
           (list "Generals")
           binary-vars
          (list "End")))))
-    (Request
-     (lambda (n)
-       (fold-left
-        (lambda (result c)
-          (cons (list
-                 (string-append " req" (number->string (ast-child-index c)) ":")
-                 (att-value 'ilp-varname (ast-child 'returntype c))
-                 (comp->rev-string (ast-child 'comp c))
-                 (att-value 'eval c))
-                result))
-        (list)
-        (ast-children (ast-child 'Constraints n)))))
+    (Request (lambda (n) (att-value 'ilp-nego-sw n)))
     (SWRoot
      (lambda (n)
        (fold-left
@@ -346,13 +316,15 @@
      (lambda (n)
        (fold-left
         (lambda (result c)
-          (cons (list 0 "<=" (att-value 'ilp-propname c) "<=" (att-value 'eval c)) result))
+          (cons (list 0 "<=" (att-value 'ilp-propname c) "<=" (att-value 'eval-on c n)) result))
         (list)
         (ast-children (ast-child 'ProvClause* n))))))
    
    (ag-rule request-target? (Comp (lambda (n) (eq? (ast-child 'target (att-value 'get-request n)) n))))
-   (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val))))) ;TODO check if space need between +/- and value
-   (define prepend-neg-sign (lambda (val) (if (> val 0) (- val) (string-append "+ " (number->string (- val)))))) ;TODO check if space need between +/- and value
+   
+   ;TODO check if space need between +/- and value
+   (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
+   (define prepend-neg-sign (lambda (val) (if (> val 0) (- val) (string-append "+ " (number->string (- val))))))
    
    (ag-rule
     ilp-objective
@@ -360,49 +332,27 @@
      (lambda (n)
        (fold-left
         (lambda (result mode)
-          (cons* (prepend-sign (att-value 'ilp-objective mode)) (att-value 'ilp-varname mode) result))
-        (list)
-        (att-value 'every-mode n))))
-    (Mode (lambda (n) (att-value 'actual-value (att-value 'provided-clause n pn-energy)))))
+          (cons*
+           (fold-left
+            (lambda (inner pe)
+              (cons* (prepend-sign (att-value 'ilp-objective mode pe)) (att-value 'ilp-varname-deployed mode pe) inner))
+            (list) (att-value 'every-pe n))
+           result))
+        (list) (att-value 'every-mode n))))
+    (Mode (lambda (n pe) (att-value 'eval-on (att-value 'provided-clause n pn-energy) pe))))
    
    ; Creates a list of NFP-negotiation constraints ;TODO-wip: old impl. use new nego-sw and nego-hw
    (ag-rule
     ilp-nego
-    (Root
+    (Root (lambda (n) (remove (list) (att-value 'ilp-nego (ast-child 'SWRoot n))))) ; remove empty constraints
+    (SWRoot (lambda (n) (recur append n 'ilp-nego 'Comp*)))
+    (Comp
      (lambda (n)
-       (remove (list) ; remove empty constraints
-               (fold-left
-                (lambda (result prop) (append (att-value 'ilp-nego prop) result))
-                (list)
-                (ast-children (ast-child 'Property* n)))))) ;TODO -- wip: implement ag-rule 'all-properties
-    (Property
-     (lambda (n)
-       (let*
-           ([pname (att-value 'ilp-varname n)]
-            [append-if-constrained (lambda (comp loc) (debug loc) (if (null? loc) (list) (append loc (list "-" pname comp 0))))])
-         (map append-if-constrained (assq-values comp-names) ; add "-" property name, ("=", ">=" or "<=" resp.) and "0"
-              (fold-left
-               (lambda (result mode) (merge-list (att-value 'ilp-nego mode n) result))
-               (list (list) (list) (list))
-               (att-value 'every-mode n)))))) ;TODO: fold stepwise over components, impls, modes
-    (Mode
-     (lambda (n prop)
-       (debug "ilp-nego:" (ast-child 'name n) ",prop:" (ast-child 'name prop))
-       (let*
-           ([found (att-value 'search-clause n (ast-child 'name prop) 'Clause)]
-            [value (and found (att-value 'eval-unsafe found))] ; TODO: clean up to not call unsafe rules
-            [name (att-value 'ilp-varname n)]
-            [comp (and found (ast-child 'comp found))])
-         (cond ; Did not work with 'case' :|
-           ((eq? comp comp-eq) (list (list (prepend-sign value) name) (list) (list))) ; eq = 1st
-           ((eq? comp comp-min-eq) (list (list) (list (prepend-sign value) name) (list))) ; min-eq = 2nd
-           ((eq? comp comp-max-eq) (list (list) (list) (list (prepend-sign value) name))) ; max-eq = 3rd
-           (else (list (list) (list) (list)))))))) ; not found = three empty lists
+       (append (att-value 'ilp-nego-sw n)
+               (att-value 'ilp-nego-hw n)))))
    
    (define (assq-values loe) (map cadar loe))
-   
-   ; (merge-list ((eq1 eq2) (min1 min2) (max1 max2)) ((eqA) (minA) (maxA)) = ((eq1 eq2 eqA) (min1 min2 minA) (max1 max2 maxA))
-   (define (merge-list loc1 loc2) (debug loc1) (debug loc2) (map append loc1 loc2)) ; [l]ist [o]f [c]onstraints
+   (define (merge-list loc1 loc2) (map append loc1 loc2)) ; [l]ist [o]f [c]onstraints
    
    (ag-rule
     ilp-nego-sw
@@ -411,61 +361,80 @@
        (fold-left ; fold over req-comp-map
         (lambda (result entry)
           (append
-           (let ([provs (att-value 'ilp-nego-reqc (car entry) 'ProvClause comp-eq)]
-                 [max-reqs (att-value 'ilp-nego-reqc n 'ReqClause comp-max-eq)]
-                 [min-reqs (att-value 'ilp-nego-reqc n 'ReqClause comp-min-eq)])
-             (fold-left ; fold over provisions
-              (lambda (constraints prov-entry)
-                (let ([max-req-entry (assq (car prov-entry) max-reqs)]
-                      [min-req-entry (assq (car prov-entry) min-reqs)])
-                  (append-if (and max-req-entry (make-constraint (car prov-entry) (cadr prov-entry) (cadr max-req-entry) comp-max-eq))
-                             (append-if (and min-req-entry (make-constraint (car prov-entry) (cadr prov-entry) (cadr min-req-entry) comp-min-eq))
-                                        constraints))))
-              (list) provs)) result))
-        (list) (att-value 'req-comp-map n)))))
+           (make-constraints
+            (att-value 'ilp-nego-reqc (car entry) 'ProvClause comp-eq) ;provs
+            (att-value 'ilp-nego-reqc n 'ReqClause comp-max-eq) ;max-reqs
+            (att-value 'ilp-nego-reqc n 'ReqClause comp-min-eq)) ;min-reqs
+           result)) (list) (att-value 'req-comp-map n))))
+    (Request
+     (lambda (n)
+       (make-constraints
+        (att-value 'ilp-nego-reqc (ast-child 'target n) 'ProvClause comp-eq) ;provs
+        (att-value 'ilp-nego-reqc n comp-max-eq) ;max-reqs
+        (att-value 'ilp-nego-reqc n comp-min-eq))))) ;min-reqs
    
+   (define (make-constraints provs max-reqs min-reqs)
+     (fold-left ; fold over provisions
+      (lambda (constraints prov-entry)
+        (let ([max-req-entry (assq (car prov-entry) max-reqs)]
+              [min-req-entry (assq (car prov-entry) min-reqs)])
+          (cons-if (and max-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
+                                                         (cadr max-req-entry) comp-max-eq))
+                   (cons-if (and min-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
+                                                                (cadr min-req-entry) comp-min-eq))
+                            constraints)))) (list) provs))
+     
    (define (make-constraint prov prov-entry req-entry comp)
      (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
             [f-prov (if (eq? comp comp-max-eq)
-                        (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint)) ; prov for max: - (maximum - val) = val - maximum
+                        ; prov for max: - (maximum - val) = val - maximum
+                        (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
                         (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))] ; prov for other: -val
             [f-req (if (eq? comp comp-max-eq)
-                       (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint)) ; req for max: (maximum - val)
+                       ; req for max: (maximum - val)
+                       (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint))
                        (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))]) ; req for other: val
        (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
        (append
-        (list (string-append (symbol->string (ast-child 'name prov)) "-" (comp->name comp) ": ") "0 >=")
+        (list (string-append (att-value 'ilp-varname prov) "_" (comp->name comp) ": "))
         (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
-        (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry))))
+        (if (and (= 1 (length req-entry)) (eq? "" (cadar req-entry))) ;oh, this has to be a request
+            (cons* "<=" (f-req (list) (caar req-entry) ""))
+            (append
+             (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
+             (list "<= 0"))))))
    
-   (define (append-if x y) (if x (append x y) y))
+   (define (cons-if x y) (if x (cons x y) y))
    
    (ag-rule
     ilp-nego-reqc
-    (Comp ; return a list of (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode of each impl
-     (lambda (n clausetype comparator)
-       (fold-left
-        (lambda (result impl)
-          (merge-al result (att-value 'ilp-nego-reqc impl clausetype comparator)))
-        (list)
-        (ast-children (ast-child 'Impl* n)))))
-    (Impl ; return a list of (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode
-     (lambda (n clausetype comparator)
-       (fold-left
-        (lambda (result mode)
-          (merge-al result (att-value 'ilp-nego-reqc mode clausetype comparator)))
-        (list) (ast-children (ast-child 'Mode* n)))))
-    (Mode ; return a list of (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type
+    (Comp ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode of each impl
+     (lambda (n clausetype comparator) (recur2 merge-al n 'ilp-nego-reqc 'Impl* clausetype comparator)))
+    (Impl ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode
+     (lambda (n clausetype comparator) (recur2 merge-al n 'ilp-nego-reqc 'Mode* clausetype comparator)))
+    (Mode ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type
      (lambda (n clausetype comparator)
        (fold-left
         (lambda (result clause)
           (if (and (ast-subtype? clause clausetype) (eq? (ast-child 'comp clause) comparator))
               (fold-left ; fold over pe
                (lambda (inner pe)
-                 (add-to-al inner (ast-child 'returntype clause) (list (att-value 'eval-on clause pe) (att-value 'ilp-varname-deployed n pe))))
+                 (add-to-al inner (ast-child 'returntype clause)
+                            (list (att-value 'eval-on clause pe) (att-value 'ilp-varname-deployed n pe))))
                result (att-value 'every-pe n))
               result))
-        (list) (ast-children (ast-child 'Clause* n))))))
+        (list) (att-value 'combined-reqs n))))
+    (Request
+     (lambda (n comparator)
+       (fold-left
+        (lambda (result clause)
+          (if (eq? (ast-child 'comp clause) comparator)
+              (add-to-al result (ast-child 'returntype clause) (list (att-value 'eval-on clause #f) "")) ;use arbitrary target #f
+              result))
+        (list) (ast-children (ast-child 'Constraints n))))))
+   
+   (ag-rule combined-reqs (Mode (lambda (n) (append (ast-children (ast-child 'Clause* n))
+                                                    (ast-children (ast-child 'Constraints (att-value 'get-request n)))))))
    
    (define (merge-al al1 al2) (fold-left (lambda (big-al entry) (add-to-al0 big-al (car entry) (cadr entry) append)) al1 al2))
    (define (append-d a b) (debug a) (debug b) (append a b))
@@ -496,8 +465,9 @@
                          (prepend-sign (- maximum val))) ; for max: (maximum - val)
                        (lambda (val)
                          (prepend-sign val)))]) ; for other: val
-         (cons* (f (att-value 'eval-on (att-value 'provided-clause pe (ast-child 'name prop) (ast-child 'type pe)) pe)) ">="
-                (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)))))
+         (append (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
+                 (list "<=" (f (att-value 'eval-on (att-value 'provided-clause pe (ast-child 'name prop)
+                                                              (ast-child 'type pe)) pe)))))))
     (Impl (lambda (n comp prop pe) (recur3 append n 'ilp-nego-hw0 'Mode* comp prop pe)))
     (Mode (lambda (n comp prop pe) (recur3 append n 'ilp-nego-hw0 'Clause* comp prop pe)))
     (Clause
@@ -527,6 +497,12 @@
                   (op result (att-value att-name sub)))
                 (list) (ast-children (ast-child child-name n))))
    
+   (define (recur2 op n att-name child-name arg1 arg2)
+     (fold-left (lambda (result sub)
+                  (debug "rec2" n att-name child-name "arg1:" arg1 "arg2:" arg2 "result:" (att-value att-name sub arg1 arg2))
+                  (op result (att-value att-name sub arg1 arg2)))
+                (list) (ast-children (ast-child child-name n))))
+
    (define (recur3 op n att-name child-name arg1 arg2 arg3)
      (fold-left (lambda (result sub)
                   (debug "rec2" n att-name child-name "arg1:" arg1 "arg2:" arg2 "arg3:" arg3 "result:" (att-value att-name sub arg1 arg2 arg3))
@@ -548,12 +524,8 @@
    ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
    (define subs (list (list #\- #\_) (list #\+ #\_)))
    (define (ilp-conform-name name)
-     (list->string
-      (map
-       (lambda (c)
-         (let ([entry (assq c subs)])
-           (if entry (cadr entry) c)))
-       (string->list name))))
+     (list->string (map (lambda (c) (let ([entry (assq c subs)]) (if entry (cadr entry) c)))
+                        (string->list name))))
    
    (ag-rule
     ilp-varname
@@ -565,14 +537,14 @@
 
    (ag-rule
     ilp-varname-deployed
-;    (Impl (lambda (n pe) (ilp-conform-name
-;                          (string-append "b#" (symbol->string (ast-child 'name n))
-;                                         "#" (symbol->string (ast-child 'name pe))))))
-    (Mode (lambda (n pe) (ilp-conform-name ;TODO: Prepend Comp-Name?
-                          (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-impl n)))
-                                         "#" (symbol->string (ast-child 'name n))
-                                         "#" (symbol->string (ast-child 'name pe)))))))
+    (Mode (lambda (n pe)
+            (let ([impl (att-value 'get-impl n)])
+              (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-comp impl)))
+                                               "#"  (if (lonely? impl) "" (symbol->string (ast-child 'name (att-value 'get-impl n))))
+                                               "#"  (if (lonely? n) "" (symbol->string (ast-child 'name n)))
+                                               "#"  (symbol->string (ast-child 'name pe))))))))
    
+   (define lonely? (lambda (n) (= 1 (ast-num-children (ast-parent n))))) ;lonely iff no siblings
    
    (ag-rule
     ilp-propname
