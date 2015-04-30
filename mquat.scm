@@ -249,8 +249,7 @@
     to-ilp
     (Root
      (lambda (n)
-       (let
-           ([binary-vars (att-value 'ilp-binary-vars n)])
+       (let ([binary-vars (att-value 'ilp-binary-vars n)])
          (list
           (list "Minimize")
           (att-value 'ilp-objective n)
@@ -267,45 +266,38 @@
           binary-vars
          (list "End")))))
     (Request (lambda (n) (att-value 'ilp-nego-sw n)))
-    (SWRoot
-     (lambda (n)
-       (fold-left
-        (lambda (result comp) (append (att-value 'to-ilp comp) result))
-        (list)
-        (ast-children (ast-child 'Comp* n)))))
+    (SWRoot (lambda (n) (recur append n 'to-ilp 'Comp*)))
     (Comp
      (lambda (n)
        (debug "Comp:" (ast-child 'name n))
-       (let
-           ([result (fold-left
-                     (lambda (result impl)
-                       (cons
-                        (cons* "+" (att-value 'ilp-varname impl) (car result))
-                        (append (att-value 'to-ilp impl) (cdr result))))
-                     (list (list "=" "1") (list))
-                     (ast-children (ast-child 'Impl* n)))])
-         (if (att-value 'request-target? n) result (cdr result)))))
+       (let ([ics (recur cons n 'to-ilp 'Impl*)])
+         (cons
+          (fold-left
+           (lambda (result entry)
+             (cons
+              (append
+               (list (string-append (att-value 'ilp-name n) "_requires_" (att-value 'ilp-name (car entry)) ": "))
+               (fold-left (lambda (inner impl) (cons* "-" (att-value 'ilp-binvar impl) inner)) (list) (cadr entry))
+               (fold-left (lambda (inner impl) (cons* "+" (att-value 'ilp-binvar impl) inner)) (list)
+                          (ast-children (ast-child 'Impl* (car entry))))
+               (list "=" 0)) result))
+           (list) (att-value 'req-comp-map n))
+          (if (att-value 'request-target? n)
+              (cons
+               (cons (string-append "request_target_" (att-value 'ilp-name n) ": ")
+                     (fold-left (lambda (inner impl) (cons* "+" (att-value 'ilp-binvar impl) inner))
+                          (list "=" 1) (ast-children (ast-child 'Impl* n))))
+               ics) ics))))) ; list of cons, and else-branch
     (Impl
      (lambda (n)
        (debug "Impl:" (ast-child 'name n))
-       (cons
-        (fold-left ; deploy the same mode only on one pe
-         (lambda (result pe)
-           (append (fold-left (lambda (inner mode) (cons* "+" (att-value 'ilp-varname-deployed mode pe) inner))
-                              (list)
-                              (ast-children (ast-child 'Mode* n)))
-                   result))
-         (list "-" (att-value 'ilp-varname n) "=" 0)
-         (att-value 'every-pe n))
-        (fold-left
-         (lambda (result reqC)
-           (cons (fold-left ; if use this impl, also use one of the impls per required component
-                  (lambda (result rci) (cons* "+" (att-value 'ilp-varname rci) result))
-                  (list "-" (att-value 'ilp-varname n) "=" 0)
-                  (ast-children (ast-child 'Impl* reqC)))
-                 (append (att-value 'to-ilp reqC) result)))
-         (list)
-         (ast-child 'reqcomps n)))))
+       (cons (string-append "single(" (att-value 'ilp-name n) "): ")
+             (fold-left ; deploy one combination of mode and pe for this impl
+              (lambda (result pe)
+                (append (fold-left (lambda (inner mode) (cons* "+" (att-value 'ilp-binvar-deployed mode pe) inner))
+                                   (list) (ast-children (ast-child 'Mode* n))) result))
+              (list "-" (att-value 'ilp-binvar n) "=" 0)
+              (att-value 'every-pe n)))))
     (HWRoot
      (lambda (n)
        (fold-left
@@ -335,7 +327,7 @@
           (cons*
            (fold-left
             (lambda (inner pe)
-              (cons* (prepend-sign (att-value 'ilp-objective mode pe)) (att-value 'ilp-varname-deployed mode pe) inner))
+              (cons* (prepend-sign (att-value 'ilp-objective mode pe)) (att-value 'ilp-binvar-deployed mode pe) inner))
             (list) (att-value 'every-pe n))
            result))
         (list) (att-value 'every-mode n))))
@@ -364,45 +356,47 @@
            (make-constraints
             (att-value 'ilp-nego-reqc (car entry) 'ProvClause comp-eq) ;provs
             (att-value 'ilp-nego-reqc n 'ReqClause comp-max-eq) ;max-reqs
-            (att-value 'ilp-nego-reqc n 'ReqClause comp-min-eq)) ;min-reqs
+            (att-value 'ilp-nego-reqc n 'ReqClause comp-min-eq) #f) ;min-reqs,request?
            result)) (list) (att-value 'req-comp-map n))))
     (Request
      (lambda (n)
        (make-constraints
         (att-value 'ilp-nego-reqc (ast-child 'target n) 'ProvClause comp-eq) ;provs
         (att-value 'ilp-nego-reqc n comp-max-eq) ;max-reqs
-        (att-value 'ilp-nego-reqc n comp-min-eq))))) ;min-reqs
+        (att-value 'ilp-nego-reqc n comp-min-eq) #t)))) ;min-reqs,request?
    
-   (define (make-constraints provs max-reqs min-reqs)
+   (define (make-constraints provs max-reqs min-reqs request?)
      (fold-left ; fold over provisions
       (lambda (constraints prov-entry)
         (let ([max-req-entry (assq (car prov-entry) max-reqs)]
               [min-req-entry (assq (car prov-entry) min-reqs)])
           (cons-if (and max-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
-                                                         (cadr max-req-entry) comp-max-eq))
+                                                       (cadr max-req-entry) comp-max-eq request?))
                    (cons-if (and min-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
-                                                                (cadr min-req-entry) comp-min-eq))
+                                                                (cadr min-req-entry) comp-min-eq request?))
                             constraints)))) (list) provs))
      
-   (define (make-constraint prov prov-entry req-entry comp)
+   (define (make-constraint prov prov-entry req-entry comp request?)
      (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
             [f-prov (if (eq? comp comp-max-eq)
-                        ; prov for max: - (maximum - val) = val - maximum
-                        (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
-                        (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))] ; prov for other: -val
-            [f-req (if (eq? comp comp-max-eq)
-                       ; req for max: (maximum - val)
+                       ; prov for max: (maximum - val)
                        (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint))
-                       (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))]) ; req for other: val
-       (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
-       (append
-        (list (string-append (att-value 'ilp-varname prov) "_" (comp->name comp) ": "))
-        (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
-        (if (and (= 1 (length req-entry)) (eq? "" (cadar req-entry))) ;oh, this has to be a request
-            (cons* "<=" (f-req (list) (caar req-entry) ""))
-            (append
-             (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
-             (list "<= 0"))))))
+                       (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
+            [f-req (if (eq? comp comp-max-eq)
+                        ; req for max: - (maximum - val) = val - maximum
+                        (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
+                        (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
+       (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov "request?" request?)
+       (if request?
+           (append
+            (list (string-append "request("(att-value 'ilp-name prov) "_" (comp->name comp) "): "))
+            (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
+            (cons* ">=" (f-req (list) (caar req-entry) "")))
+           (append
+            (list (string-append (att-value 'ilp-name prov) "_" (comp->name comp) ": "))
+            (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
+            (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
+            (list ">= 0")))))
    
    (define (cons-if x y) (if x (cons x y) y))
    
@@ -420,7 +414,7 @@
               (fold-left ; fold over pe
                (lambda (inner pe)
                  (add-to-al inner (ast-child 'returntype clause)
-                            (list (att-value 'eval-on clause pe) (att-value 'ilp-varname-deployed n pe))))
+                            (list (att-value 'eval-on clause pe) (att-value 'ilp-binvar-deployed n pe))))
                result (att-value 'every-pe n))
               result))
         (list) (att-value 'combined-reqs n))))
@@ -465,7 +459,9 @@
                          (prepend-sign (- maximum val))) ; for max: (maximum - val)
                        (lambda (val)
                          (prepend-sign val)))]) ; for other: val
-         (append (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
+         (append (list (string-append (att-value 'ilp-name n) "_" (att-value 'ilp-name prop) "_"
+                                      (att-value 'ilp-name pe) "_" (comp->name comp) ": "))
+                 (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
                  (list "<=" (f (att-value 'eval-on (att-value 'provided-clause pe (ast-child 'name prop)
                                                               (ast-child 'type pe)) pe)))))))
     (Impl (lambda (n comp prop pe) (recur3 append n 'ilp-nego-hw0 'Mode* comp prop pe)))
@@ -475,7 +471,7 @@
        (if (and (eq? prop (ast-child 'returntype n))
                 (eq? comp (ast-child 'comp n))
                 (eq? (ast-child 'type pe) (ast-child 'target n)))
-           (list (list (att-value 'eval-on n pe) (att-value 'ilp-varname-deployed (ast-pp n) pe)))
+           (list (list (att-value 'eval-on n pe) (att-value 'ilp-binvar-deployed (ast-pp n) pe)))
            (list))))) ;empty pair if not a suitable clause
    
    (define (ast-pp n) (ast-parent (ast-parent n)))
@@ -494,13 +490,13 @@
    (define (recur op n att-name child-name)
      (fold-left (lambda (result sub)
                   (debug "rec" n att-name child-name (att-value att-name sub))
-                  (op result (att-value att-name sub)))
+                  (op (att-value att-name sub) result))
                 (list) (ast-children (ast-child child-name n))))
    
    (define (recur2 op n att-name child-name arg1 arg2)
      (fold-left (lambda (result sub)
                   (debug "rec2" n att-name child-name "arg1:" arg1 "arg2:" arg2 "result:" (att-value att-name sub arg1 arg2))
-                  (op result (att-value att-name sub arg1 arg2)))
+                  (op (att-value att-name sub arg1 arg2) result))
                 (list) (ast-children (ast-child child-name n))))
 
    (define (recur3 op n att-name child-name arg1 arg2 arg3)
@@ -516,8 +512,8 @@
     (Root
      (lambda (n)
        (append
-        (map (lambda (impl) (att-value 'ilp-varname impl)) (att-value 'every-impl n))
-        (fold-left (lambda (result mode) (append (map (lambda (pe) (att-value 'ilp-varname-deployed mode pe))
+        (map (lambda (impl) (att-value 'ilp-binvar impl)) (att-value 'every-impl n))
+        (fold-left (lambda (result mode) (append (map (lambda (pe) (att-value 'ilp-binvar-deployed mode pe))
                                                       (att-value 'every-pe n)) result))
                    (list) (att-value 'every-mode n))))))
    
@@ -528,15 +524,21 @@
                         (string->list name))))
    
    (ag-rule
-    ilp-varname
+    ilp-name
     (Property (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
-    (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name n)))))) ;TODO prepend name of Comp
-    (Mode (lambda (n) (ilp-conform-name
-                       (string-append (att-value 'ilp-varname (att-value 'get-impl n))
-                                      "#" (symbol->string (ast-child 'name n)))))))
+    (Comp (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
+    (Impl (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
+    (Mode (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
+    (Resource (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n))))))
+   
+   (ag-rule
+    ilp-binvar
+    (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-comp n)))
+                                                       "#"  (if (lonely? n) "" (symbol->string (ast-child 'name n)))))))
+    (Mode (lambda (n) (error "Should not be called for Modes"))))
 
    (ag-rule
-    ilp-varname-deployed
+    ilp-binvar-deployed
     (Mode (lambda (n pe)
             (let ([impl (att-value 'get-impl n)])
               (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-comp impl)))
@@ -746,6 +748,7 @@
                  (string-append
                   (cond
                     ((string? s) s)
+                    ((boolean? s) (if s "#t" "#f"))
                     ((symbol? s) (symbol->string s))
                     ((number? s) (number->string s))
                     ((list? s) (string-append "(" (D s) ")"))
