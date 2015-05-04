@@ -7,6 +7,18 @@
 (define debugging #t)
 (define comp-names (list))
 (define pn-energy 'energy-consumption) ; Name of the property energy-consumption and as default objective function property name
+(define agg-max 1) (define agg-sum 2)  ; Used in agg of property to describe how to aggregate the property
+(define comp-min-eq (lambda (req act) (<= req act)))
+(define comp-max-eq (lambda (req act) (>= req act)))
+(define comp-eq (lambda (req act) (= req act)))
+(define f-comp-max-diff-eq (lambda (diff) (lambda (req act) (<= (- req act) diff))))
+
+; 1st = op: property op forumla
+; 2nd = rev-op: formula rev-op property
+; 3rd = name as string
+(set! comp-names (list (list comp-eq '= '= "=")
+                       (list comp-min-eq '<= '>= "min")
+                       (list comp-max-eq '>= '<= "max")))
 
 (define ast
   (with-specification
@@ -31,20 +43,6 @@
    (ast-rule 'MetaParameter->name-value)
    ; kind=static|runtime|derived. direction=decreasing|increasing. agg = sum|max.
    (ast-rule 'Property->name-unit-kind-direction-agg)
-   
-   (define comp-min-eq (lambda (req act) (<= req act)))
-   (define comp-max-eq (lambda (req act) (>= req act)))
-   (define comp-eq (lambda (req act) (= req act)))
-   (define f-comp-max-diff-eq (lambda (diff) (lambda (req act) (<= (- req act) diff))))
-   
-   ; 1st = op: property op forumla
-   ; 2nd = rev-op: formula rev-op property
-   ; 3rd = name as string
-   (set! comp-names (list (list comp-eq '= '= "=")
-                          (list comp-min-eq '<= '>= "min")
-                          (list comp-max-eq '>= '<= "max")))
-   
-   (define agg-max 1) (define agg-sum 2)
    
    (compile-ast-specifications 'Root)
    
@@ -122,7 +120,7 @@
     clauses-met?
     (Root ; clauses-met for all software components and for request?
      (lambda (n) (fold-left (lambda (result comp) (and result (att-value 'clauses-met? comp)))
-                            (att-value 'objective-value (ast-child 'Request n))
+                            (att-value 'clauses-met? (ast-child 'Request n))
                             (ast-children (ast-child 'Comp* (ast-child 'SWRoot n))))))
     (Comp (lambda (n) (att-value 'clauses-met? (ast-child 'selectedimpl n))))
     (Impl (lambda (n) (att-value 'clauses-met? (att-value 'mode-to-use n))))
@@ -778,7 +776,7 @@
 
 (define (display-part node)
   (define (print name) (cons name (lambda (v) v)))
-  (define printer (list (print 'eval)))
+  (define printer (list)); (print 'eval)))
   (print-ast node printer (current-output-port)))
 
 (define display-ast (lambda () (display-part ast)))
@@ -889,3 +887,108 @@
 
 (define (save-ilp path) (save-to-file path (att-value 'to-ilp ast)))
 (define (make) (save-ilp "gen/ilp.txt"))
+
+;;; AST-Generation
+
+(define (call-n-times proc n) (debug n) (create-ast-list (if (>= 0 n) (list) (cons (proc n) (call-n-times proc (- n 1))))))
+(define (random n) 42) ;find a suitable impl
+(define (rand max digits offset) (lambda _ (+ offset (/ (random (* digits max)) digits))))
+
+; returns the (load freq HWRoot)
+(define (create-hw num-top-pe num-subs)
+  (with-specification
+   spec
+   (let* ([load (create-ast 'Property (list 'load '% 'runtime 'decreasing agg-sum))]
+          [freq (create-ast 'Property (list 'frequency 'MHz 'runtime 'increasing agg-max))]
+          [only-type (create-ast 'ResourceType (list 'theType (create-ast-list (list load freq))))]
+          [res-name (lambda (outer-id n) (string->symbol (string-append (symbol->string outer-id) "-" (number->string n))))]
+          [make-prov (lambda (p max digits offset)
+                      (create-ast 'ProvClause (list p comp-eq (rand max digits offset))))])
+     (letrec ([make-subs (lambda (outer-id total subs)
+                           (debug '~make-subs total subs)
+                           (call-n-times (lambda (sub-n)
+                                           (make-res (res-name outer-id sub-n)
+                                                     (floor (/ (- total 1) subs)) subs)) (min total subs)))]
+              [make-res
+               (lambda (id total subs)
+                 (debug id total subs)
+                 (create-ast 'Resource
+                             (list id only-type (make-subs id total subs)
+                                   (create-ast-list (list (make-prov load 1 3 0) ; load = 0.001 - 1.000
+                                                          (make-prov freq 500 2 500))))))]) ; freq = 500.01 - 1000.00
+       (list
+        load freq
+        (create-ast
+         'HWRoot
+         (list
+          (create-ast-list (list only-type))
+          (make-subs 'res num-top-pe num-subs))))))))
+
+; returns (mp-names prop-first-comp SWRoot)
+(define (create-sw load freq num-comp impl-per-comp mode-per-impl)
+  (define (prop-al) (list)) (define (last-comp) #f) (define (first-comp) #f) (define (mp-name) 'size)
+  (define (new-comp comp) (set! last-comp comp) (unless first-comp (set! first-comp comp)))
+  (with-specification
+   spec
+   (let* ([make-prop (lambda (n) (create-ast 'Property (list n 'u 'runtime 'increasing 'max)))]
+          [prop (lambda (n) (let ([entry (assq n prop-al)])
+                              (if entry (cadr entry) ;entry found, return it
+                                  (let ([new (make-prop n)]) (set! prop-al (cons (list n new) prop-al)) new))))] ;new entry
+          [node-name (lambda (outer-id n) (string->symbol (string-append (symbol->string outer-id) "-" (number->string n))))]
+          [make-req (lambda (p max digits offset) (create-ast 'ReqClause (list p comp-min-eq (rand max digits offset))))]
+          [make-prov (lambda (p max digits offset) (create-ast 'ProvClause (list p comp-eq (rand max digits offset))))]
+          [make-mode (lambda (comp impl mode) (let ([cls (list (make-req load 1 2 0)
+                                                               (make-req freq 480 1 510)
+                                                               (make-prov (prop comp) comp 3 0))])
+                                                (create-ast
+                                                 'Mode
+                                                 (list
+                                                  (node-name impl mode)
+                                                  (create-ast-list
+                                                   (if (or (eq? last-comp #f)
+                                                           (> (random 2) 1))
+                                                       (cls)
+                                                       (cons (make-req (prop (- last-comp 1)) last-comp 2 0) cls)))))))]
+          [make-impl (lambda (comp comp-name impl) (let ([name (node-name comp-name impl)])
+                                                     (create-ast
+                                                      'Impl
+                                                      (list
+                                                       name
+                                                       (call-n-times (lambda (mode) (make-mode name mode)) mode-per-impl) ; Mode*
+                                                       (if (eq? last-comp #f) (list) (list last-comp)) ; reqcomps
+                                                       #f #f))))]
+          [make-comp (lambda (comp) (let ([name (node-name 'comp comp)])
+                                      (create-ast
+                                       'Comp
+                                       (list
+                                        name
+                                        (call-n-times (lambda (impl) (make-impl comp name impl)) impl-per-comp) #f
+                                        (create-ast-list (list (prop comp)))))))]
+          [sw-root (create-ast
+                    'SWRoot
+                    (list (call-n-times (lambda (n) (let ([comp (make-comp n)]) (new-comp n) comp)) num-comp)))])
+     (list (list mp-name) first-comp sw-root))))
+
+(define (create-request mp-names prop)
+  (let ([make-req (lambda (p max digits offset) (create-ast 'ReqClause (list p comp-min-eq (rand max digits offset))))])
+    (create-ast
+     spec
+     'Request
+     (create-ast-list (map (lambda (mp-name) (create-ast 'MetaParameter mp-name (rand 100 2 0))) mp-names))
+     (create-ast-list (list (make-req prop 1 2 0))) #f)))
+
+
+(define (create-example-ast num-top-pe num-pe-subs num-comp impl-per-comp mode-per-impl)
+  (let* ([hw-result (create-hw num-top-pe num-pe-subs)]
+         [load (car hw-result)]
+         [freq (cadr hw-result)]
+         [hw-root (caddr hw-result)]
+         [sw-result (create-sw load freq num-comp impl-per-comp mode-per-impl)]
+         [mp-names (car sw-result)]
+         [prop-c1 (cadr sw-result)]
+         [sw-root (caddr sw-result)])
+    (create-ast
+     'Root
+     (list hw-root
+           sw-root
+           (create-request mp-names prop-c1)))))
