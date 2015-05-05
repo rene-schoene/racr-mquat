@@ -1,6 +1,6 @@
 #!r6rs
 
-(import (rnrs) (racr core) (racr testing) (srfi :27))
+(import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27))
 
 (define spec (create-specification))
 
@@ -899,7 +899,7 @@
                                    (lambda _ (inexact (+ offset (/ (random (* factor max)) factor))))))
 
 ; returns the (load freq HWRoot)
-(define (create-hw num-top-pe num-subs)
+(define (create-hw num-pe num-subs)
   (with-specification
    spec
    (let* ([load (create-ast 'Property (list 'load '% 'runtime 'decreasing agg-sum))]
@@ -926,7 +926,7 @@
          'HWRoot
          (list
           (create-ast-list (list only-type))
-          (make-subs 'res num-top-pe num-subs))))))))
+          (make-subs 'res num-pe num-subs))))))))
 
 ; returns (mp-names prop-first-comp SWRoot)
 (define (create-sw load freq num-comp impl-per-comp mode-per-impl)
@@ -989,8 +989,8 @@
        target (create-ast-list (list (make-req prop 1 2 0))) #f)))))
 
 
-(define (create-example-ast num-top-pe num-pe-subs num-comp impl-per-comp mode-per-impl)
-  (let* ([hw-result (create-hw num-top-pe num-pe-subs)]
+(define (create-example-ast num-pe num-pe-subs num-comp impl-per-comp mode-per-impl)
+  (let* ([hw-result (create-hw num-pe num-pe-subs)]
          [load (car hw-result)]
          [freq (cadr hw-result)]
          [hw-root (caddr hw-result)]
@@ -1004,3 +1004,8 @@
      (list hw-root
            sw-root
            (create-request mp-names prop-c1)))))
+
+(define (time-it proc)
+  (let ([before (current-time)])
+    (let ([result (proc)])
+      (list result (time-difference (current-time) before)))))
