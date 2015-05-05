@@ -1,6 +1,6 @@
 #!r6rs
 
-(import (rnrs) (racr core) (racr testing))
+(import (rnrs) (racr core) (racr testing) (srfi :27))
 
 (define spec (create-specification))
 
@@ -33,7 +33,7 @@
    ;comp is a lambda expecting two values, required and actual, returning #t or #f
    (ast-rule 'Clause->returntype-comp-value)
    ; target is either a Comp or a ResourceType
-   (ast-rule 'ReqClause:Clause->target)
+   (ast-rule 'ReqClause:Clause->)
    (ast-rule 'ProvClause:Clause->)
    (ast-rule 'HWRoot->ResourceType*-Resource*)
    (ast-rule 'ResourceType->name-Property*)
@@ -55,7 +55,9 @@
        (fold-left
         (lambda (result-for-comp impl)
           (debug "out: impl=" (ast-child 'name impl) ",result=" result-for-comp)
-          (fold-left (lambda (result-for-impl req) (debug "inner: impl=" (ast-child 'name impl) ",req=" (ast-child 'name req)) (add-to-al result-for-impl req impl))
+          (fold-left (lambda (result-for-impl req)
+                       (debug "inner: impl=" (ast-child 'name impl) ",req=" (ast-child 'name req))
+                       (add-to-al result-for-impl req impl))
                      result-for-comp (att-value 'req-comp-map impl))) ;fold over reqs of impl
         (list) (ast-children (ast-child 'Impl* n))))) ;fold over impls
     (Impl (lambda (n) (ast-child 'reqcomps n))))
@@ -138,7 +140,7 @@
     (ReqClause
      (lambda (n)
        (let ([propName (ast-child 'name (ast-child 'returntype n))]
-             [target (ast-child 'target n)])
+             [target (ast-pp (ast-child 'returntype n))])
          ((ast-child
            'value (if (ast-subtype? target 'ResourceType)
                       ; hw → search in deployedon for name and type
@@ -445,7 +447,7 @@
      (lambda (n comp prop pe)
        (if (and (eq? prop (ast-child 'returntype n))
                 (eq? comp (ast-child 'comp n))
-                (eq? (ast-child 'type pe) (ast-child 'target n)))
+                (eq? (ast-child 'type pe) (ast-pp (ast-child 'returntype n))))
            (list (list (att-value 'eval-on n pe) (att-value 'ilp-binvar-deployed (ast-pp n) pe)))
            (list))))) ;empty pair if not a suitable clause
    
@@ -604,7 +606,7 @@
             'Mode (list mode-name
                         (create-ast-list ;Clause*
                          (append other-reqs
-                                 (list (create-ast 'ReqClause (list load comp-max-eq req-f Cubieboard))
+                                 (list (create-ast 'ReqClause (list load comp-max-eq req-f))
                                        (create-ast 'ProvClause (list c-energy comp-eq prov-e-f))
                                        (create-ast 'ProvClause (list rt comp-eq prov-rt-f))))))))]
         [part-impl2a
@@ -641,7 +643,7 @@
                      (list
                       (create-ast
                        'ReqClause
-                       (list rt-C2 comp-max-eq (lambda (lomp target) (att-value 'value-of lomp 'size)) comp2)))
+                       (list rt-C2 comp-max-eq (lambda (lomp target) (att-value 'value-of lomp 'size)))))
                      energy-c1
                      (lambda _ 20) ;energy
                      rt-C1 (lambda _ 0.2) ;response-time
@@ -682,7 +684,7 @@
                  (list
                   (make-simple-mode
                    (lambda _ 0) ;propload
-                   (list (create-ast 'ReqClause (list rt-C2 comp-max-eq (lambda _ -1) comp2)))
+                   (list (create-ast 'ReqClause (list rt-C2 comp-max-eq (lambda _ -1))))
                    energy-c1
                    (lambda _ 100) ;energy
                    rt-C1 (lambda _ 0.2) ;response-time
@@ -707,7 +709,7 @@
         (list
          (create-ast-list (list (make-mp-size 50))) ;MetaParameter*
          comp1
-         (create-ast-list (list (create-ast 'ReqClause (list rt-C1 comp-max-eq (lambda _ 0.3) comp1))))
+         (create-ast-list (list (create-ast 'ReqClause (list rt-C1 comp-max-eq (lambda _ 0.3)))))
          #f))))))) ;default objective
 
 ;;; Misc and UI ;;;
@@ -719,18 +721,17 @@
               ((= (length loa) 0) "") ;no arguments given
               ((null? (car loa)) "") ;end of recursion
               (else ;recure with cdr
-               (let ([s (car loa)])
-                 (string-append
-                  (cond
-                    ((string? s) s)
-                    ((boolean? s) (if s "#t" "#f"))
-                    ((symbol? s) (symbol->string s))
-                    ((number? s) (number->string s))
-                    ((list? s) (string-append "(" (D s) ")"))
-                    ((procedure? s) "<proc>")
-                    ((ast-node? s) (if (ast-has-child? 'name s) (symbol->string (ast-child 'name s)) "<node>"))
-                    (else "?")) " "
-                  (D (cdr loa)))))))])
+               (string-append (P (car loa)) " " (D (cdr loa))))))]
+       [P (lambda (s)
+             (cond
+               ((string? s) s)
+               ((boolean? s) (if s "#t" "#f"))
+               ((symbol? s) (symbol->string s))
+               ((number? s) (number->string s))
+               ((list? s) (string-append "(" (D s) ")"))
+               ((procedure? s) "<proc>")
+               ((ast-node? s) (if (ast-has-child? 'name s) (P (ast-child 'name s)) "<node>"))
+               (else "?")))])
     (when debugging (display (D args)) (display "\n"))))
 
 (define (print . args)
@@ -793,7 +794,7 @@
            [compName (comp->rev-string (ast-child 'comp clause))])
        (cons
         (if (ast-subtype? clause 'ProvClause) (list returnType compName evalValue)
-            (list returnType 'on (ast-child 'name (ast-child 'target clause))
+            (list returnType 'on (ast-child 'name (ast-parent (ast-parent (ast-child 'returntype clause))))
                   compName evalValue 'currently: (att-value 'actual-value clause)))
         result)))
    (list) loc))
@@ -885,14 +886,17 @@
   (with-output-to-file path
     (lambda () (for-each (lambda (x) (print-per-line x #t)) values) (newline))))
 
-(define (save-ilp path) (save-to-file path (att-value 'to-ilp ast)))
+(define (save-ilp path root) (save-to-file path (att-value 'to-ilp root)))
 (define (make) (save-ilp "gen/ilp.txt"))
 
 ;;; AST-Generation
 
-(define (call-n-times proc n) (debug n) (create-ast-list (if (>= 0 n) (list) (cons (proc n) (call-n-times proc (- n 1))))))
-(define (random n) 42) ;find a suitable impl
-(define (rand max digits offset) (lambda _ (+ offset (/ (random (* digits max)) digits))))
+(define (call-n-times proc n)
+  (letrec ([cnt (lambda (n) (if (>= 0 n) (list) (cons (proc n) (cnt (- n 1)))))])
+    (create-ast-list (cnt n))))
+(define (random n) (random-integer n)) ;find a suitable impl
+(define (rand max digits offset) (let ([factor (expt 10 digits)])
+                                   (lambda _ (inexact (+ offset (/ (random (* factor max)) factor))))))
 
 ; returns the (load freq HWRoot)
 (define (create-hw num-top-pe num-subs)
@@ -905,13 +909,13 @@
           [make-prov (lambda (p max digits offset)
                       (create-ast 'ProvClause (list p comp-eq (rand max digits offset))))])
      (letrec ([make-subs (lambda (outer-id total subs)
-                           (debug '~make-subs total subs)
+;                           (debug '~make-subs total subs)
                            (call-n-times (lambda (sub-n)
                                            (make-res (res-name outer-id sub-n)
                                                      (floor (/ (- total 1) subs)) subs)) (min total subs)))]
               [make-res
                (lambda (id total subs)
-                 (debug id total subs)
+;                 (debug id total subs)
                  (create-ast 'Resource
                              (list id only-type (make-subs id total subs)
                                    (create-ast-list (list (make-prov load 1 3 0) ; load = 0.001 - 1.000
@@ -926,36 +930,40 @@
 
 ; returns (mp-names prop-first-comp SWRoot)
 (define (create-sw load freq num-comp impl-per-comp mode-per-impl)
-  (define (prop-al) (list)) (define (last-comp) #f) (define (first-comp) #f) (define (mp-name) 'size)
-  (define (new-comp comp) (set! last-comp comp) (unless first-comp (set! first-comp comp)))
+  (define prop-al (list)) (define last-comp-nr #f) (define last-comp #f) (define first-comp #f) (define mp-name 'size)
+  (define (new-comp comp comp-nr) (set! last-comp-nr comp-nr) (set! last-comp comp)
+    (unless first-comp (set! first-comp comp-nr)))
   (with-specification
    spec
-   (let* ([make-prop (lambda (n) (create-ast 'Property (list n 'u 'runtime 'increasing 'max)))]
+   (let* ([node-name (lambda (outer-id n) (string->symbol (string-append (symbol->string outer-id) "-" (number->string n))))]
+          [make-sw-prop (lambda (n) (list (create-ast 'Property (list (node-name 'prop- n) 'u 'runtime 'increasing 'max))
+                                          (create-ast 'Property (list pn-energy 'J 'runtime 'decreasing 'sum))))]
           [prop (lambda (n) (let ([entry (assq n prop-al)])
-                              (if entry (cadr entry) ;entry found, return it
-                                  (let ([new (make-prop n)]) (set! prop-al (cons (list n new) prop-al)) new))))] ;new entry
-          [node-name (lambda (outer-id n) (string->symbol (string-append (symbol->string outer-id) "-" (number->string n))))]
+                              (if entry (cdr entry) ;entry found, return it
+                                  (let ([new (make-sw-prop n)]) (set! prop-al (cons (cons n new) prop-al)) new))))] ;new entry
           [make-req (lambda (p max digits offset) (create-ast 'ReqClause (list p comp-min-eq (rand max digits offset))))]
           [make-prov (lambda (p max digits offset) (create-ast 'ProvClause (list p comp-eq (rand max digits offset))))]
-          [make-mode (lambda (comp impl mode) (let ([cls (list (make-req load 1 2 0)
+          [make-mode (lambda (comp impl mode) (let* ([ps (prop comp)]
+                                                     [cls (list (make-req load 1 2 0)
                                                                (make-req freq 480 1 510)
-                                                               (make-prov (prop comp) comp 3 0))])
+                                                               (make-prov (car ps) comp 3 0) ;sw-property
+                                                               (make-prov (cadr ps) 100 3 0))]) ;energy
                                                 (create-ast
                                                  'Mode
                                                  (list
                                                   (node-name impl mode)
                                                   (create-ast-list
-                                                   (if (or (eq? last-comp #f)
+                                                   (if (or (eq? last-comp-nr #f)
                                                            (> (random 2) 1))
-                                                       (cls)
-                                                       (cons (make-req (prop (- last-comp 1)) last-comp 2 0) cls)))))))]
+                                                       cls
+                                                       (cons (make-req (car (prop (- last-comp-nr 1))) last-comp-nr 2 0) cls)))))))]
           [make-impl (lambda (comp comp-name impl) (let ([name (node-name comp-name impl)])
                                                      (create-ast
                                                       'Impl
                                                       (list
                                                        name
-                                                       (call-n-times (lambda (mode) (make-mode name mode)) mode-per-impl) ; Mode*
-                                                       (if (eq? last-comp #f) (list) (list last-comp)) ; reqcomps
+                                                       (call-n-times (lambda (mode) (make-mode comp name mode)) mode-per-impl) ; Mode*
+                                                       (if (eq? last-comp-nr #f) (list) (list last-comp)) ; reqcomps
                                                        #f #f))))]
           [make-comp (lambda (comp) (let ([name (node-name 'comp comp)])
                                       (create-ast
@@ -963,19 +971,22 @@
                                        (list
                                         name
                                         (call-n-times (lambda (impl) (make-impl comp name impl)) impl-per-comp) #f
-                                        (create-ast-list (list (prop comp)))))))]
+                                        (create-ast-list (prop comp))))))]
           [sw-root (create-ast
                     'SWRoot
-                    (list (call-n-times (lambda (n) (let ([comp (make-comp n)]) (new-comp n) comp)) num-comp)))])
-     (list (list mp-name) first-comp sw-root))))
+                    (list (call-n-times (lambda (n) (let ([comp (make-comp n)]) (new-comp comp n) comp)) num-comp)))])
+     (list (list mp-name) (car (prop first-comp)) sw-root))))
 
 (define (create-request mp-names prop)
-  (let ([make-req (lambda (p max digits offset) (create-ast 'ReqClause (list p comp-min-eq (rand max digits offset))))])
-    (create-ast
-     spec
-     'Request
-     (create-ast-list (map (lambda (mp-name) (create-ast 'MetaParameter mp-name (rand 100 2 0))) mp-names))
-     (create-ast-list (list (make-req prop 1 2 0))) #f)))
+  (with-specification
+   spec
+   (let ([make-req (lambda (p max digits offset) (create-ast 'ReqClause (list p comp-min-eq (rand max digits offset))))]
+         [target (ast-parent (ast-parent prop))])
+     (create-ast
+      'Request
+      (list
+       (create-ast-list (map (lambda (mp-name) (create-ast 'MetaParameter (list mp-name (rand 100 2 0)))) mp-names))
+       target (create-ast-list (list (make-req prop 1 2 0))) #f)))))
 
 
 (define (create-example-ast num-top-pe num-pe-subs num-comp impl-per-comp mode-per-impl)
@@ -988,6 +999,7 @@
          [prop-c1 (cadr sw-result)]
          [sw-root (caddr sw-result)])
     (create-ast
+     spec
      'Root
      (list hw-root
            sw-root
