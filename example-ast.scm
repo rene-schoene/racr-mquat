@@ -4,9 +4,9 @@
  (mquat example-ast)
  (export example-ast comp1 comp2 impl1a impl1b impl1c cb1 cb2)
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
-         (mquat ast) (mquat constants))
+         (mquat ast) (mquat constants) (mquat main) (mquat ui))
  
- (define (example-ast mquat-spec)
+ (define example-ast
    (with-specification
     mquat-spec
     (let*
@@ -114,8 +114,7 @@
                    (make-simple-mode
                     (lambda _ 0) ;propload
                     (list (create-ast 'ReqClause (list rt-C2 comp-max-eq (lambda _ -1))))
-                    energy-c1
-                    (lambda _ 100) ;energy
+                    energy-c1 (lambda _ 100) ;energy
                     rt-C1 (lambda _ 0.2) ;response-time
                     'default-mode-1c)))
                  (list comp2) #f #f))]

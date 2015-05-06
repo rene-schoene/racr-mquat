@@ -2,7 +2,8 @@
 
 (library
  (mquat ui)
- (export cim hw req obj clauses-met? deploy-on use-next-impl)
+ (export cim hw req obj clauses-met? deploy-on use-next-impl
+         display-part display-ast)
  (import (rnrs) (racr core) (racr testing)
          (mquat constants))
 

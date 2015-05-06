@@ -3,5 +3,7 @@ utils
 ast
 basic-ag
 ilp
-example-ast
 ui
+ast-generation
+main
+example-ast

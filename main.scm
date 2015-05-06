@@ -7,7 +7,7 @@
          (mquat ast)
          (mquat basic-ag)
          (mquat ilp)
-         (mquat example-ast))
+         (mquat ast-generation))
  
  (define mquat-spec (create-specification))
 
@@ -15,4 +15,6 @@
    (specify&compile-ast mquat-spec))
  
  (when (= (specification->phase mquat-spec) 2)
-   (add-basic-ags mquat-spec)))
+   (add-basic-ags mquat-spec)
+   (add-ilp-ags mquat-spec)
+   (compile-ag-specifications mquat-spec)))
