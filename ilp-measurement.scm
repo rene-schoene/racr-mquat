@@ -2,20 +2,49 @@
 
 (library
  (mquat ilp-measurement)
- (export rewrite)
- (import (rnrs) (racr core) (racr testing) (srfi :19)
-         (mquat constants) (mquat utils) (mquat main) (mquat ilp) (mquat ast-generation))
+ (export run-test-one)
+ (import (rnrs) (racr core) (srfi :19)
+         (mquat utils) (mquat main) (mquat ilp) (mquat ast-generation) (mquat ui))
  
- (define (rewrite comp-name prop-name new-value ast)
+ (define (rw comp-name restype prop-name new-value ast)
+   (debug comp-name prop-name new-value ast)
    (rewrite-terminal 'value (att-value 'provided-clause (find (lambda (pe) (eq? (ast-child 'name pe) comp-name))
-                                                              (att-value 'every-pe ast)) prop-name 'theType) (lambda _ new-value)))
+                                                              (att-value 'every-pe ast)) prop-name restype)
+                     (lambda _ new-value)))
  
- (define (save-ilp-timed name ast)
-   (let ([result (time-it (lambda _ (save-ilp (string-append name ".txt") ast)))])
-     (save-to-file (string-append name "-time.txt") (list (time-second (car result) (time-nanosecond (car result)))))))
+ (define (rw* restype prop-name new-value? ast)
+   (for-each
+    (lambda (pe) (rewrite-terminal 'value (att-value 'provided-clause pe prop-name restype)
+                                   (if new-value? (lambda _ new-value?) (rand 1 3 0))))
+    (att-value 'every-pe ast)))
+ 
+ (define (sit name ast) ; [s]ave-[i]lp-[t]imed
+   (let ([result (time-it (lambda _ (save-ilp (string-append name ".lp") ast)))])
+     (save-to-file (string-append name ".lp.time") (list (time-second (cdr result)) (time-nanosecond (cdr result))))))
+ 
+ ;;; Test definitions
+ 
+ (define (run-tests)
+   (run-test-one))
  
  (define (run-test-one)
-   (define ast
-     (create-example-ast 10 0 1 1 2))
-   (save-ilp-timed "test/one/01" ast))
- )
+   (let* ([ast (create-example-ast mquat-spec 10 0 1 1 2)]
+          [rt (ast-child 1 (ast-child 'ResourceType* (ast-child 'HWRoot ast)))]
+          [was-debugging debugging?])
+     (debug "Running test one")
+     (set!debugging #f)
+     (sit "test/one/01-init" ast)
+     (rw 'res-1 rt 'load 0.1 ast) (sit "test/one/02-comp1" ast)
+     (rw 'res-1 rt 'load 0.5 ast) (sit "test/one/03-comp1" ast)
+     (rw 'res-1 rt 'load 0.8 ast) (rw 'res-2 rt 'load 0.8 ast) (rw 'res-3 rt 'load 0.8 ast) (sit "test/one/04-three-comps" ast)
+     (rw* rt 'load 0.1 ast) (sit "test/one/05-every-comp" ast)
+     (rw* rt 'load #f ast) (sit "test/one/06-every-comp-rand" ast)
+     (rw* rt 'load #f ast) (sit "test/one/07-every-comp-rand" ast)
+     (rw* rt 'load #f ast) (sit "test/one/08-every-comp-rand" ast)
+     (set!debugging was-debugging)))
+ 
+ (define (test)
+   (create-example-ast mquat-spec 10 0 1 1 2))
+ 
+ (when (find (lambda (arg) (string=? "all" arg)) (command-line))
+   (run-tests)))
