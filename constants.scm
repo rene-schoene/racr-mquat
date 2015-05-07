@@ -2,13 +2,11 @@
 
 (library
  (mquat constants)
- (export debugging
-         pn-energy agg-max agg-sum
+ (export pn-energy agg-max agg-sum
          comp-min-eq comp-max-eq comp-eq f-comp-max-diff-eq
          comp-names comp->string comp->rev-string comp->name)
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27))
  
- (define debugging #t)
  (define pn-energy 'energy-consumption) ; Name of the property energy-consumption and as default objective function property name
  (define agg-max 1) (define agg-sum 2)  ; Used in agg of property to describe how to aggregate the property
  (define comp-min-eq (lambda (req act) (<= req act)))

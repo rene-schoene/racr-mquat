@@ -4,7 +4,7 @@
  (mquat utils)
  (export add-to-al merge-al union intersect-b ;associate lists
          lonely? ast-pp recur recur2 recur3 ;ast
-         debug save-to-file time-it) ;misc
+         debug save-to-file time-it set!debugging debugging?) ;misc
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (mquat constants))
  
@@ -66,7 +66,13 @@
                 (debug "rec2" n att-name child-name "arg1:" arg1 "arg2:" arg2 "arg3:" arg3 "result:" (att-value att-name sub arg1 arg2 arg3))
                 (op result (att-value att-name sub arg1 arg2 arg3)))
               (list) (ast-children (ast-child child-name n))))
+
+ ;; Debugging
  
+ (define debugging #t)
+ (define (set!debugging b)
+   (set! debugging b))
+ (define (debugging?) debugging)
  ; Displays the given arguments
  (define (debug . args)
   (letrec
@@ -117,4 +123,4 @@
  (define (time-it proc)
   (let ([before (current-time)])
     (let ([result (proc)])
-      (list result (time-difference (current-time) before))))))
+      (cons result (time-difference (current-time) before))))))
