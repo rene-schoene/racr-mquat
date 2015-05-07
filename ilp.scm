@@ -288,5 +288,5 @@
                                                "#" rpname))))))))) ; Mode
  
  (define (save-ilp path root) (save-to-file path (att-value 'to-ilp root)))
- (define (make-ilp) (save-ilp "gen/ilp.txt")))
+ (define (make-ilp root) (save-ilp "gen/ilp.txt" root)))
  

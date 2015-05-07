@@ -2,7 +2,7 @@
 
 (library
  (mquat ast-generation)
- (export create-hw create-sw create-example-ast)
+ (export create-hw create-sw create-example-ast rand)
  (import (rnrs) (racr core) (srfi :27)
          (mquat constants))
  
@@ -15,7 +15,7 @@
  (define (rand max digits offset) (let ([factor (expt 10 digits)])
                                     (lambda _ (inexact (+ offset (/ (random (* factor max)) factor))))))
  
- ; returns the (load freq HWRoot)
+ ; Returns the (load freq HWRoot)
  (define (create-hw mquat-spec num-pe num-subs)
    (with-specification
     mquat-spec
@@ -26,13 +26,13 @@
            [make-prov (lambda (p max digits offset)
                         (create-ast 'ProvClause (list p comp-eq (rand max digits offset))))])
       (letrec ([make-subs (lambda (outer-id total subs)
-                            ;                           (debug '~make-subs total subs)
+                            ;(debug '~make-subs total subs)
                             (call-n-times (lambda (sub-n)
                                             (make-res (res-name outer-id sub-n)
                                                       (floor (/ (- total 1) subs)) subs)) (min total subs)))]
                [make-res
                 (lambda (id total subs)
-                  ;                 (debug id total subs)
+                  ;(debug id total subs)
                   (create-ast 'Resource
                               (list id only-type (make-subs id total subs)
                                     (create-ast-list (list (make-prov load 1 3 0) ; load = 0.001 - 1.000
@@ -43,7 +43,7 @@
           'HWRoot
           (list
            (create-ast-list (list only-type))
-           (make-subs 'res num-pe num-subs))))))))
+           (make-subs 'res num-pe (if (= 0 num-subs) num-pe num-subs)))))))))
  
  ; returns (mp-names prop-first-comp SWRoot)
  (define (create-sw mquat-spec load freq num-comp impl-per-comp mode-per-impl)
@@ -105,13 +105,12 @@
         (create-ast-list (map (lambda (mp-name) (create-ast 'MetaParameter (list mp-name (rand 100 2 0)))) mp-names))
         target (create-ast-list (list (make-req prop 1 2 0))) #f)))))
  
- 
  (define (create-example-ast mquat-spec num-pe num-pe-subs num-comp impl-per-comp mode-per-impl)
    (let* ([hw-result (create-hw mquat-spec num-pe num-pe-subs)]
           [load (car hw-result)]
           [freq (cadr hw-result)]
           [hw-root (caddr hw-result)]
-          [sw-result (create-sw load mquat-spec freq num-comp impl-per-comp mode-per-impl)]
+          [sw-result (create-sw mquat-spec load freq num-comp impl-per-comp mode-per-impl)]
           [mp-names (car sw-result)]
           [prop-c1 (cadr sw-result)]
           [sw-root (caddr sw-result)])
