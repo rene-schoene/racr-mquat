@@ -146,7 +146,7 @@
             (append
              (list (string-append "request("(att-value 'ilp-name prov) "_" (comp->name comp) "): "))
              (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
-             (cons* ">=" (f-req (list) (caar req-entry) "")))
+             (cons* ">=" (f-prov (list) (caar req-entry) "")))
             (append
              (list (string-append (att-value 'ilp-name prov) "_" (comp->name comp) ": "))
              (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)

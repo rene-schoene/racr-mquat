@@ -28,23 +28,23 @@
    (run-test-one))
  
  (define (run-test-one)
-   (let* ([ast (create-example-ast mquat-spec 10 0 1 1 2)]
+   (let* ([ast (create-system mquat-spec 10 0 1 1 2)]
           [rt (ast-child 1 (ast-child 'ResourceType* (ast-child 'HWRoot ast)))]
           [was-debugging debugging?])
      (debug "Running test one")
      (set!debugging #f)
-     (sit "test/one/01-init" ast)
-     (rw 'res-1 rt 'load 0.1 ast) (sit "test/one/02-comp1" ast)
-     (rw 'res-1 rt 'load 0.5 ast) (sit "test/one/03-comp1" ast)
-     (rw 'res-1 rt 'load 0.8 ast) (rw 'res-2 rt 'load 0.8 ast) (rw 'res-3 rt 'load 0.8 ast) (sit "test/one/04-three-comps" ast)
-     (rw* rt 'load 0.1 ast) (sit "test/one/05-every-comp" ast)
-     (rw* rt 'load #f ast) (sit "test/one/06-every-comp-rand" ast)
-     (rw* rt 'load #f ast) (sit "test/one/07-every-comp-rand" ast)
-     (rw* rt 'load #f ast) (sit "test/one/08-every-comp-rand" ast)
+     (sit "profiling/one/01-init" ast)
+     (rw 'res-1 rt 'load 0.1 ast) (sit "profiling/one/02-comp1" ast)
+     (rw 'res-1 rt 'load 0.5 ast) (sit "profiling/one/03-comp1" ast)
+     (rw 'res-1 rt 'load 0.8 ast) (rw 'res-2 rt 'load 0.8 ast) (rw 'res-3 rt 'load 0.8 ast)
+     (sit "profiling/one/04-three-comps" ast)
+     (rw* rt 'load 0.1 ast) (sit "profiling/one/05-every-comp" ast)
+     (rw* rt 'load #f ast) (sit "profiling/one/06-every-comp-rand" ast)
+     (rw* rt 'load #f ast) (sit "profiling/one/07-every-comp-rand" ast)
+     (rw* rt 'load #f ast) (sit "profiling/one/08-every-comp-rand" ast)
      (set!debugging was-debugging)))
  
- (define (test)
-   (create-example-ast mquat-spec 10 0 1 1 2))
+ (define (test) (create-system mquat-spec 10 0 1 1 2))
  
  (when (find (lambda (arg) (string=? "all" arg)) (command-line))
    (run-tests)))

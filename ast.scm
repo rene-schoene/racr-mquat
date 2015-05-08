@@ -3,7 +3,7 @@
 (library
  (mquat ast)
  (export specify&compile-ast)
- (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27))
+ (import (rnrs) (racr core))
  
  (define (specify&compile-ast mquat-spec)
    (with-specification
