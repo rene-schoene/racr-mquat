@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
-import re, unittest, os
+import re, unittest, os, shutil
 from fabric.api import lcd, local
 from fabric.colors import red
 
-fname_sol = "test/tmp.sol"
-fname_lp = "test/tmp.lp"
 RACR_BIN="/home/rschoene/git/racr/racr/racket-bin"
 MQUAT_BIN="/home/rschoene/git/racr-mquat/racket-bin"
 
@@ -54,59 +52,113 @@ def read_solution(fname):
 	return (obj,sol)
 
 
-class ILPTest(unittest.TestCase):
+class AbstractILPTest(unittest.TestCase):
+
+	longMessage = True
+	fname_lp_racket = "test/tmp.lp"
+
+	def solution_file(self, name):
+		return "test/%s.sol" % name
+
+	def lp_file(self, name):
+		return "test/%s.lp" % name
 
 	def run_case(self, name):
+		fname_sol = self.solution_file(name)
+		fname_lp_python = self.lp_file(name)
 		if run_racket:
-			if os.path.exists(fname_lp):
-				os.remove(fname_lp)
+			if os.path.exists(self.fname_lp_racket):
+				os.remove(self.fname_lp_racket)
 			if os.path.exists(fname_sol):
 				os.remove(fname_sol)
-			# generate the ilp in test/tmp.lp
+			# generate the ilp
 			local('racket -S %s -S %s ilp-test.scm run %s' % (RACR_BIN, MQUAT_BIN, name))
-		self.assertTrue(os.path.exists(fname_lp), "ILP was not generated")
-		out = local('glpsol --lp %s -o %s' % (fname_lp, fname_sol), capture = True)
+			shutil.copyfile(self.fname_lp_racket, fname_lp_python)
+		self.assertTrue(os.path.exists(fname_lp_python), "ILP was not generated")
+		out = local('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol), capture = True)
 		self.assertTrue(os.path.exists(fname_sol), "No solution file created")
 		self.assertTrue(re.search('INTEGER OPTIMAL SOLUTION FOUND', out), "No solution found")
 		return read_solution(fname_sol)
 
-	def test_two_modes(self):
-		obj,sol = self.run_case('1')
+class ILPTestForModes(AbstractILPTest):
+
+	def test_2m(self):
+		obj,sol = self.run_case(1)
 		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
 		self.assertTrue(sol['b#comp_1##comp_1_1_1#res_1'] == 1 or sol['b#comp_1##comp_1_1_1#res_2'] == 1,
 			"First mode is not deployed")
-		self.assertEqual(obj, 10, "Wrong objective value %s" % obj)
+		self.assertEqual(obj, 10.001, "Wrong objective value %s" % obj)
 
-	def test_two_modes_1max_good(self):
-		obj,sol = self.run_case('2')
+	def test_2m_1max(self):
+		obj,sol = self.run_case(2)
 		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
 		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
 			"First mode is not deployed")
-		self.assertEqual(obj, 20, "Wrong objective value %s" % obj)
+		self.assertEqual(obj, 20.002, "Wrong objective value %s" % obj)
 
-	def test_two_modes_1min_good(self):
-		obj,sol = self.run_case('3')
+	def test_2m_1min(self):
+		obj,sol = self.run_case(3)
 		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
 		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
 			"First mode is not deployed")
-		self.assertEqual(obj, 30, "Wrong objective value %s" % obj)
+		self.assertEqual(obj, 20.003, "Wrong objective value %s" % obj)
 
-	def test_two_modes_1req_min_good(self):
-		obj,sol = self.run_case('4')
+	def test_2m__req_1min(self):
+		obj,sol = self.run_case(4)
 		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
 		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
 			"First mode is not deployed")
-		self.assertEqual(obj, 40, "Wrong objective value %s" % obj)
+		self.assertEqual(obj, 20.004, "Wrong objective value %s" % obj)
 
-	def test_two_modes_1req_max_good(self):
-		obj,sol = self.run_case('5')
+	def test_2m_req_1max(self):
+		obj,sol = self.run_case(5)
 		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
 		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
 			"First mode is not deployed")
-		self.assertEqual(obj, 50, "Wrong objective value %s" % obj)
+		self.assertEqual(obj, 20.005, "Wrong objective value %s" % obj)
+
+	def test_2m_res1(self):
+		obj,sol = self.run_case(6)
+		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
+		self.assertEqual(sol['b#comp_1##comp_1_1_1#res_1'], 1, "First mode is not deployed on first resource")
+		self.assertEqual(obj, 10.006, "Wrong objective value %s" % obj)
+
+	def test_2m_res2(self):
+		obj,sol = self.run_case(7)
+		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
+		self.assertEqual(sol['b#comp_1##comp_1_1_1#res_2'], 1, "First mode is not deployed on second resource")
+		self.assertEqual(obj, 10.007, "Wrong objective value %s" % obj)
+
+class ILPTestForImpls(AbstractILPTest):
+
+	def test_2i2(self):
+		obj,sol = self.run_case(100)
+		self.assertEqual(sol['b#comp_1#comp_1_1'], 1, "First implementation is not deployed!")
+		self.assertEqual(sol['b#comp_1#comp_1_2'], 0, "Seond implementation is deployed!")
+		self.assertTrue(sol['b#comp_1#comp_1_1#comp_1_1_1#res_1'] == 1 or sol['b#comp_1#comp_1_1#comp_1_1_1#res_2'] == 1
+			 or sol['b#comp_1#comp_1_1#comp_1_1_1#res_3'] == 1, "First mode of first impl is not deployed")
+		self.assertEqual(obj, 10.100, "Wrong objective value %s" % obj)
+
+	def test_2i2_2nd(self):
+		for test_id in [101, 105]:
+			obj,sol = self.run_case(test_id)
+			self.assertEqual(sol['b#comp_1#comp_1_1'], 1, "First implementation is not deployed!")
+			self.assertEqual(sol['b#comp_1#comp_1_2'], 0, "Seond implementation is deployed!")
+			self.assertTrue(sol['b#comp_1#comp_1_1#comp_1_1_2#res_1'] == 1 or sol['b#comp_1#comp_1_1#comp_1_1_2#res_2'] == 1
+				 or sol['b#comp_1#comp_1_1#comp_1_1_2#res_3'] == 1, "Second mode of first impl is not deployed")
+			self.assertEqual(obj, 15 + (test_id / 1000.0), "Wrong objective value %s" % obj)
+
+	def test_2i2_3rd(self):
+		for test_id in [102, 103, 104]:
+			obj,sol = self.run_case(test_id)
+			self.assertEqual(sol['b#comp_1#comp_1_1'], 0, "First implementation is deployed!")
+			self.assertEqual(sol['b#comp_1#comp_1_2'], 1, "Seond implementation is not deployed!")
+			self.assertTrue(sol['b#comp_1#comp_1_2#comp_1_2_1#res_1'] == 1 or sol['b#comp_1#comp_1_2#comp_1_2_1#res_2'] == 1
+				 or sol['b#comp_1#comp_1_2#comp_1_2_1#res_3'] == 1, "Third mode of first impl is not deployed")
+			self.assertEqual(obj, 20 + (test_id / 1000.0), "Wrong objective value %s" % obj)
 
 
-#print read_solution('gen/printable.txt')
+#print read_solution('test/tmp.sol'); exit(0)
 
 if __name__ == '__main__':
     unittest.main()
