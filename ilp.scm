@@ -29,7 +29,6 @@
             (att-value 'ilp-nego n)) ; NFP-negotiation
            (list "Bounds")
            (append
-            (att-value 'to-ilp (ast-child 'HWRoot n))
             (map (lambda (var) (list 0 "<=" var "<=" 1)) binary-vars))
            (list "Generals")
            binary-vars
@@ -66,14 +65,7 @@
                  (append (fold-left (lambda (inner mode) (cons* "+" (att-value 'ilp-binvar-deployed mode pe) inner))
                                     (list) (ast-children (ast-child 'Mode* n))) result))
                (list "-" (att-value 'ilp-binvar n) "=" 0)
-               (att-value 'every-pe n)))))
-     (HWRoot (lambda (n) (recur append n 'to-ilp 'Resource*)))
-     (Resource
-      (lambda (n)
-        (fold-left
-         (lambda (result c)
-           (cons (list 0 "<=" (att-value 'ilp-propname c) "<=" (att-value 'eval-on c n)) result))
-         (list) (ast-children (ast-child 'ProvClause* n))))))
+               (att-value 'every-pe n))))))
     
     (ag-rule request-target? (Comp (lambda (n) (eq? (ast-child 'target (att-value 'get-request n)) n))))
     
@@ -132,21 +124,21 @@
                              constraints)))) (list) provs))
     
     (define (make-constraint prov prov-entry req-entry comp request?)
-      (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
-             [f-prov (if (eq? comp comp-max-eq)
-                         ; prov for max: (maximum - val)
-                         (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint))
-                         (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
-             [f-req (if (eq? comp comp-max-eq)
-                        ; req for max: - (maximum - val) = val - maximum
-                        (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
-                        (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
-        (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov "request?" request?)
-        (if request?
-            (append
-             (list (string-append "request("(att-value 'ilp-name prov) "_" (comp->name comp) "): "))
-             (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
-             (cons* ">=" (f-prov (list) (caar req-entry) "")))
+      (if request?
+          (append
+           (list (string-append "request("(att-value 'ilp-name prov) "_" (comp->name comp) "): "))
+           (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
+           (cons* (comp->rev-string comp) (car req-entry)))
+          (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
+                 [f-prov (if (eq? comp comp-max-eq)
+                             ; prov for max: (maximum - val)
+                             (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint))
+                             (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
+                 [f-req (if (eq? comp comp-max-eq)
+                            ; req for max: - (maximum - val) = val - maximum
+                            (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
+                            (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
+            (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov "request?" request?)
             (append
              (list (string-append (att-value 'ilp-name prov) "_" (comp->name comp) ": "))
              (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
@@ -274,18 +266,7 @@
                (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-comp impl)))
                                                 "#"  (if (lonely? impl) "" (symbol->string (ast-child 'name (att-value 'get-impl n))))
                                                 "#"  (if (lonely? n) "" (symbol->string (ast-child 'name n)))
-                                                "#"  (symbol->string (ast-child 'name pe))))))))
-    
-    (ag-rule
-     ilp-propname
-     (Clause
-      (lambda (n)
-        (let ([pp (ast-parent (ast-parent n))]
-              [rpname (symbol->string (ast-child 'name (ast-child 'returntype n)))])
-          (ilp-conform-name (if (ast-subtype? pp 'Resource)
-                                (string-append (symbol->string (ast-child 'name pp)) "#" rpname) ; Resource
-                                (string-append (symbol->string (ast-child 'name (att-value 'get-impl pp)))
-                                               "#" rpname))))))))) ; Mode
+                                                "#"  (symbol->string (ast-child 'name pe))))))))))
  
  (define (save-ilp path root) (save-to-file path (att-value 'to-ilp root)))
  (define (make-ilp root) (save-ilp "gen/ilp.txt" root)))
