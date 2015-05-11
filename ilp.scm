@@ -4,8 +4,25 @@
  (mquat ilp)
  (export add-ilp-ags save-ilp make-ilp)
  (import (rnrs) (racr core) (racr testing)
-         (mquat constants) (mquat utils))
+         (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
  
+ (define (=to-ilp n)                    (att-value 'to-ilp n))
+ (define (=ilp-name n)                  (att-value 'ilp-name n))
+ (define (=ilp-binvar n)                (att-value 'ilp-binvar n))
+ (define (=ilp-binvar-deployed n pe)    (att-value 'ilp-binvar-deployed n pe))
+ (define (=ilp-binary-vars n)           (att-value 'ilp-binary-vars n))
+ (define =ilp-objective
+   (case-lambda ((n)                    (att-value 'ilp-objective n))
+                ((n pe)                 (att-value 'ilp-objective n pe))))
+ (define (=ilp-nego n)                  (att-value 'ilp-nego n))
+ (define (=ilp-nego-sw n)               (att-value 'ilp-nego-sw n))
+ (define =ilp-nego-reqc
+   (case-lambda ((n comp)               (att-value 'ilp-nego-reqc n comp))
+                ((n clausetype comp)    (att-value 'ilp-nego-reqc n clausetype comp))))
+ (define (=ilp-nego-hw n)               (att-value 'ilp-nego-hw n))
+ (define (=ilp-req-hw-properties n)     (att-value 'required-hw-properties n))
+ (define (=ilp-nego-hw0 n comp prop pe) (att-value 'ilp-nego-hw0 n comp prop pe))
+
  (define (add-ilp-ags mquat-spec)
    (with-specification
     mquat-spec
@@ -18,56 +35,56 @@
      to-ilp
      (Root
       (lambda (n)
-        (let ([binary-vars (att-value 'ilp-binary-vars n)])
+        (let ([binary-vars (=ilp-binary-vars n)])
           (list
            (list "Minimize")
-           (att-value 'ilp-objective n)
+           (=ilp-objective n)
            (list "Subject To")
            (append
-            (att-value 'to-ilp (ast-child 'Request n)) ; request-constraints
-            (att-value 'to-ilp (ast-child 'SWRoot n)) ; archtitecture-constraints
-            (att-value 'ilp-nego n)) ; NFP-negotiation
+            (=to-ilp (<=request n)) ; request-constraints
+            (=to-ilp (->SWRoot n)) ; archtitecture-constraints
+            (=ilp-nego n)) ; NFP-negotiation
            (list "Bounds")
            (append
             (map (lambda (var) (list 0 "<=" var "<=" 1)) binary-vars))
            (list "Generals")
            binary-vars
            (list "End")))))
-     (Request (lambda (n) (att-value 'ilp-nego-sw n)))
+     (Request (lambda (n) (=ilp-nego-sw n)))
      (SWRoot (lambda (n) (recur append n 'to-ilp 'Comp*)))
      (Comp
       (lambda (n)
-        (debug "Comp:" (ast-child 'name n))
+        (debug "Comp:" (->name n))
         (let ([ics (recur cons n 'to-ilp 'Impl*)])
           (cons
            (fold-left
             (lambda (result entry)
               (cons
                (append
-                (list (string-append (att-value 'ilp-name n) "_requires_" (att-value 'ilp-name (car entry)) ": "))
-                (fold-left (lambda (inner impl) (cons* "-" (att-value 'ilp-binvar impl) inner)) (list) (cadr entry))
-                (fold-left (lambda (inner impl) (cons* "+" (att-value 'ilp-binvar impl) inner)) (list)
-                           (ast-children (ast-child 'Impl* (car entry))))
+                (list (string-append (=ilp-name n) "_requires_" (=ilp-name (car entry)) ": "))
+                (fold-left (lambda (inner impl) (cons* "-" (=ilp-binvar impl) inner)) (list) (cadr entry))
+                (fold-left (lambda (inner impl) (cons* "+" (=ilp-binvar impl) inner)) (list)
+                           (->* (->Impl* (car entry))))
                 (list "=" 0)) result))
-            (list) (att-value 'req-comp-map n))
+            (list) (=req-comp-map n))
            (if (att-value 'request-target? n)
                (cons
-                (cons (string-append "request_target_" (att-value 'ilp-name n) ": ")
-                      (fold-left (lambda (inner impl) (cons* "+" (att-value 'ilp-binvar impl) inner))
-                                 (list "=" 1) (ast-children (ast-child 'Impl* n))))
+                (cons (string-append "request_target_" (=ilp-name n) ": ")
+                      (fold-left (lambda (inner impl) (cons* "+" (=ilp-binvar impl) inner))
+                                 (list "=" 1) (->* (->Impl* n))))
                 ics) ics))))) ; list of cons, and else-branch
      (Impl
       (lambda (n)
-        (debug "Impl:" (ast-child 'name n))
-        (cons (string-append "single(" (att-value 'ilp-name n) "): ")
+        (debug "Impl:" (->name n))
+        (cons (string-append "single(" (=ilp-name n) "): ")
               (fold-left ; deploy one combination of mode and pe for this impl
                (lambda (result pe)
-                 (append (fold-left (lambda (inner mode) (cons* "+" (att-value 'ilp-binvar-deployed mode pe) inner))
-                                    (list) (ast-children (ast-child 'Mode* n))) result))
-               (list "-" (att-value 'ilp-binvar n) "=" 0)
-               (att-value 'every-pe n))))))
+                 (append (fold-left (lambda (inner mode) (cons* "+" (=ilp-binvar-deployed mode pe) inner))
+                                    (list) (->* (->Mode* n))) result))
+               (list "-" (=ilp-binvar n) "=" 0)
+               (=every-pe n))))))
     
-    (ag-rule request-target? (Comp (lambda (n) (eq? (ast-child 'target (att-value 'get-request n)) n))))
+    (ag-rule request-target? (Comp (lambda (n) (eq? (->target (<=request n)) n))))
     
     (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
     
@@ -78,20 +95,20 @@
         (fold-left
          (lambda (result mode)
            (cons*
-            (fold-left (lambda (inner pe) (cons* (prepend-sign (att-value 'ilp-objective mode pe))
-                                                 (att-value 'ilp-binvar-deployed mode pe) inner))
-                       (list) (att-value 'every-pe n))
+            (fold-left (lambda (inner pe) (cons* (prepend-sign (=ilp-objective mode pe))
+                                                 (=ilp-binvar-deployed mode pe) inner))
+                       (list) (=every-pe n))
             result))
-         (list) (att-value 'every-mode n))))
-     (Mode (lambda (n pe) (att-value 'eval-on (att-value 'provided-clause n pn-energy) pe))))
+         (list) (=every-mode n))))
+     (Mode (lambda (n pe) (=eval-on (=provided-clause n pn-energy) pe))))
     
     ; Creates a list of NFP-negotiation constraints
     (ag-rule
      ilp-nego
-     (Root (lambda (n) (remove (list) (att-value 'ilp-nego (ast-child 'SWRoot n))))) ; remove empty constraints
+     (Root (lambda (n) (remove (list) (=ilp-nego (->SWRoot n))))) ; remove empty constraints
      (SWRoot (lambda (n) (recur append n 'ilp-nego 'Comp*)))
-     (Comp (lambda (n) (append (att-value 'ilp-nego-sw n)
-                               (att-value 'ilp-nego-hw n)))))
+     (Comp (lambda (n) (append (=ilp-nego-sw n)
+                               (=ilp-nego-hw n)))))
     
     (ag-rule
      ilp-nego-sw
@@ -101,16 +118,16 @@
          (lambda (result entry)
            (append
             (make-constraints
-             (att-value 'ilp-nego-reqc (car entry) 'ProvClause comp-eq) ;provs
-             (att-value 'ilp-nego-reqc n 'ReqClause comp-max-eq) ;max-reqs
-             (att-value 'ilp-nego-reqc n 'ReqClause comp-min-eq) #f) ;min-reqs,request?
-            result)) (list) (att-value 'req-comp-map n))))
+             (=ilp-nego-reqc (car entry) 'ProvClause comp-eq) ;provs
+             (=ilp-nego-reqc n 'ReqClause comp-max-eq) ;max-reqs
+             (=ilp-nego-reqc n 'ReqClause comp-min-eq) #f) ;min-reqs,request?
+            result)) (list) (=req-comp-map n))))
      (Request
       (lambda (n)
         (make-constraints
-         (att-value 'ilp-nego-reqc (ast-child 'target n) 'ProvClause comp-eq) ;provs
-         (att-value 'ilp-nego-reqc n comp-max-eq) ;max-reqs
-         (att-value 'ilp-nego-reqc n comp-min-eq) #t)))) ;min-reqs,request?
+         (=ilp-nego-reqc (->target n) 'ProvClause comp-eq) ;provs
+         (=ilp-nego-reqc n comp-max-eq) ;max-reqs
+         (=ilp-nego-reqc n comp-min-eq) #t)))) ;min-reqs,request?
     
     (define (make-constraints provs max-reqs min-reqs request?)
       (fold-left ; fold over provisions
@@ -126,7 +143,7 @@
     (define (make-constraint prov prov-entry req-entry comp request?)
       (if request?
           (append
-           (list (string-append "request("(att-value 'ilp-name prov) "_" (comp->name comp) "): "))
+           (list (string-append "request("(=ilp-name prov) "_" (comp->name comp) "): "))
            (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
            (cons* (comp->rev-string comp) (car req-entry)))
           (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
@@ -140,7 +157,7 @@
                             (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
             (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov "request?" request?)
             (append
-             (list (string-append (att-value 'ilp-name prov) "_" (comp->name comp) ": "))
+             (list (string-append (=ilp-name prov) "_" (comp->name comp) ": "))
              (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
              (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
              (list ">= 0")))))
@@ -157,25 +174,25 @@
       (lambda (n clausetype comparator)
         (fold-left
          (lambda (result clause)
-           (if (and (ast-subtype? clause clausetype) (eq? (ast-child 'comp clause) comparator))
+           (if (and (ast-subtype? clause clausetype) (eq? (->comparator clause) comparator))
                (fold-left ; fold over pe
                 (lambda (inner pe)
-                  (add-to-al inner (ast-child 'returntype clause)
-                             (list (att-value 'eval-on clause pe) (att-value 'ilp-binvar-deployed n pe))))
-                result (att-value 'every-pe n))
+                  (add-to-al inner (->return-type clause)
+                             (list (=eval-on clause pe) (=ilp-binvar-deployed n pe))))
+                result (=every-pe n))
                result))
          (list) (att-value 'combined-reqs n))))
      (Request
       (lambda (n comparator)
         (fold-left
          (lambda (result clause)
-           (if (eq? (ast-child 'comp clause) comparator)
-               (add-to-al result (ast-child 'returntype clause) (list (att-value 'eval-on clause #f) "")) ;use arbitrary target #f
+           (if (eq? (->comparator clause) comparator)
+               (add-to-al result (->return-type clause) (list (=eval-on clause #f) "")) ;use arbitrary target #f
                result))
-         (list) (ast-children (ast-child 'Constraints n))))))
+         (list) (->* (->Constraints n))))))
     
-    (ag-rule combined-reqs (Mode (lambda (n) (append (ast-children (ast-child 'Clause* n))
-                                                     (ast-children (ast-child 'Constraints (att-value 'get-request n)))))))
+    (ag-rule combined-reqs (Mode (lambda (n) (append (->* (->Clause* n))
+                                                     (->* (->Constraints (<=request n)))))))
     
     (ag-rule
      ilp-nego-hw
@@ -185,37 +202,37 @@
          (lambda (result cp) ;[c]omparator+[p]roperty
            (append
             (fold-left
-             (lambda (inner pe) (cons (att-value 'ilp-nego-hw0 n (car cp) (cadr cp) pe) inner))
-             (list) (att-value 'every-pe n))
+             (lambda (inner pe) (cons (=ilp-nego-hw0 n (car cp) (cadr cp) pe) inner))
+             (list) (=every-pe n))
             result))
-         (list) (att-value 'required-hw-properties n)))))
+         (list) (=ilp-req-hw-properties n)))))
     
     (ag-rule
      ilp-nego-hw0
      (Comp
       (lambda (n comp prop pe)
         (let* ([lop (fold-left ;here we have a [l]ist [o]f [p]airs (evaled-prop mode-on-pe-name)
-                     (lambda (result impl) (append (att-value 'ilp-nego-hw0 impl comp prop pe) result))
-                     (list) (ast-children (ast-child 'Impl* n)))]
+                     (lambda (result impl) (append (=ilp-nego-hw0 impl comp prop pe) result))
+                     (list) (->* (->Impl* n)))]
                [maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 lop))]
                [f (if (eq? comp comp-max-eq)
                       (lambda (val)
                         (prepend-sign (- maximum val))) ; for max: (maximum - val)
                       (lambda (val)
                         (prepend-sign val)))]) ; for other: val
-          (append (list (string-append (att-value 'ilp-name n) "_" (att-value 'ilp-name prop) "_"
-                                       (att-value 'ilp-name pe) "_" (comp->name comp) ": "))
+          (append (list (string-append (=ilp-name n) "_" (=ilp-name prop) "_"
+                                       (=ilp-name pe) "_" (comp->name comp) ": "))
                   (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
-                  (list "<=" (f (att-value 'eval-on (att-value 'provided-clause pe (ast-child 'name prop)
-                                                               (ast-child 'type pe)) pe)))))))
+                  (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
+                                                            (->type pe)) pe)))))))
      (Impl (lambda (n comp prop pe) (recur3 append n 'ilp-nego-hw0 'Mode* comp prop pe)))
      (Mode (lambda (n comp prop pe) (recur3 append n 'ilp-nego-hw0 'Clause* comp prop pe)))
      (Clause
       (lambda (n comp prop pe)
-        (if (and (eq? prop (ast-child 'returntype n))
-                 (eq? comp (ast-child 'comp n))
-                 (eq? (ast-child 'type pe) (ast-pp (ast-child 'returntype n))))
-            (list (list (att-value 'eval-on n pe) (att-value 'ilp-binvar-deployed (ast-pp n) pe)))
+        (if (and (eq? prop (->return-type n))
+                 (eq? comp (->comparator n))
+                 (eq? (->type pe) (<<- (->return-type n))))
+            (list (list (=eval-on n pe) (=ilp-binvar-deployed (<<- n) pe)))
             (list))))) ;empty pair if not a suitable clause
     
     (ag-rule
@@ -225,19 +242,19 @@
      (Mode (lambda (n) (recur union n 'required-hw-properties 'Clause*)))
      (Clause
       (lambda (n)
-        (let ([prop (ast-child 'returntype n)])
-          (if (and (ast-subtype? n 'ReqClause) (att-value 'is-hw prop))
-              (list (list (ast-child 'comp n) prop)) (list))))))
+        (let ([prop (->return-type n)])
+          (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
+              (list (list (->comparator n) prop)) (list))))))
     
     (ag-rule
      ilp-binary-vars
      (Root
       (lambda (n)
         (append
-         (map (lambda (impl) (att-value 'ilp-binvar impl)) (att-value 'every-impl n))
-         (fold-left (lambda (result mode) (append (map (lambda (pe) (att-value 'ilp-binvar-deployed mode pe))
-                                                       (att-value 'every-pe n)) result))
-                    (list) (att-value 'every-mode n))))))
+         (map (lambda (impl) (=ilp-binvar impl)) (=every-impl n))
+         (fold-left (lambda (result mode) (append (map (lambda (pe) (=ilp-binvar-deployed mode pe))
+                                                       (=every-pe n)) result))
+                    (list) (=every-mode n))))))
     
     ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
     (define subs (list (list #\- #\_) (list #\+ #\_)))
@@ -247,27 +264,27 @@
     
     (ag-rule
      ilp-name
-     (Property (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
-     (Comp (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
-     (Impl (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
-     (Mode (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n)))))
-     (Resource (lambda (n) (ilp-conform-name (symbol->string (ast-child 'name n))))))
+     (Property (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
+     (Comp (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
+     (Impl (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
+     (Mode (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
+     (Resource (lambda (n) (ilp-conform-name (symbol->string (->name n))))))
     
     (ag-rule
      ilp-binvar
-     (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-comp n)))
-                                                        "#"  (if (lonely? n) "" (symbol->string (ast-child 'name n)))))))
+     (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (->name (<=comp n)))
+                                                        "#"  (if (lonely? n) "" (symbol->string (->name n)))))))
      (Mode (lambda (n) (error "Should not be called for Modes"))))
     
     (ag-rule
      ilp-binvar-deployed
      (Mode (lambda (n pe)
-             (let ([impl (att-value 'get-impl n)])
-               (ilp-conform-name (string-append "b#" (symbol->string (ast-child 'name (att-value 'get-comp impl)))
-                                                "#"  (if (lonely? impl) "" (symbol->string (ast-child 'name (att-value 'get-impl n))))
-                                                "#"  (if (lonely? n) "" (symbol->string (ast-child 'name n)))
-                                                "#"  (symbol->string (ast-child 'name pe))))))))))
+             (let ([impl (<=impl n)])
+               (ilp-conform-name (string-append "b#" (symbol->string (->name (<=comp impl)))
+                                                "#"  (if (lonely? impl) "" (symbol->string (->name (<=impl n))))
+                                                "#"  (if (lonely? n) "" (symbol->string (->name n)))
+                                                "#"  (symbol->string (->name pe))))))))))
  
- (define (save-ilp path root) (save-to-file path (att-value 'to-ilp root)))
+ (define (save-ilp path root) (save-to-file path (=to-ilp root)))
  (define (make-ilp root) (save-ilp "gen/ilp.txt" root)))
  

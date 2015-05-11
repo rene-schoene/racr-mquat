@@ -4,10 +4,7 @@
  (mquat main)
  (export mquat-spec)
  (import (rnrs) (racr core)
-         (mquat ast)
-         (mquat basic-ag)
-         (mquat ilp)
-         (mquat ast-generation))
+         (mquat ast) (mquat basic-ag) (mquat ilp))
  
  (define mquat-spec (create-specification))
 

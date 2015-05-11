@@ -3,7 +3,7 @@
 (library
  (mquat utils)
  (export add-to-al merge-al union intersect-b ;associate lists
-         lonely? ast-pp recur recur2 recur3 ;ast
+         lonely? recur recur2 recur3 ;ast
          debug save-to-file time-it set!debugging debugging?) ;misc
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (mquat constants))
@@ -42,9 +42,6 @@
  
  ; Returns true, iff the node does not have any true siblings, i.e. if its parent does have more than one children
  (define lonely? (lambda (n) (= 1 (ast-num-children (ast-parent n)))))
-
- ; Returns the ast-parent of the ast-parent of the given node
- (define (ast-pp n) (ast-parent (ast-parent n)))
  
  ; Apply the given attribute on each child and aggregate with op
  (define (recur op n att-name child-name)

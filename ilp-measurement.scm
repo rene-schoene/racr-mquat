@@ -4,19 +4,19 @@
  (mquat ilp-measurement)
  (export run-test-one)
  (import (rnrs) (racr core) (srfi :19)
-         (mquat utils) (mquat main) (mquat ilp) (mquat ast-generation) (mquat ui))
+         (mquat ast) (mquat basic-ag) (mquat utils) (mquat main) (mquat ilp) (mquat ast-generation) (mquat ui))
  
  (define (rw comp-name restype prop-name new-value ast)
    (debug comp-name prop-name new-value ast)
-   (rewrite-terminal 'value (att-value 'provided-clause (find (lambda (pe) (eq? (ast-child 'name pe) comp-name))
-                                                              (att-value 'every-pe ast)) prop-name restype)
+   (rewrite-terminal 'value (=provided-clause (find (lambda (pe) (eq? (->name pe) comp-name))
+                                                              (=every-pe ast)) prop-name restype)
                      (lambda _ new-value)))
  
  (define (rw* restype prop-name new-value? ast)
    (for-each
-    (lambda (pe) (rewrite-terminal 'value (att-value 'provided-clause pe prop-name restype)
+    (lambda (pe) (rewrite-terminal 'value (=provided-clause pe prop-name restype)
                                    (if new-value? (lambda _ new-value?) (rand 1 3 0))))
-    (att-value 'every-pe ast)))
+    (=every-pe ast)))
  
  (define (sit name ast) ; [s]ave-[i]lp-[t]imed
    (let ([result (time-it (lambda _ (save-ilp (string-append name ".lp") ast)))])
@@ -29,8 +29,8 @@
  
  (define (run-test-one)
    (let* ([ast (create-system mquat-spec 10 0 1 1 2)]
-          [rt (ast-child 1 (ast-child 'ResourceType* (ast-child 'HWRoot ast)))]
-          [was-debugging debugging?])
+          [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))]
+          [was-debugging? debugging?])
      (debug "Running test one")
      (set!debugging #f)
      (sit "profiling/one/01-init" ast)
@@ -42,7 +42,7 @@
      (rw* rt 'load #f ast) (sit "profiling/one/06-every-comp-rand" ast)
      (rw* rt 'load #f ast) (sit "profiling/one/07-every-comp-rand" ast)
      (rw* rt 'load #f ast) (sit "profiling/one/08-every-comp-rand" ast)
-     (set!debugging was-debugging)))
+     (set!debugging was-debugging?)))
  
  (define (test) (create-system mquat-spec 10 0 1 1 2))
  

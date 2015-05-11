@@ -2,12 +2,62 @@
 
 (library
  (mquat ast)
- (export specify&compile-ast)
+ (export specify&compile-ast
+         ->HWRoot ->SWRoot ->Comp* ->name ->Impl* ->selected-impl ->Property* ->deployed-on ->selected-mode ->Mode* ->Clause*
+         ->ResourceType* ->SubResources ->type ->ProvClause* ->MetaParameter* ->target ->Constraints ->objective
+         ->return-type ->comparator ->value ->unit ->kind ->direction ->agg
+         ->* <- <<-
+         :Root :SWRoot :Comp :Impl :Mode :ReqClause :ProvClause :HWRoot :ResourceType :Resource :Request :MetaParameter :Property)
  (import (rnrs) (racr core))
  
+ (define (->HWRoot n)         (ast-child 'HWRoot n))
+ (define (->SWRoot n)         (ast-child 'SWRoot n))
+ (define (->Comp* n)          (ast-child 'Comp* n))
+ (define (->name n)           (ast-child 'name n))
+ (define (->Impl* n)          (ast-child 'Impl* n))
+ (define (->selected-impl n)  (ast-child 'selectedImpl n))
+ (define (->Property* n)      (ast-child 'Property n))
+ (define (->deployed-on n)    (ast-child 'deployedon n))
+ (define (->selected-mode n)  (ast-child 'selectedmode n))
+ (define (->Mode* n)          (ast-child 'Mode* n))
+ (define (->Clause* n)        (ast-child 'Clause* n))
+ (define (->ResourceType* n)  (ast-child 'ResourceType* n))
+ (define (->SubResources n)   (ast-child 'SubResources n))
+ (define (->type n)           (ast-child 'type n))
+ (define (->ProvClause* n)    (ast-child 'ProvClause* n))
+ (define (->MetaParameter* n) (ast-child 'MetaParameter* n))
+ (define (->target n)         (ast-child 'target n))
+ (define (->Constraints n)    (ast-child 'Constraints n))
+ (define (->objective n)      (ast-child 'objective n))
+ (define (->return-type n)    (ast-child 'returntype n))
+ (define (->comparator n)     (ast-child 'comp n))
+ (define (->value n)          (ast-child 'value n))
+ (define (->unit n)           (ast-child 'unit n))
+ (define (->kind n)           (ast-child 'kind n))
+ (define (->direction n)      (ast-child 'direction n))
+ (define (->agg n)            (ast-child 'agg n))
+ (define (->* n)              (ast-children n))
+ (define (<- n)               (ast-parent n))
+ (define (<<- n)              (ast-parent (ast-parent n)))
+ 
+ (define (:Root spec hw sw r)       (create-ast spec 'Root (list hw sw r)))
+ (define (:SWRoot spec c)           (create-ast spec 'SWRoot (list (create-ast-list c))))
+ (define (:Comp spec n i s p)       (create-ast spec 'Comp (list n (create-ast-list i) s (create-ast-list p))))
+ (define (:Impl spec n m r d s)     (create-ast spec 'Impl (list n (create-ast-list m) r d s)))
+ (define (:Mode spec n c)           (create-ast spec 'Mode (list n (create-ast-list c))))
+ (define (:ReqClause spec r c v)    (create-ast spec 'ReqClause (list r c v)))
+ (define (:ProvClause spec r c v)   (create-ast spec 'ProvClause (list r c v)))
+ (define (:HWRoot spec t r)         (create-ast spec 'HWRoot (list (create-ast-list t) (create-ast-list r))))
+ (define (:ResourceType spec n p)   (create-ast spec 'ResourceType (list n (create-ast-list p))))
+ (define (:Resource spec n t s p)   (create-ast spec 'Resource (list n t (create-ast-list s) (create-ast-list p))))
+ (define (:Request spec m t c o)    (create-ast spec 'Request (list (create-ast-list m) t (create-ast-list c) o)))
+ (define (:MetaParameter spec n v)  (create-ast spec 'MetaParameter (list n v)))
+ (define (:Property spec n u k d a) (create-ast spec 'Property (list n u k d a)))
+
  (define (specify&compile-ast mquat-spec)
    (with-specification
     mquat-spec
+    
     ;; AST rules
     (ast-rule 'Root->HWRoot-SWRoot-Request)
     (ast-rule 'SWRoot->Comp*)
@@ -20,7 +70,7 @@
     ; target is either a Comp or a ResourceType
     (ast-rule 'ReqClause:Clause->)
     (ast-rule 'ProvClause:Clause->)
-    (ast-rule 'HWRoot->ResourceType*-Resource*)
+    (ast-rule 'HWRoot->ResourceType*-Resource*<SubResources)
     (ast-rule 'ResourceType->name-Property*)
     ; type is a ResourceType
     (ast-rule 'Resource->name-type-Resource*<SubResources-ProvClause*)
