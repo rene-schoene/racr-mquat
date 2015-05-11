@@ -2,3 +2,4 @@ racket-bin
 test
 profiling
 *.pyc
+*.log

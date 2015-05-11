@@ -3,8 +3,8 @@
 (library
  (mquat ilp-test)
  (export run-test)
- (import (rnrs) (racr core) (srfi :64)
-         (mquat utils) (mquat ilp) (mquat main)
+ (import (rnrs) (racr core)
+         (mquat utils) (mquat ilp) (mquat main) (mquat basic-ag) (mquat ast)
          (mquat constants) (mquat ast-generation))
  ;; Testing generated ILP, whether correct results are computed for small models
  
@@ -12,37 +12,35 @@
  
  (define (change-hw-prov ast prop-name new-value . res-names)
    (let ([resources (if (null? res-names)
-                        (att-value 'every-pe ast)
-                        (filter (lambda (res) (find (lambda (name) (eq? (ast-child 'name res) name)) res-names))
-                                (att-value 'every-pe ast)))])
+                        (=every-pe ast)
+                        (filter (lambda (res) (find (lambda (name) (eq? (->name res) name)) res-names))
+                                (=every-pe ast)))])
      (for-each (lambda (res)
-                 (rewrite-terminal 'value (att-value 'provided-clause res prop-name (ast-child 'type res))
+                 (rewrite-terminal 'value (=provided-clause res prop-name (->type res))
                                                (lambda _ new-value))) resources)))
  
  (define (change-sw-hw-req ast prop-name comparator new-value . mode-names)
    (let ([modes (if (null? mode-names)
-                    (att-value 'every-mode ast)
-                    (filter (lambda (mode) (find (lambda (name) (eq? (ast-child 'name mode) name)) mode-names))
-                            (att-value 'every-mode ast)))])
-     (for-each (lambda (mode) (let ([clause (att-value 'search-clause mode prop-name 'ReqClause)])
+                    (=every-mode ast)
+                    (filter (lambda (mode) (find (lambda (name) (eq? (->name mode) name)) mode-names))
+                            (=every-mode ast)))])
+     (for-each (lambda (mode) (let ([clause (=search-req-clause mode prop-name)])
                                 (rewrite-terminal 'value clause (lambda _ new-value))
                                 (rewrite-terminal 'comp clause comparator))) modes)))
 
  (define (change-sw-prov ast prop-name new-value . mode-names)
    (let ([modes (if (null? mode-names)
-                    (att-value 'every-mode ast)
-                    (filter (lambda (mode) (find (lambda (name) (eq? (ast-child 'name mode) name)) mode-names))
-                            (att-value 'every-mode ast)))])
-     (for-each (lambda (mode) (rewrite-terminal 'value (att-value 'provided-clause mode prop-name)
+                    (=every-mode ast)
+                    (filter (lambda (mode) (find (lambda (name) (eq? (->name mode) name)) mode-names))
+                            (=every-mode ast)))])
+     (for-each (lambda (mode) (rewrite-terminal 'value (=provided-clause mode prop-name)
                                                 (lambda _ new-value))) modes)))
  
- (define (remove-req-constraints ast)
-   (for-each (lambda (req) (rewrite-delete req)) (ast-children (ast-child 'Constraints (ast-child 'Request ast)))))
+ (define (remove-req-constraints ast) (for-each (lambda (req) (rewrite-delete req)) (->* (->Constraints (<=request ast)))))
  
  (define (change-req-constraint ast name comparator new-value)
-   (debug (ast-children (ast-child 'Constraints (ast-child 'Request ast))))
-   (let ([clause (ast-find-child (lambda (i child) (eq? (ast-child 'name (ast-child 'returntype child)) name))
-                                 (ast-child 'Constraints (ast-child 'Request ast)))])
+   (debug (->* (->Constraints (<=request ast))))
+   (let ([clause (ast-find-child (lambda (i child) (eq? (->name (->return-type child)) name)) (->Constraints (<=request ast)))])
      (rewrite-terminal 'value clause (lambda _ new-value))
      (rewrite-terminal 'comp clause comparator)))
  
@@ -251,32 +249,74 @@
      [(20) 1]
      [else (display (string-append "Unknown test case id '" id "'\n"))]))
  
- (define (read-solution fname)
-   (cons "vars" "obj"))
- (define (check-test id vars obj . cmds)
+ (define (read-solution table fname error)
+   (when (not (file-exists? fname)) (error (string-append "File " fname " not found.")))
+   (with-input-from-file fname
+     (lambda ()
+       (for-each (lambda (entry) (hashtable-set! table (car entry) (cdr entry))) (read)))))
+ 
+ (define (check-test id-s obj fname) ; l = (cons objective-value vars=1)
    (call/cc
     (lambda (error)
-      (define (val name) (let ([entry (assq name vars)]) (if entry (cdr entry) (error (string-append "var " name " not found")))))
-      (test-begin id)
-      (test-equal "First implementation is not deployed!" (val "b#comp_1#") 1) ; First component has to be always deployed
-      (case (string->number id)
-        [(1 2) (test-equal "first mode not deployed" (+ (val "b#comp_1##comp_1_1_1#res_1") (val "b#comp_1##comp_1_1_1#res_2")) 1)]
+      (let* ([table (make-hashtable string-hash string=?)]
+             [val (lambda (name) (or (hashtable-ref table name #f) (error (string-append "var " name " not found\n"))))]
+             [val=1? (lambda (name) (= (val name) 1))] [val=0? (lambda (name) (= (val name) 0))]
+             [contains? (lambda (name) (hashtable-contains? table name))]
+             [id (string->number id-s)]
+             [test-obj (lambda (expected-base actual id) (if (not (= actual (+ expected-base (/ id 1e3))))
+                                                             (error "Wrong objective value")))]
+             [test-assert (lambda (msg expr) (if (not expr) (error msg)))])
+        (read-solution table fname error)
+        (for-each (lambda (key) (debug key ":" (hashtable-ref table key #f))) (vector->list (hashtable-keys table)))
+        ; impl deployment
+        (case id
+          [(1 2 3 4 5 6 7) (test-assert "first impl not deployed" (val=1? "b#comp_1#"))]
+          [(100 101 105) (test-assert "first impl not deployed"  (val=1? "b#comp_1#comp_1_1"))
+                           (test-assert "second impl deployed"     (val=0? "b#comp_1#comp_1_2"))]
+          [(102 103 104) (test-assert "first impl deployed"      (val=0? "b#comp_1#comp_1_1"))
+                           (test-assert "second impl not deployed" (val=1? "b#comp_1#comp_1_2"))]
+          [else (error (string-append "Unknown test case id '" id-s " for impls'\n"))])
         
-        [else (display (string-append "Unknown test case id '" id "'\n"))])
-      (case (string->number id)
-        [(1) (test-equal "Wrong objective value" obj 10.01)]
-        [else (display (string-append "Unknown test case id '" id "'\n"))])
-      (test-end id)
-      #f)))
+        ; mode-deployment
+        (case id
+          [(1) (test-assert "first mode not deployed" (or (val=1? "b#comp_1##comp_1_1_1#res_1")
+                                                          (val=1? "b#comp_1##comp_1_1_1#res_2")))]
+          [(2 3 4 5)
+           (test-assert "second mode not deployed" (or (val=1? "b#comp_1##comp_1_1_2#res_1")
+                                                       (val=1? "b#comp_1##comp_1_1_2#res_2")))]
+          [(6) (test-assert "first mode not deployed on res1" (val=1? "b#comp_1##comp_1_1_1#res_1"))]
+          [(7) (test-assert "first mode not deployed on res2" (val=1? "b#comp_1##comp_1_1_1#res_2"))]
+          [(100) (test-assert "first mode not deployed" (or (val=1? "b#comp_1##comp_1_1_1#res_1")
+                                                            (val=1? "b#comp_1##comp_1_1_1#res_2")
+                                                            (val=1? "b#comp_1##comp_1_1_1#res_3")))]
+          [(101 105) (test-assert "second mode not deployed" (or (val=1? "b#comp_1##comp_1_1_2#res_1")
+                                                                  (val=1? "b#comp_1##comp_1_1_2#res_2")
+                                                                  (val=1? "b#comp_1##comp_1_1_2#res_3")))]
+          [(102 103 104) (test-assert "third mode not deployed" (or (val=1? "b#comp_1##comp_1_1_3#res_1")
+                                                                      (val=1? "b#comp_1##comp_1_1_3#res_2")
+                                                                      (val=1? "b#comp_1##comp_1_1_3#res_3")))]
+          [else (error (string-append "Unknown test case id '" id-s " for modes'\n"))])
+        (case id
+          [(1 6 7) (test-obj 10 obj id)]
+          [(2 3 4 5) (test-obj 20 obj id)]
+          [(100) (test-obj 10 obj id)]
+          [(101 105) (test-obj 15 obj id)]
+          [(102 103 104) (test-obj 20 obj id)]
+          [else (error (string-append "Unknown test case id '" id-s " for objectives'\n"))])
+        #f))))
  
- (when (member "run" (command-line)) ; expect "run" "$id"
-   (set!debugging #f)
-   (run-test (caddr (command-line)))) ; take 2nd real argument, i.e. id
- (when (member "check" (command-line)) ; expect "run" "$id" "$fname"
-   (set!debugging #f)
-   (let* ([os (read-solution (cadddr (command-line)))]
-          [error (check-test (caddr (command-line)) (car os) (cdr os))])
-     (when error
-       (display error)
-       (exit 1))
-     (exit 0))))
+ (if (< (length (command-line)) 2)
+     (display "Usage: ilp-test.scm action cmds\n action = run → cmds = id\n action = check → cmds id objective-value file-name\n")
+     (begin
+       (when (string=? "run" (cadr (command-line))) ; expect "run" id
+         (set!debugging #f)
+         (let* ([cmds (cddr (command-line))]
+                [id-s (car cmds)])
+           (run-test id-s)))
+       (when (string=? "check" (cadr (command-line))) ; expect "check" id obj fname
+         (set!debugging #t)
+         (let* ([cmds (cddr (command-line))]
+                [id-s (car cmds)] [obj (string->number (cadr cmds))] [fname (caddr cmds)]
+                [error (check-test id-s obj fname)])
+           (when error (display error) (exit 1))
+           (exit 0))))))

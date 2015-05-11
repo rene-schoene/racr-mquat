@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import re, unittest, os, shutil
-from fabric.api import lcd, local
+from fabric.api import lcd, local, task, warn_only
 from fabric.colors import red
 
 RACR_BIN="/home/rschoene/git/racr/racr/racket-bin"
@@ -51,85 +51,90 @@ def read_solution(fname):
 				status = 2
 	return (obj,sol)
 
+@task
+def tws(fname):
+	sol = { "b#comp_1#comp_1_2": 1, "b#comp_1#comp_1_1#comp_1_1_2#res_1": 0}
+	write_solution(sol, fname)
+
+@task
+def f(cmd):
+	with warn_only():
+		out = local(cmd)
+	print out.succeeded
+
+def write_solution(sol, fname):
+	with open(fname, 'w') as fd:
+		fd.write('(\n')
+		for key,value in sol.iteritems():
+			fd.write('("%s" . %s)\n' % (key, value))
+		fd.write(')\n')
 
 class AbstractILPTest(unittest.TestCase):
 
 	longMessage = True
 	fname_lp_racket = "test/tmp.lp"
 
-	def solution_file(self, name):
-		return "test/%s.sol" % name
+	def solution_file(self, test_nr):
+		return "test/%s.sol" % test_nr
 
-	def lp_file(self, name):
-		return "test/%s.lp" % name
+	def scheme_solution_file(self, test_nr):
+		return "test/%s.scsol" % test_nr
 
-	def run_case(self, name):
-		fname_sol = self.solution_file(name)
-		fname_lp_python = self.lp_file(name)
+	def lp_file(self, test_nr):
+		return "test/%s.lp" % test_nr
+
+	def run_case(self, test_nr):
+		## Run Racket to generate ILP
+		fname_sol = self.solution_file(test_nr)
+		fname_lp_python = self.lp_file(test_nr)
+		fname_scheme_sol = self.scheme_solution_file(test_nr)
 		if run_racket:
 			if os.path.exists(self.fname_lp_racket):
 				os.remove(self.fname_lp_racket)
 			if os.path.exists(fname_sol):
 				os.remove(fname_sol)
-			# generate the ilp
-			local('racket -S %s -S %s ilp-test.scm run %s' % (RACR_BIN, MQUAT_BIN, name))
+			local('racket -S %s -S %s ilp-test.scm run %s' % (RACR_BIN, MQUAT_BIN, test_nr))
 			shutil.copyfile(self.fname_lp_racket, fname_lp_python)
 		self.assertTrue(os.path.exists(fname_lp_python), "ILP was not generated")
-		out = local('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol), capture = True)
+		
+		## Solve the ILP with glpsol
+		with warn_only():
+			out = local('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol), capture = True)
+		if not out.succeeded:
+			print out
 		self.assertTrue(os.path.exists(fname_sol), "No solution file created")
 		self.assertTrue(re.search('INTEGER OPTIMAL SOLUTION FOUND', out), "No solution found")
-		return read_solution(fname_sol)
+		obj,sol = read_solution(fname_sol)
+		
+		## Write the solution to fname_sc_sol
+		write_solution(sol, fname_scheme_sol)
+		
+		## Check solution with Racket
+		with warn_only():
+			result = local('racket -S %s -S %s ilp-test.scm check %s %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, obj, fname_scheme_sol))
+		self.assertTrue(result.succeeded, "Could not check test #%s successfully" % test_nr)
+
+	@classmethod
+	def setUpClass(cls):
+		print cls
+		for test_nr in cls.test_numbers:
+			test_func = cls.make_test_function(cls, test_nr)
+			setattr(cls, 'test_{0}'.format(test_nr), test_func)
+
+	@staticmethod
+	def make_test_function(self, test_nr):
+		def test(self):
+			self.run_case(test_nr)
+		return test
+
 
 class ILPTestForModes(AbstractILPTest):
 
-	def test_2m(self):
-		obj,sol = self.run_case(1)
-		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
-		self.assertTrue(sol['b#comp_1##comp_1_1_1#res_1'] == 1 or sol['b#comp_1##comp_1_1_1#res_2'] == 1,
-			"First mode is not deployed")
-		self.assertEqual(obj, 10.001, "Wrong objective value %s" % obj)
-
-	def test_2m_1max(self):
-		obj,sol = self.run_case(2)
-		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
-		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
-			"First mode is not deployed")
-		self.assertEqual(obj, 20.002, "Wrong objective value %s" % obj)
-
-	def test_2m_1min(self):
-		obj,sol = self.run_case(3)
-		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
-		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
-			"First mode is not deployed")
-		self.assertEqual(obj, 20.003, "Wrong objective value %s" % obj)
-
-	def test_2m__req_1min(self):
-		obj,sol = self.run_case(4)
-		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
-		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
-			"First mode is not deployed")
-		self.assertEqual(obj, 20.004, "Wrong objective value %s" % obj)
-
-	def test_2m_req_1max(self):
-		obj,sol = self.run_case(5)
-		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
-		self.assertTrue(sol['b#comp_1##comp_1_1_2#res_1'] == 1 or sol['b#comp_1##comp_1_1_2#res_2'] == 1,
-			"First mode is not deployed")
-		self.assertEqual(obj, 20.005, "Wrong objective value %s" % obj)
-
-	def test_2m_res1(self):
-		obj,sol = self.run_case(6)
-		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
-		self.assertEqual(sol['b#comp_1##comp_1_1_1#res_1'], 1, "First mode is not deployed on first resource")
-		self.assertEqual(obj, 10.006, "Wrong objective value %s" % obj)
-
-	def test_2m_res2(self):
-		obj,sol = self.run_case(7)
-		self.assertEqual(sol['b#comp_1#'], 1, "First implementation is not deployed!")
-		self.assertEqual(sol['b#comp_1##comp_1_1_1#res_2'], 1, "First mode is not deployed on second resource")
-		self.assertEqual(obj, 10.007, "Wrong objective value %s" % obj)
+	test_numbers = [1,2,3,4,5,6,7]
 
 class ILPTestForImpls(AbstractILPTest):
+
+	test_numbers = [100,101,102,103,104,105,106,107]
 
 	def test_2i2(self):
 		obj,sol = self.run_case(100)
@@ -161,4 +166,6 @@ class ILPTestForImpls(AbstractILPTest):
 #print read_solution('test/tmp.sol'); exit(0)
 
 if __name__ == '__main__':
-    unittest.main()
+	print 'before'
+	ILPTestForModes.setUpClass()
+	unittest.main(failfast=True)
