@@ -116,7 +116,6 @@ class AbstractILPTest(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(cls):
-		print cls
 		for test_nr in cls.test_numbers:
 			test_func = cls.make_test_function(cls, test_nr)
 			setattr(cls, 'test_{0}'.format(test_nr), test_func)
@@ -136,36 +135,7 @@ class ILPTestForImpls(AbstractILPTest):
 
 	test_numbers = [100,101,102,103,104,105,106,107]
 
-	def test_2i2(self):
-		obj,sol = self.run_case(100)
-		self.assertEqual(sol['b#comp_1#comp_1_1'], 1, "First implementation is not deployed!")
-		self.assertEqual(sol['b#comp_1#comp_1_2'], 0, "Seond implementation is deployed!")
-		self.assertTrue(sol['b#comp_1#comp_1_1#comp_1_1_1#res_1'] == 1 or sol['b#comp_1#comp_1_1#comp_1_1_1#res_2'] == 1
-			 or sol['b#comp_1#comp_1_1#comp_1_1_1#res_3'] == 1, "First mode of first impl is not deployed")
-		self.assertEqual(obj, 10.100, "Wrong objective value %s" % obj)
-
-	def test_2i2_2nd(self):
-		for test_id in [101, 105]:
-			obj,sol = self.run_case(test_id)
-			self.assertEqual(sol['b#comp_1#comp_1_1'], 1, "First implementation is not deployed!")
-			self.assertEqual(sol['b#comp_1#comp_1_2'], 0, "Seond implementation is deployed!")
-			self.assertTrue(sol['b#comp_1#comp_1_1#comp_1_1_2#res_1'] == 1 or sol['b#comp_1#comp_1_1#comp_1_1_2#res_2'] == 1
-				 or sol['b#comp_1#comp_1_1#comp_1_1_2#res_3'] == 1, "Second mode of first impl is not deployed")
-			self.assertEqual(obj, 15 + (test_id / 1000.0), "Wrong objective value %s" % obj)
-
-	def test_2i2_3rd(self):
-		for test_id in [102, 103, 104]:
-			obj,sol = self.run_case(test_id)
-			self.assertEqual(sol['b#comp_1#comp_1_1'], 0, "First implementation is deployed!")
-			self.assertEqual(sol['b#comp_1#comp_1_2'], 1, "Seond implementation is not deployed!")
-			self.assertTrue(sol['b#comp_1#comp_1_2#comp_1_2_1#res_1'] == 1 or sol['b#comp_1#comp_1_2#comp_1_2_1#res_2'] == 1
-				 or sol['b#comp_1#comp_1_2#comp_1_2_1#res_3'] == 1, "Third mode of first impl is not deployed")
-			self.assertEqual(obj, 20 + (test_id / 1000.0), "Wrong objective value %s" % obj)
-
-
-#print read_solution('test/tmp.sol'); exit(0)
-
 if __name__ == '__main__':
-	print 'before'
 	ILPTestForModes.setUpClass()
+	ILPTestForImpls.setUpClass()
 	unittest.main(failfast=True)

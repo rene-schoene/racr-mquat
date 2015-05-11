@@ -55,53 +55,53 @@
  
  (define (two-modes id)
    ; General description: 2 modes, first mode is better
-   (let ([ast (create-system mquat-spec 2 0 1 1 2)])
-     (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'comp-1-1-1)
-     (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'comp-1-1-2)
+   (let ([ast (create-system 2 0 1 1 2)])
+     (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
+     (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-1-2)
      (case id
        [(1) ; Description: no further constraints
-        ; Expected outcome: first mode (comp-1-1-1) is deployed on either res-1 or res-2
+        ; Expected outcome: first mode (mode-1-1-1) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(2) ; Description: comp-1-1-1 does not meet its requirements (max-eq)
-        ; Expected outcome: second mode (comp-1-1-2) is deployed on either res-1 or res-2
+       [(2) ; Description: mode-1-1-1 does not meet its requirements (max-eq)
+        ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
-        (change-sw-hw-req ast 'load comp-max-eq 0.2 'comp-1-1-1) ; max-req is *not* met
-        (change-sw-hw-req ast 'load comp-max-eq 0.8 'comp-1-1-2)
+        (change-sw-hw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.8 'mode-1-1-2)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(3) ; Description: comp-1-1-1 does not meet its requirements (min-eq)
-        ; Expected outcome: second mode (comp-1-1-2) is deployed on either res-1 or res-2
+       [(3) ; Description: mode-1-1-1 does not meet its requirements (min-eq)
+        ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-1-1) ; min-req is *not* met
-        (change-sw-hw-req ast 'load comp-max-eq 0.8 'comp-1-1-2)
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.8 'mode-1-1-2)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
  
-       [(4) ; Description: comp-1-1-1 does not meet request constraint (max-eq)
-        ; Expected outcome: second mode (comp-1-1-2) is deployed on either res-1 or res-2
+       [(4) ; Description: mode-1-1-1 does not meet request constraint (max-eq)
+        ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
-        (change-sw-prov ast 'prop-1 7 'comp-1-1-1) ; max-req is *not* met
-        (change-sw-prov ast 'prop-1 3 'comp-1-1-2)
+        (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req is *not* met
+        (change-sw-prov ast 'prop-1 3 'mode-1-1-2)
         (save-ilp tmp-lp ast)]
  
-       [(5) ; Description: comp-1-1-1 does not meet request constraint (min-eq)
-        ; Expected outcome: second mode (comp-1-1-2) is deployed on either res-1 or res-2
+       [(5) ; Description: mode-1-1-1 does not meet request constraint (min-eq)
+        ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-min-eq 4)
-        (change-sw-prov ast 'prop-1 3 'comp-1-1-1) ; min-req is *not* met
-        (change-sw-prov ast 'prop-1 7 'comp-1-1-2)
+        (change-sw-prov ast 'prop-1 3 'mode-1-1-1) ; min-req is *not* met
+        (change-sw-prov ast 'prop-1 7 'mode-1-1-2)
         (save-ilp tmp-lp ast)]
 
        [(6) ; Description: Reqs only met on res-1
-        ; Expected outcome: first mode (comp-1-1-1) is deployed on res-1
+        ; Expected outcome: first mode (mode-1-1-1) is deployed on res-1
         (change-hw-prov ast 'load 0.5 'res-1)
         (change-hw-prov ast 'load 0.9 'res-2)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
@@ -109,7 +109,7 @@
         (save-ilp tmp-lp ast)]
 
        [(7) ; Description: Reqs only met on res-2
-        ; Expected outcome: first mode (comp-1-1-1) is deployed on res-2
+        ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.5 'res-2)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
@@ -120,114 +120,114 @@
  
  (define (two-impls id)
    ; General description: 2 impls with each 2 modes, first modes are better, first impl is better
-   (let ([ast (create-system mquat-spec 3 0 1 2 2)])
-     (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'comp-1-1-1)
-     (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'comp-1-1-2)
-     (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'comp-1-2-1)
-     (change-sw-prov ast pn-energy (+ 25 (/ id 1e3)) 'comp-1-2-2)
+   (let ([ast (create-system 3 0 1 2 2)])
+     (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
+     (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'mode-1-1-2)
+     (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-2-1)
+     (change-sw-prov ast pn-energy (+ 25 (/ id 1e3)) 'mode-1-2-2)
      (case id
        [(100) ; Description: normal load constraints
-        ; Expected outcome: comp-1-1-1 is deployed on res-1, res-2 or res-3
+        ; Expected outcome: mode-1-1-1 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(101) ; Description: comp-1-1-1 does not meet its requirements (max-eq)
-        ; Expected outcome: comp-1-1-2 is deployed on res-1, res-2 or res-3
+       [(101) ; Description: mode-1-1-1 does not meet its requirements (max-eq)
+        ; Expected outcome: mode-1-1-2 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
-        (change-sw-hw-req ast 'load comp-max-eq 0.2 'comp-1-1-1) ; max-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req is *not* met
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(102) ; Description: comp-1-1-1 and comp-1-1-2 do not meet their requirements (both max-eq)
-        ; Expected outcome: comp-1-2-1 is deployed on res-1, res-2 or res-3
+       [(102) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (both max-eq)
+        ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
-        (change-sw-hw-req ast 'load comp-max-eq 0.2 'comp-1-1-1) ; max-req is *not* met
-        (change-sw-hw-req ast 'load comp-max-eq 0.2 'comp-1-1-2) ; max-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.2 'mode-1-1-2) ; max-req is *not* met
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(103) ; Description: comp-1-1-1 and comp-1-1-2 do not meet their requirements (min-eq and max-eq)
+       [(103) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (min-eq and max-eq)
         ; Interesting: complete impl not meeting reqs
-        ; Expected outcome: comp-1-2-1 is deployed on res-1, res-2 or res-3
+        ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
-        (change-sw-hw-req ast 'load comp-max-eq 0.2 'comp-1-1-1) ; max-req is *not* met
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-1-2) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req is *not* met
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(104) ; Description: comp-1-1-1 and comp-1-1-2 do not meet their requirements (both min-eq)
+       [(104) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (both min-eq)
         ; Interesting: one mode per impl not meeting reqs (only min reqs)
-        ; Expected outcome: comp-1-2-1 is deployed on res-1, res-2 or res-3
+        ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-1-1) ; min-req is *not* met
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-1-2) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req is *not* met
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(105) ; Description: comp-1-1-1 and comp-1-2-1 do not meet their requirements (min-eq and max-eq)
+       [(105) ; Description: mode-1-1-1 and mode-1-2-1 do not meet their requirements (min-eq and max-eq)
         ; Interesting: one mode per impl not meeting reqs
-        ; Expected outcome: comp-1-1-2 is deployed on res-1, res-2 or res-3
+        ; Expected outcome: mode-1-1-2 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
-        (change-sw-hw-req ast 'load comp-max-eq 0.2 'comp-1-1-1) ; max-req is *not* met
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-2-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req is *not* met
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(106) ; Description: only comp-1-2-2 meet its requirements (others mix of max-eq)
-        ; Expected outcome: comp-1-2-2 is deployed on res-1, res-2 or res-3
+       [(106) ; Description: only mode-1-2-2 meet its requirements (others mix of max-eq)
+        ; Expected outcome: mode-1-2-2 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
-        (change-sw-hw-req ast 'load comp-max-eq 0.8)
-        (change-sw-hw-req ast 'load comp-max-eq 0.2 'comp-1-1-1) ; max-req is *not* met
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-1-2) ; min-req is *not* met
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-2-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.8 'mode-1-2-2)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
-       [(107) ; Description: only comp-1-2-2 meet its requirements (all min-eq)
-        ; Expected outcome: comp-1-2-2 is deployed on res-1, res-2 or res-3
+       [(107) ; Description: only mode-1-2-2 meet its requirements (all min-eq)
+        ; Expected outcome: mode-1-2-2 is deployed on res-1, res-2 or res-3
         (change-hw-prov ast 'load 0.5)
-        (change-sw-hw-req ast 'load comp-max-eq 0.8)
-        (change-sw-hw-req ast 'load comp-max-eq 0.7 'comp-1-1-1) ; min-req is *not* met
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-1-2) ; min-req is *not* met
-        (change-sw-hw-req ast 'load comp-min-eq 0.7 'comp-1-2-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.8 'mode-1-2-2)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
 
        [(3) ; Description: 2 modes, first mode is better, but does not meet its requirements (min-eq)
-        ; Expected outcome: second mode (comp-1-1-2) is deployed on either res-1 or res-2
+        ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
-        (change-sw-hw-req ast 'load comp-min-eq 0.8 'comp-1-1-1) ; min-req is *not* met
-        (change-sw-hw-req ast 'load comp-max-eq 0.8 'comp-1-1-2)
+        (change-sw-hw-req ast 'load comp-min-eq 0.8 'mode-1-1-1) ; min-req is *not* met
+        (change-sw-hw-req ast 'load comp-max-eq 0.8 'mode-1-1-2)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)]
  
        [(4) ; Description: 2 modes, first mode is better, but does not meet request constraint (max-eq)
-        ; Expected outcome: second mode (comp-1-1-2) is deployed on either res-1 or res-2
+        ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
-        (change-sw-prov ast 'prop-1 7 'comp-1-1-1) ; max-req is *not* met
-        (change-sw-prov ast 'prop-1 3 'comp-1-1-2)
+        (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req is *not* met
+        (change-sw-prov ast 'prop-1 3 'mode-1-1-2)
         (save-ilp tmp-lp ast)]
  
        [(5) ; Description: 2 modes, first mode is better, but does not meet request constraint (min-eq)
-        ; Expected outcome: second mode (comp-1-1-2) is deployed on either res-1 or res-2
+        ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
         (change-hw-prov ast 'load 0.5)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-min-eq 4)
-        (change-sw-prov ast 'prop-1 3 'comp-1-1-1) ; min-req is *not* met
-        (change-sw-prov ast 'prop-1 7 'comp-1-1-2)
+        (change-sw-prov ast 'prop-1 3 'mode-1-1-1) ; min-req is *not* met
+        (change-sw-prov ast 'prop-1 7 'mode-1-1-2)
         (save-ilp tmp-lp ast)]
 
        [(6) ; Description: 2 modes, reqs only met on res-1, first mode is better
-        ; Expected outcome: first mode (comp-1-1-1) is deployed on res-1
+        ; Expected outcome: first mode (mode-1-1-1) is deployed on res-1
         (change-hw-prov ast 'load 0.5 'res-1)
         (change-hw-prov ast 'load 0.9 'res-2)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
@@ -235,7 +235,7 @@
         (save-ilp tmp-lp ast)]
 
        [(7) ; Description: 2 modes, reqs only met on res-2, first mode is better
-        ; Expected outcome: first mode (comp-1-1-1) is deployed on res-2
+        ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.5 'res-2)
         (change-sw-hw-req ast 'load comp-max-eq 0.8)
@@ -271,30 +271,33 @@
         ; impl deployment
         (case id
           [(1 2 3 4 5 6 7) (test-assert "first impl not deployed" (val=1? "b#comp_1#"))]
-          [(100 101 105) (test-assert "first impl not deployed"  (val=1? "b#comp_1#comp_1_1"))
-                           (test-assert "second impl deployed"     (val=0? "b#comp_1#comp_1_2"))]
-          [(102 103 104) (test-assert "first impl deployed"      (val=0? "b#comp_1#comp_1_1"))
-                           (test-assert "second impl not deployed" (val=1? "b#comp_1#comp_1_2"))]
+          [(100 101 105) (test-assert "first impl not deployed"  (val=1? "b#comp_1#impl_1_1"))
+                           (test-assert "second impl deployed"     (val=0? "b#comp_1#impl_1_2"))]
+          [(102 103 104 106 107) (test-assert "first impl deployed"      (val=0? "b#comp_1#impl_1_1"))
+                                 (test-assert "second impl not deployed" (val=1? "b#comp_1#impl_1_2"))]
           [else (error (string-append "Unknown test case id '" id-s " for impls'\n"))])
         
         ; mode-deployment
         (case id
-          [(1) (test-assert "first mode not deployed" (or (val=1? "b#comp_1##comp_1_1_1#res_1")
-                                                          (val=1? "b#comp_1##comp_1_1_1#res_2")))]
+          [(1) (test-assert "first mode not deployed" (or (val=1? "b#comp_1##mode_1_1_1#res_1")
+                                                          (val=1? "b#comp_1##mode_1_1_1#res_2")))]
           [(2 3 4 5)
-           (test-assert "second mode not deployed" (or (val=1? "b#comp_1##comp_1_1_2#res_1")
-                                                       (val=1? "b#comp_1##comp_1_1_2#res_2")))]
-          [(6) (test-assert "first mode not deployed on res1" (val=1? "b#comp_1##comp_1_1_1#res_1"))]
-          [(7) (test-assert "first mode not deployed on res2" (val=1? "b#comp_1##comp_1_1_1#res_2"))]
-          [(100) (test-assert "first mode not deployed" (or (val=1? "b#comp_1##comp_1_1_1#res_1")
-                                                            (val=1? "b#comp_1##comp_1_1_1#res_2")
-                                                            (val=1? "b#comp_1##comp_1_1_1#res_3")))]
-          [(101 105) (test-assert "second mode not deployed" (or (val=1? "b#comp_1##comp_1_1_2#res_1")
-                                                                  (val=1? "b#comp_1##comp_1_1_2#res_2")
-                                                                  (val=1? "b#comp_1##comp_1_1_2#res_3")))]
-          [(102 103 104) (test-assert "third mode not deployed" (or (val=1? "b#comp_1##comp_1_1_3#res_1")
-                                                                      (val=1? "b#comp_1##comp_1_1_3#res_2")
-                                                                      (val=1? "b#comp_1##comp_1_1_3#res_3")))]
+           (test-assert "second mode not deployed" (or (val=1? "b#comp_1##mode_1_1_2#res_1")
+                                                       (val=1? "b#comp_1##mode_1_1_2#res_2")))]
+          [(6) (test-assert "first mode not deployed on res1" (val=1? "b#comp_1##mode_1_1_1#res_1"))]
+          [(7) (test-assert "first mode not deployed on res2" (val=1? "b#comp_1##mode_1_1_1#res_2"))]
+          [(100) (test-assert "first mode not deployed" (or (val=1? "b#comp_1#impl_1_1#mode_1_1_1#res_1")
+                                                            (val=1? "b#comp_1#impl_1_1#mode_1_1_1#res_2")
+                                                            (val=1? "b#comp_1#impl_1_1#mode_1_1_1#res_3")))]
+          [(101 105) (test-assert "second mode not deployed" (or (val=1? "b#comp_1#impl_1_1#mode_1_1_2#res_1")
+                                                                 (val=1? "b#comp_1#impl_1_1#mode_1_1_2#res_2")
+                                                                 (val=1? "b#comp_1#impl_1_1#mode_1_1_2#res_3")))]
+          [(102 103 104) (test-assert "third mode not deployed" (or (val=1? "b#comp_1#impl_1_2#mode_1_2_1#res_1")
+                                                                    (val=1? "b#comp_1#impl_1_2#mode_1_2_1#res_2")
+                                                                    (val=1? "b#comp_1#impl_1_2#mode_1_2_1#res_3")))]
+          [(106 107) (test-assert "fourth mode not deployed" (or (val=1? "b#comp_1#impl_1_2#mode_1_2_2#res_1")
+                                                                 (val=1? "b#comp_1#impl_1_2#mode_1_2_2#res_2")
+                                                                 (val=1? "b#comp_1#impl_1_2#mode_1_2_2#res_3")))]
           [else (error (string-append "Unknown test case id '" id-s " for modes'\n"))])
         (case id
           [(1 6 7) (test-obj 10 obj id)]
@@ -302,6 +305,7 @@
           [(100) (test-obj 10 obj id)]
           [(101 105) (test-obj 15 obj id)]
           [(102 103 104) (test-obj 20 obj id)]
+          [(106 107) (test-obj 25 obj id)]
           [else (error (string-append "Unknown test case id '" id-s " for objectives'\n"))])
         #f))))
  
