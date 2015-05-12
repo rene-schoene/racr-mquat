@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import re, unittest, os, shutil
-from fabric.api import lcd, local, task, warn_only
+from fabric.api import lcd, local, task, warn_only, quiet
 from fabric.colors import red
 
 RACR_BIN="/home/rschoene/git/racr/racr/racket-bin"
@@ -83,6 +83,13 @@ class AbstractILPTest(unittest.TestCase):
 	def lp_file(self, test_nr):
 		return "test/%s.lp" % test_nr
 
+	def local_quiet(self, cmd):
+		""" Runs the command quietly, asserts successfull execution and returns stdout """
+		with quiet():
+			out = local(cmd, capture = True)
+			self.assertTrue(out.succeeded, '"%s" not successful, stdout:\n%s' % (cmd, out))
+			return out
+
 	def run_case(self, test_nr):
 		## Run Racket to generate ILP
 		fname_sol = self.solution_file(test_nr)
@@ -93,15 +100,12 @@ class AbstractILPTest(unittest.TestCase):
 				os.remove(self.fname_lp_racket)
 			if os.path.exists(fname_sol):
 				os.remove(fname_sol)
-			local('racket -S %s -S %s ilp-test.scm run %s' % (RACR_BIN, MQUAT_BIN, test_nr))
+			out = self.local_quiet('racket -S %s -S %s ilp-test.scm run %s' % (RACR_BIN, MQUAT_BIN, test_nr))
 			shutil.copyfile(self.fname_lp_racket, fname_lp_python)
-		self.assertTrue(os.path.exists(fname_lp_python), "ILP was not generated")
+		self.assertTrue(os.path.exists(fname_lp_python), "ILP was not generated\n%s" % out)
 		
 		## Solve the ILP with glpsol
-		with warn_only():
-			out = local('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol), capture = True)
-		if not out.succeeded:
-			print out
+		out = self.local_quiet('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol))
 		self.assertTrue(os.path.exists(fname_sol), "No solution file created")
 		self.assertTrue(re.search('INTEGER OPTIMAL SOLUTION FOUND', out), "No solution found")
 		obj,sol = read_solution(fname_sol)
@@ -110,9 +114,7 @@ class AbstractILPTest(unittest.TestCase):
 		write_solution(sol, fname_scheme_sol)
 		
 		## Check solution with Racket
-		with warn_only():
-			result = local('racket -S %s -S %s ilp-test.scm check %s %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, obj, fname_scheme_sol))
-		self.assertTrue(result.succeeded, "Could not check test #%s successfully" % test_nr)
+		self.local_quiet('racket -S %s -S %s ilp-test.scm check %s %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, obj, fname_scheme_sol))
 
 	@classmethod
 	def setUpClass(cls):
@@ -126,16 +128,15 @@ class AbstractILPTest(unittest.TestCase):
 			self.run_case(test_nr)
 		return test
 
+class ILPTest01Modes(AbstractILPTest):
 
-class ILPTestForModes(AbstractILPTest):
+	test_numbers = range(1,15)
 
-	test_numbers = [1,2,3,4,5,6,7]
+class ILPTest02Impls(AbstractILPTest):
 
-class ILPTestForImpls(AbstractILPTest):
-
-	test_numbers = [100,101,102,103,104,105,106,107]
+	test_numbers = range(100,112)
 
 if __name__ == '__main__':
-	ILPTestForModes.setUpClass()
-	ILPTestForImpls.setUpClass()
+	ILPTest01Modes.setUpClass()
+	ILPTest02Impls.setUpClass()
 	unittest.main(failfast=True)
