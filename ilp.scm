@@ -20,7 +20,7 @@
    (case-lambda ((n comp)               (att-value 'ilp-nego-reqc n comp))
                 ((n clausetype comp)    (att-value 'ilp-nego-reqc n clausetype comp))))
  (define (=ilp-nego-hw n)               (att-value 'ilp-nego-hw n))
- (define (=ilp-req-hw-properties n)     (att-value 'required-hw-properties n))
+ (define (=req-hw-properties n)         (att-value 'required-hw-properties n))
  (define (=ilp-nego-hw0 n comp prop pe) (att-value 'ilp-nego-hw0 n comp prop pe))
 
  (define (add-ilp-ags mquat-spec)
@@ -51,11 +51,11 @@
            binary-vars
            (list "End")))))
      (Request (lambda (n) (=ilp-nego-sw n)))
-     (SWRoot (lambda (n) (recur append n 'to-ilp 'Comp*)))
+     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))
      (Comp
       (lambda (n)
         (debug "Comp:" (->name n))
-        (let ([ics (recur cons n 'to-ilp 'Impl*)])
+        (let ([ics (recur n cons =to-ilp ->Impl*)])
           (cons
            (fold-left
             (lambda (result entry)
@@ -106,7 +106,7 @@
     (ag-rule
      ilp-nego
      (Root (lambda (n) (remove (list) (=ilp-nego (->SWRoot n))))) ; remove empty constraints
-     (SWRoot (lambda (n) (recur append n 'ilp-nego 'Comp*)))
+     (SWRoot (lambda (n) (recur n append =ilp-nego ->Comp*)))
      (Comp (lambda (n) (append (=ilp-nego-sw n)
                                (=ilp-nego-hw n)))))
     
@@ -167,9 +167,9 @@
     (ag-rule
      ilp-nego-reqc
      (Comp ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode of each impl
-      (lambda (n clausetype comparator) (recur2 merge-al n 'ilp-nego-reqc 'Impl* clausetype comparator)))
+      (lambda (n clausetype comparator) (recur n merge-al =ilp-nego-reqc ->Impl* clausetype comparator)))
      (Impl ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode
-      (lambda (n clausetype comparator) (recur2 merge-al n 'ilp-nego-reqc 'Mode* clausetype comparator)))
+      (lambda (n clausetype comparator) (recur n merge-al =ilp-nego-reqc ->Mode* clausetype comparator)))
      (Mode ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type
       (lambda (n clausetype comparator)
         (fold-left
@@ -205,7 +205,7 @@
              (lambda (inner pe) (cons (=ilp-nego-hw0 n (car cp) (cadr cp) pe) inner))
              (list) (=every-pe n))
             result))
-         (list) (=ilp-req-hw-properties n)))))
+         (list) (=req-hw-properties n)))))
     
     (ag-rule
      ilp-nego-hw0
@@ -225,8 +225,8 @@
                   (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
                   (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
                                                             (->type pe)) pe)))))))
-     (Impl (lambda (n comp prop pe) (recur3 append n 'ilp-nego-hw0 'Mode* comp prop pe)))
-     (Mode (lambda (n comp prop pe) (recur3 append n 'ilp-nego-hw0 'Clause* comp prop pe)))
+     (Impl (lambda (n comp prop pe) (recur n append =ilp-nego-hw0 ->Mode* comp prop pe)))
+     (Mode (lambda (n comp prop pe) (recur n append =ilp-nego-hw0 ->Clause* comp prop pe)))
      (Clause
       (lambda (n comp prop pe)
         (if (and (eq? prop (->return-type n))
@@ -237,9 +237,9 @@
     
     (ag-rule
      required-hw-properties
-     (Comp (lambda (n) (recur union n 'required-hw-properties 'Impl*)))
-     (Impl (lambda (n) (recur union n 'required-hw-properties 'Mode*)))
-     (Mode (lambda (n) (recur union n 'required-hw-properties 'Clause*)))
+     (Comp (lambda (n) (recur n union =req-hw-properties ->Impl*)))
+     (Impl (lambda (n) (recur n union =req-hw-properties ->Mode*)))
+     (Mode (lambda (n) (recur n union =req-hw-properties ->Clause*)))
      (Clause
       (lambda (n)
         (let ([prop (->return-type n)])

@@ -3,7 +3,7 @@
 (library
  (mquat utils)
  (export add-to-al merge-al union intersect-b ;associate lists
-         lonely? recur recur2 recur3 ;ast
+         lonely? recur ;ast
          debug save-to-file time-it set!debugging debugging?) ;misc
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (mquat constants))
@@ -44,25 +44,9 @@
  (define lonely? (lambda (n) (= 1 (ast-num-children (ast-parent n)))))
  
  ; Apply the given attribute on each child and aggregate with op
- (define (recur op n att-name child-name)
-   (fold-left (lambda (result sub)
-                (debug "rec" n att-name child-name (att-value att-name sub))
-                (op (att-value att-name sub) result))
-              (list) (ast-children (ast-child child-name n))))
+ (define (recur n op att childs . args) (fold-left (lambda (result sub) (op (apply att sub args) result))
+                                                   (list) (ast-children (childs n))))
  
- ; Apply the given attribute on each child and aggregate with op
- (define (recur2 op n att-name child-name arg1 arg2)
-   (fold-left (lambda (result sub)
-                (debug "rec2" n att-name child-name "arg1:" arg1 "arg2:" arg2 "result:" (att-value att-name sub arg1 arg2))
-                (op (att-value att-name sub arg1 arg2) result))
-              (list) (ast-children (ast-child child-name n))))
- 
- ; Apply the given attribute on each child and aggregate with op
- (define (recur3 op n att-name child-name arg1 arg2 arg3)
-   (fold-left (lambda (result sub)
-                (debug "rec2" n att-name child-name "arg1:" arg1 "arg2:" arg2 "arg3:" arg3 "result:" (att-value att-name sub arg1 arg2 arg3))
-                (op result (att-value att-name sub arg1 arg2 arg3)))
-              (list) (ast-children (ast-child child-name n))))
 
  ;; Debugging
  
