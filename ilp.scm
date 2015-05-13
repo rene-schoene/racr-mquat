@@ -65,7 +65,7 @@
                 (fold-left (lambda (inner impl) (cons* "-" (=ilp-binvar impl) inner)) (list) (cadr entry))
                 (fold-left (lambda (inner impl) (cons* "+" (=ilp-binvar impl) inner)) (list)
                            (->* (->Impl* (car entry))))
-                (list "=" 0)) result))
+                (list ">=" 0)) result))
             (list) (=req-comp-map n))
            (if (att-value 'request-target? n)
                (cons

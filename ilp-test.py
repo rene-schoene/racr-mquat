@@ -119,8 +119,8 @@ class ILPTest(unittest.TestCase):
 			if os.path.exists(fname_sol):
 				os.remove(fname_sol)
 			out = self.local_quiet('racket -S %s -S %s ilp-test.scm run %s' % (RACR_BIN, MQUAT_BIN, test_nr))
+			self.assertTrue(os.path.exists(self.fname_lp_racket), "ILP was not generated\n%s" % out)
 			shutil.copyfile(self.fname_lp_racket, fname_lp_python)
-		self.assertTrue(os.path.exists(fname_lp_python), "ILP was not generated\n%s" % out)
 		
 		## Solve the ILP with glpsol
 		out = self.local_quiet('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol))
