@@ -44,7 +44,7 @@
         (list load freq (:HWRoot mquat-spec (list only-type) (make-subs 'res num-pe (if (= 0 num-subs) num-pe num-subs))))))))
  
  ; returns (mp-names prop-first-comp SWRoot)
- (define (create-sw load freq num-comp impl-per-comp mode-per-impl as-reqs)
+ (define (create-sw load freq num-comp impl-per-comp mode-per-impl reqc)
    (define prop-al (list)) (define last-comp-nr #f) (define last-comp #f) (define first-comp #f) (define mp-name 'size)
    (define (new-comp comp comp-nr) (set! last-comp-nr comp-nr) (set! last-comp comp)
      (unless first-comp (set! first-comp comp-nr)))
@@ -57,28 +57,22 @@
                                   (let ([new (make-sw-prop n)]) (set! prop-al (cons (cons n new) prop-al)) new))))] ;new entry
           [make-req (lambda (p max digits offset) (:ReqClause mquat-spec p comp-max-eq (rand max digits offset)))]
           [make-prov (lambda (p max digits offset) (:ProvClause mquat-spec p comp-eq (rand max digits offset)))]
-          [make-mode (lambda (comp impl-lon mode)
+          [make-mode (lambda (comp impl-lon mode req?)
                        (let* ([ps (prop comp)]
                               [name (node-name 'mode (cons mode impl-lon))]
-                              [ureq (assq name as-reqs)]
                               [cls (f? (list (make-req load 1 2 0)
                                              (make-req freq 480 1 510)
                                              (make-prov (car ps) comp 3 0) ;sw-property
                                              (make-prov (cadr ps) 100 3 0)))]) ;energy
-                         (:Mode
-                          mquat-spec name
-                          (if ureq (cdr ureq)
-                              (if (or (eq? last-comp-nr #f)
-                                      (> (random 2) 1))
-                                  cls
-                                  (cons (make-req (car (prop (- last-comp-nr 1)))
-                                                  last-comp-nr 2 0) cls))))))]
+                         (:Mode mquat-spec name (if req? (cons (make-req (car (prop last-comp-nr)) last-comp-nr 2 0) cls) cls))))]
           [make-impl (lambda (comp impl)
-                       (let ([lon (list impl comp)])
+                       (let* ([lon (list impl comp)]
+                              [name (node-name 'impl lon)]
+                              [req? (and last-comp-nr (if reqc (reqc name) (> (random 2) 1)))])
                          (:Impl
-                          mquat-spec (node-name 'impl lon)
-                          (call-n-times (lambda (mode) (make-mode comp lon mode)) mode-per-impl) ; Mode*
-                          (if (eq? last-comp-nr #f) (list) (list last-comp)) ; reqcomps
+                          mquat-spec name
+                          (call-n-times (lambda (mode) (make-mode comp lon mode req?)) mode-per-impl) ; Mode*
+                          (if req? (list last-comp) (list)) ; reqcomps
                           #f #f)))]
           [make-comp (lambda (comp) (let ([lon (list comp)])
                                       (:Comp
@@ -97,12 +91,26 @@
       (map (lambda (mp-name) (:MetaParameter mquat-spec mp-name (rand 100 2 0))) mp-names)
       target (list (make-req prop 1 2 0)) #f)))
  
- (define (create-system num-pe num-pe-subs num-comp impl-per-comp mode-per-impl . sw-reqs)
+ ; Creates a new system.
+ ; num-pe:        total number of resources
+ ; num-pe-subs:   number of subresources for every resource (use zero for flat layout)
+ ; num-comp:      total number of components
+ ; impl-per-comp: number of implementations per component
+ ; mode-per-impl: number of modes per implementation
+ ; [sw-reqc:      a function, given a impl name, returns, whether this impl should require the previous created component]
+ (define create-system
+   (case-lambda
+     [(num-pe num-pe-subs num-comp impl-per-comp mode-per-impl)
+      (create-system1 num-pe num-pe-subs num-comp impl-per-comp mode-per-impl #f)]
+     [(num-pe num-pe-subs num-comp impl-per-comp mode-per-impl sw-reqc)
+      (create-system1 num-pe num-pe-subs num-comp impl-per-comp mode-per-impl sw-reqc)]))
+
+ (define (create-system1 num-pe num-pe-subs num-comp impl-per-comp mode-per-impl sw-reqc)
    (let* ([hw-result (create-hw num-pe num-pe-subs)]
           [load (car hw-result)]
           [freq (cadr hw-result)]
           [hw-root (caddr hw-result)]
-          [sw-result (create-sw load freq num-comp impl-per-comp mode-per-impl sw-reqs)]
+          [sw-result (create-sw load freq num-comp impl-per-comp mode-per-impl sw-reqc)]
           [mp-names (car sw-result)]
           [prop-c1 (cadr sw-result)]
           [sw-root (caddr sw-result)])
