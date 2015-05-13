@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import re, unittest, os, shutil
+import re, unittest, os, shutil, sys
 from fabric.api import lcd, local, task, warn_only, quiet
 from fabric.colors import red
 
@@ -8,6 +8,24 @@ RACR_BIN="/home/rschoene/git/racr/racr/racket-bin"
 MQUAT_BIN="/home/rschoene/git/racr-mquat/racket-bin"
 
 run_racket = True
+
+def get_ranges():
+	with warn_only():
+		intervals = local('racket -S %s -S %s ilp-test.scm ranges' % (RACR_BIN, MQUAT_BIN), capture=True)
+	if intervals.failed:
+		print "Could not get intervals"
+		print intervals.stdout
+		sys.exit(1)
+	result = []
+	lb = False
+	for token in intervals.split():
+		if not lb:
+			lb = int(token)
+		else:
+			result.append( (lb,int(token)) )
+			lb = False
+	print "Ranges:", result
+	return result
 
 def read_solution(fname):
 	status = 0 # 0=search for column activities, 1=skip line, 2=name, 3=values
@@ -69,7 +87,7 @@ def write_solution(sol, fname):
 			fd.write('("%s" . %s)\n' % (key, value))
 		fd.write(')\n')
 
-class AbstractILPTest(unittest.TestCase):
+class ILPTest(unittest.TestCase):
 
 	longMessage = True
 	fname_lp_racket = "test/tmp.lp"
@@ -87,7 +105,7 @@ class AbstractILPTest(unittest.TestCase):
 		""" Runs the command quietly, asserts successfull execution and returns stdout """
 		with quiet():
 			out = local(cmd, capture = True)
-			self.assertTrue(out.succeeded, '"%s" not successful, stdout:\n%s' % (cmd, out))
+			self.assertTrue(out.succeeded, '"%s" not successful, stdout:\n%s\nstderr:\n%s' % (cmd, out.stdout, out.stderr))
 			return out
 
 	def run_case(self, test_nr):
@@ -117,26 +135,18 @@ class AbstractILPTest(unittest.TestCase):
 		self.local_quiet('racket -S %s -S %s ilp-test.scm check %s %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, obj, fname_scheme_sol))
 
 	@classmethod
-	def setUpClass(cls):
-		for test_nr in cls.test_numbers:
-			test_func = cls.make_test_function(cls, test_nr)
+	def create_ts(cls, test_numbers):
+		for test_nr in test_numbers:
+			test_func = cls.make_t_function(cls, test_nr)
 			setattr(cls, 'test_{0}'.format(test_nr), test_func)
 
 	@staticmethod
-	def make_test_function(self, test_nr):
+	def make_t_function(self, test_nr):
 		def test(self):
 			self.run_case(test_nr)
 		return test
 
-class ILPTest01Modes(AbstractILPTest):
-
-	test_numbers = range(1,15)
-
-class ILPTest02Impls(AbstractILPTest):
-
-	test_numbers = range(100,112)
-
 if __name__ == '__main__':
-	ILPTest01Modes.setUpClass()
-	ILPTest02Impls.setUpClass()
+	for lb,ub in get_ranges():
+		ILPTest.create_ts(range(lb,ub+1))
 	unittest.main(failfast=True)
