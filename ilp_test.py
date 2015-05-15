@@ -3,11 +3,16 @@
 import re, unittest, os, shutil, sys
 from fabric.api import lcd, local, task, warn_only, quiet
 from fabric.colors import red
-
-RACR_BIN="/home/rschoene/git/racr/racr/racket-bin"
-MQUAT_BIN="/home/rschoene/git/racr-mquat/racket-bin"
+from constants import RACR_BIN, MQUAT_BIN
 
 run_racket = True
+
+@task
+def run():
+	for lb,ub in get_ranges():
+		ILPTest.create_ts(range(lb,ub+1))
+	suite = unittest.TestLoader().loadTestsFromTestCase(ILPTest)
+	unittest.TextTestRunner(verbosity=2).run(suite)
 
 def get_ranges():
 	with warn_only():
@@ -69,17 +74,6 @@ def read_solution(fname):
 				status = 2
 	return (obj,sol)
 
-@task
-def tws(fname):
-	sol = { "b#comp_1#comp_1_2": 1, "b#comp_1#comp_1_1#comp_1_1_2#res_1": 0}
-	write_solution(sol, fname)
-
-@task
-def f(cmd):
-	with warn_only():
-		out = local(cmd)
-	print out.succeeded
-
 def write_solution(sol, fname):
 	with open(fname, 'w') as fd:
 		fd.write('(\n')
@@ -92,13 +86,16 @@ class ILPTest(unittest.TestCase):
 	longMessage = True
 	fname_lp_racket = "test/tmp.lp"
 
-	def solution_file(self, test_nr):
+	@staticmethod
+	def solution_file(test_nr):
 		return "test/%s.sol" % test_nr
 
-	def scheme_solution_file(self, test_nr):
+	@staticmethod
+	def scheme_solution_file(test_nr):
 		return "test/%s.scsol" % test_nr
 
-	def lp_file(self, test_nr):
+	@staticmethod
+	def lp_file(test_nr):
 		return "test/%s.lp" % test_nr
 
 	def local_quiet(self, cmd):
@@ -147,6 +144,4 @@ class ILPTest(unittest.TestCase):
 		return test
 
 if __name__ == '__main__':
-	for lb,ub in get_ranges():
-		ILPTest.create_ts(range(lb,ub+1))
-	unittest.main(failfast=True)
+	run()
