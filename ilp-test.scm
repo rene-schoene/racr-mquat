@@ -46,10 +46,11 @@
    (set!no-frequency) ; only use property load for system creation
    (let ([id (string->number id-string)])
      (cond
-       [(< id 100) (two-modes id)]
-       [(< id 200) (two-impls id)]
-       [(< id 300) (two-comps id)]
-       [(< id 400) (two-comps-reqc id)]
+       [(< id 100)  (two-modes id)]
+       [(< id 200)  (two-impls id)]
+       [(< id 300)  (two-comps id)]
+       [(< id 400)  (two-comps-reqc id)]
+       [(>= id 900) (unsolvable id)]
        [else (display (string-append "unknown id " id-string)) 1])))
  
  (define (two-modes id)
@@ -594,6 +595,73 @@
        
        [else (display (string-append "Unknown test case id '" id "'\n"))])))
  
+ (define (unsolvable id)
+   ; General description: Systems without a solution, thus, no optimal solution
+   (case id
+     [(900) ; All hw-reqs not met (min-eq)
+      (let [(ast (create-system 3 0 1 1 2))]
+        (change-hw-prov ast 'load 0.4)
+        (change-sw-req ast 'load comp-min-eq 0.7)
+        (remove-request-constraints ast)
+        (save-ilp tmp-lp ast))]
+
+     [(901) ; All hw-reqs not met (max-eq)
+      (let [(ast (create-system 3 0 1 1 2))]
+        (change-hw-prov ast 'load 0.8)
+        (change-sw-req ast 'load comp-max-eq 0.3)
+        (remove-request-constraints ast)
+        (save-ilp tmp-lp ast))]
+
+     [(902) ; Request constraint not met for any mode of the target component (min-eq)
+      (let [(ast (create-system 3 0 1 2 3))]
+        (change-hw-prov ast 'load 0.5)
+        (change-sw-req ast 'load comp-max-eq 0.8)
+        (change-sw-prov ast 'prop-1 2)
+        (change-req-constraint ast 'prop-1 comp-min-eq 15)
+        (save-ilp tmp-lp ast))]
+
+     [(903) ; Request constraint not met for any mode of the target component (max-eq)
+      (let [(ast (create-system 3 0 1 2 3))]
+        (change-hw-prov ast 'load 0.5)
+        (change-sw-req ast 'load comp-max-eq 0.8)
+        (change-sw-prov ast 'prop-1 7)
+        (change-req-constraint ast 'prop-1 comp-max-eq 4)
+        (save-ilp tmp-lp ast))]
+
+     [(904) ; Requirement on second component not met by any of its modes (max-eq)
+      (let [(ast (create-system 3 0 2 2 2 (lambda _ #t)))]
+        (change-hw-prov ast 'load 0.5)
+        (change-sw-req ast 'load comp-max-eq 0.8)
+        (change-sw-prov ast 'prop-2 7 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
+        (change-sw-req ast 'prop-2 comp-max-eq 4 'mode-1-1-1 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
+        (save-ilp tmp-lp ast))]
+
+     [(905) ; Requirement on second component not met by any of its modes (min-eq)
+      (let [(ast (create-system 3 0 2 2 2 (lambda _ #t)))]
+        (change-hw-prov ast 'load 0.8)
+        (change-sw-req ast 'load comp-max-eq 0.3)
+        (change-sw-prov ast 'prop-2 2 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
+        (change-sw-req ast 'prop-2 comp-min-eq 15 'mode-1-1-1 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
+        (save-ilp tmp-lp ast))]
+
+     [(906) ; Requirement on third component not met by any of its modes (max-eq)
+      (let [(ast (create-system 3 0 3 2 2 (lambda _ #t)))]
+        (change-hw-prov ast 'load 0.5)
+        (change-sw-req ast 'load comp-max-eq 0.8)
+        (change-sw-prov ast 'prop-3 7 'mode-3-1-1 'mode-3-1-2 'mode-3-2-1 'mode-3-2-2)
+        (change-sw-req ast 'prop-3 comp-max-eq 4 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
+        (save-ilp tmp-lp ast))]
+
+     [(907) ; Requirement on third component not met by any of its modes (min-eq)
+      (let [(ast (create-system 3 0 3 2 2 (lambda _ #t)))]
+        (change-hw-prov ast 'load 0.8)
+        (change-sw-req ast 'load comp-max-eq 0.3)
+        (change-sw-prov ast 'prop-3 2 'mode-3-1-1 'mode-3-1-2 'mode-3-2-1 'mode-3-2-2)
+        (change-sw-req ast 'prop-3 comp-min-eq 15 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
+        (save-ilp tmp-lp ast))]
+
+     [else (display (string-append "Unknown test case id '" id "'\n"))]))
+ 
  (define (read-solution table fname error)
    (when (not (file-exists? fname)) (error (string-append "File " fname " not found.")))
    (with-input-from-file fname
@@ -621,145 +689,191 @@
         ; impl deployment
         (case id
           [(1 2 3 4 5 6 7 8 9 10 11 12 13 14)
-           (test-assert "first impl not deployed"  (val=1? "b#comp_1#"))]
+           (test-assert "impl not deployed"     (val=1? "b#comp_1#"))]
           [(100 101 105 112 116 119 120 121 122)
-           (test-assert "first impl not deployed"  (val=1? "b#comp_1#impl_1_1"))
-           (test-assert "second impl deployed"     (val=0? "b#comp_1#impl_1_2"))]
+           (test-assert "impl-1 not deployed"   (val=1? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2 deployed"       (val=0? "b#comp_1#impl_1_2"))]
           [(102 103 104 106 107 108 109 110 111 113 114 115 117 118 123 124 125 126)
-           (test-assert "first impl deployed"      (val=0? "b#comp_1#impl_1_1"))
-           (test-assert "second impl not deployed" (val=1? "b#comp_1#impl_1_2"))]
+           (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2 not deployed"   (val=1? "b#comp_1#impl_1_2"))]
           [(200 202 203 301)
-           (test-assert "impl-1-1 not deployed"  (val=1? "b#comp_1#impl_1_1"))
-           (test-assert "impl-2-1 not deployed"  (val=1? "b#comp_2#impl_2_1"))
-           (test-assert "impl-1-2 deployed"      (val=0? "b#comp_1#impl_1_2"))
-           (test-assert "impl-2-2 deployed"      (val=0? "b#comp_2#impl_2_2"))]
+           (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2-1 not deployed" (val=1? "b#comp_2#impl_2_1"))
+           (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
+           (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))]
           [(201)
-           (test-assert "impl-1-1 not deployed"  (val=1? "b#comp_1#impl_1_1"))
-           (test-assert "impl-2-2 not deployed"  (val=1? "b#comp_2#impl_2_2"))
-           (test-assert "impl-1-2 deployed"      (val=0? "b#comp_1#impl_1_2"))
-           (test-assert "impl-2-1 deployed"      (val=0? "b#comp_2#impl_2_1"))]
+           (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2-2 not deployed" (val=1? "b#comp_2#impl_2_2"))
+           (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
+           (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))]
           [(300)
-           (test-assert "impl-1-2 not deployed"  (val=1? "b#comp_1#impl_1_2"))
-           (test-assert "impl-1-1 deployed"      (val=0? "b#comp_1#impl_1_1"))
-           (test-assert "impl-2-1 deployed"      (val=0? "b#comp_2#impl_2_1"))
-           (test-assert "impl-2-2 deployed"      (val=0? "b#comp_2#impl_2_2"))]
+           (test-assert "impl-1-2 not deployed" (val=1? "b#comp_1#impl_1_2"))
+           (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))
+           (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))]
+          [(900 901)
+           (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))]
+          [(902 903)
+           (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2 deployed"       (val=0? "b#comp_1#impl_1_2"))]
+          [(904 905)
+           (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
+           (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
+           (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))
+           (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))]
+          [(906 907)
+           (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
+           (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
+           (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))
+           (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))
+           (test-assert "impl-3-1 deployed"     (val=0? "b#comp_3#impl_3_1"))
+           (test-assert "impl-3-2 deployed"     (val=0? "b#comp_3#impl_3_2"))]
           [else (error (string-append "Unknown test case id '" id-s " for impls'\n"))])
         
         ; mode-deployment
         (case id
-          [(1)           (test-assert "first mode not deployed on 12"   (val=1? "b#comp_1##mode_1_1_1" 1 2))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-          [(2 3 4 5)     (test-assert "second mode not deployed on 12"  (val=1? "b#comp_1##mode_1_1_2" 1 2))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1##mode_1_1_1" 1 2))]
-          [(6 14)        (test-assert "first mode not deployed on 1"    (val=1? "b#comp_1##mode_1_1_1" 1))
-                         (test-assert "first mode deployed on 2"        (val=0? "b#comp_1##mode_1_1_1" 2))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-          [(7 12)        (test-assert "first mode not deployed on 2"    (val=1? "b#comp_1##mode_1_1_1" 2))
-                         (test-assert "first mode deployed on 1"        (val=0? "b#comp_1##mode_1_1_1" 1))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-          [(13)          (test-assert "second mode not deployed on 1"   (val=1? "b#comp_1##mode_1_1_2" 1))
-                         (test-assert "second mode deployed on 2"       (val=0? "b#comp_1##mode_1_1_2" 2))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1##mode_1_1_1" 1 2))]
-          [(8 9 10 11)   (test-assert "second mode not deployed on 2"   (val=1? "b#comp_1##mode_1_1_2" 2))
-                         (test-assert "second mode deployed on 1"       (val=0? "b#comp_1##mode_1_1_2" 1))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1##mode_1_1_1" 1 2))]
-          [(100)         (test-assert "first mode not deployed on 123"  (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(108 109)     (test-assert "first mode not deployed on 23"   (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 2 3))
-                         (test-assert "first mode deployed on 1"        (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(110 111)     (test-assert "first mode not deployed on 2"    (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 2))
-                         (test-assert "first mode deployed on 1"        (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(101 105)     (test-assert "second mode not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(112 116)     (test-assert "second mode not deployed on 23"  (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 2 3))
-                         (test-assert "second mode deployed on 1"       (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(1)           (test-assert "mode-1-1-1 not deployed on 12"  (val=1? "b#comp_1##mode_1_1_1" 1 2))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
+          [(2 3 4 5)     (test-assert "mode-1-1-2 not deployed on 12"  (val=1? "b#comp_1##mode_1_1_2" 1 2))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
+          [(6 14)        (test-assert "mode-1-1-1 not deployed on 1"   (val=1? "b#comp_1##mode_1_1_1" 1))
+                         (test-assert "mode-1-1-1 deployed on 2"       (val=0? "b#comp_1##mode_1_1_1" 2))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
+          [(7 12)        (test-assert "mode-1-1-1 not deployed on 2"   (val=1? "b#comp_1##mode_1_1_1" 2))
+                         (test-assert "mode-1-1-1 deployed on 1"       (val=0? "b#comp_1##mode_1_1_1" 1))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
+          [(13)          (test-assert "mode-1-1-2 not deployed on 1"   (val=1? "b#comp_1##mode_1_1_2" 1))
+                         (test-assert "mode-1-1-2 deployed on 2"       (val=0? "b#comp_1##mode_1_1_2" 2))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
+          [(8 9 10 11)   (test-assert "mode-1-1-2 not deployed on 2"   (val=1? "b#comp_1##mode_1_1_2" 2))
+                         (test-assert "mode-1-1-2 deployed on 1"       (val=0? "b#comp_1##mode_1_1_2" 1))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
+          [(100)         (test-assert "mode-1-1-1 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(101 105)     (test-assert "mode-1-1-2 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(102 103 104) (test-assert "mode-1-2-1 not deployed on 123" (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(106 107)     (test-assert "mode-1-2-2 not deployed on 123" (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
+          [(108 109)     (test-assert "mode-1-1-1 not deployed on 23"  (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 2 3))
+                         (test-assert "mode-1-1-1 deployed on 1"       (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(110 111)     (test-assert "mode-1-1-1 not deployed on 2"   (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 2))
+                         (test-assert "mode-1-1-1 deployed on 1"       (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(112 116)     (test-assert "mode-1-1-2 not deployed on 23"  (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 2 3))
+                         (test-assert "mode-1-1-2 deployed on 1"       (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(113 114 115) (test-assert "mode-1-2-1 not deployed on 23"  (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 2 3))
+                         (test-assert "mode-1-2-1 deployed on 1"       (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(117 118)     (test-assert "mode-1-2-2 not deployed on 23"  (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2 3))
+                         (test-assert "mode-1-2-2 deployed on 1"       (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
           [(119 120 121 122)
-                         (test-assert "second mode not deployed on 13"  (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 3))
-                         (test-assert "second mode deployed on 2"       (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 2))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(102 103 104) (test-assert "third mode not deployed on 123"  (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_1_2" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(113 114 115) (test-assert "third mode not deployed on 23"   (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 2 3))
-                         (test-assert "third mode deployed on 1"        (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_1_2" 1 2 3))
-                         (test-assert "fourth mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(106 107)     (test-assert "fourth mode not deployed on 123" (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_1_2" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-          [(117 118)     (test-assert "fourth mode not deployed on 23"  (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2 3))
-                         (test-assert "fourth mode deployed on 1"       (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_1_2" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-          [(123 125)     (test-assert "fourth mode not deployed on 12"  (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2))
-                         (test-assert "fourth mode deployed on 3"       (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 3))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_1_2" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-          [(124 126)     (test-assert "fourth mode not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2))
-                         (test-assert "fourth mode deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 3))
-                         (test-assert "first mode deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "second mode deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_1_2" 1 2 3))
-                         (test-assert "third mode deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-          [(200 301)     (test-assert "mode-1-1-1 not deployed on 123"  (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "mode-2-1-1 not deployed on 123"  (val=1? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                         (test-assert "mode-1-1-2 deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "mode-1-2-1 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "mode-1-2-2 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                         (test-assert "mode-2-1-2 deployed"             (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                         (test-assert "mode-2-2-1 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                         (test-assert "mode-2-2-2 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-          [(201)         (test-assert "mode-1-1-1 not deployed on 123"  (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "mode-2-2-1 not deployed on 123"  (val=1? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                         (test-assert "mode-1-1-2 deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "mode-1-2-1 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "mode-1-2-2 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                         (test-assert "mode-2-1-1 deployed"             (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                         (test-assert "mode-2-1-2 deployed"             (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                         (test-assert "mode-2-2-2 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-          [(202)         (test-assert "mode-1-1-2 not deployed on 123"  (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "mode-2-1-2 not deployed on 123"  (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                         (test-assert "mode-1-1-1 deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "mode-1-2-1 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "mode-1-2-2 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                         (test-assert "mode-2-1-1 deployed"             (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                         (test-assert "mode-2-2-1 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                         (test-assert "mode-2-2-2 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-          [(203)         (test-assert "mode-1-1-2 not deployed on 3"    (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 3))
-                         (test-assert "mode-2-1-2 not deployed on 3"    (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 3))
-                         (test-assert "mode-1-1-1 deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "mode-1-2-1 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "mode-1-2-2 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                         (test-assert "mode-2-1-1 deployed"             (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                         (test-assert "mode-2-2-1 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                         (test-assert "mode-2-2-2 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-          [(300)         (test-assert "mode-1-2-1 not deployed on 123"  (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                         (test-assert "mode-1-1-1 deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "mode-1-1-2 deployed"             (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "mode-1-2-2 deployed"             (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                         (test-assert "mode-2-1-1 deployed"             (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                         (test-assert "mode-2-1-2 deployed"             (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                         (test-assert "mode-2-2-1 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                         (test-assert "mode-2-2-2 deployed"             (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
+                         (test-assert "mode-1-1-2 not deployed on 13"  (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 3))
+                         (test-assert "mode-1-1-2 deployed on 2"       (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 2))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+          [(123 125)     (test-assert "mode-1-2-2 not deployed on 12"  (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2))
+                         (test-assert "mode-1-2-2 deployed on 3"       (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
+          [(124 126)     (test-assert "mode-1-2-2 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2))
+                         (test-assert "mode-1-2-2 deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
+          [(200 301)     (test-assert "mode-1-1-1 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-2-1-1 not deployed on 123" (val=1? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+                         (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
+          [(201)         (test-assert "mode-1-1-1 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-2-2-1 not deployed on 123" (val=1? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+                         (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
+          [(202)         (test-assert "mode-1-1-2 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-2-1-2 not deployed on 123" (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
+          [(203)         (test-assert "mode-1-1-2 not deployed on 3"   (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 3))
+                         (test-assert "mode-2-1-2 not deployed on 3"   (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
+          [(300)         (test-assert "mode-1-2-1 not deployed on 123" (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+                         (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
+          [(900 901)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
+          [(902 903)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-1-3 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_3" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-1-2-3 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_3" 1 2 3))]
+          [(904 905)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+                         (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))]
+          [(906 907)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+                         (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+                         (test-assert "mode-3-1-1 deployed"            (val=0? "b#comp_3#impl_3_1#mode_3_1_1" 1 2 3))
+                         (test-assert "mode-3-1-2 deployed"            (val=0? "b#comp_3#impl_3_1#mode_3_1_2" 1 2 3))
+                         (test-assert "mode-3-2-1 deployed"            (val=0? "b#comp_3#impl_3_2#mode_3_2_1" 1 2 3))
+                         (test-assert "mode-3-2-2 deployed"            (val=0? "b#comp_3#impl_3_2#mode_3_2_1" 1 2 3))]
+
           [else (error (string-append "Unknown test case id '" id-s " for modes'\n"))])
         (case id
           [(1 6 7 12 14)                      (test-obj 10 obj id)]
@@ -772,12 +886,13 @@
           [(201)                              (test-obj 50 obj id)] ;10+40
           [(202 203)                          (test-obj 50 obj id)] ;15+35
           [(300)                              (test-obj 20 obj id)]
+          [(900 901 902 903 904 905 906 907)  (test-assert "Wrong objective" (eq? 0.0 obj))]
           [else (error (string-append "Unknown test case id '" id-s " for objectives'\n"))])
         #f))))
  
  (define (display-ranges)
-;   (display "1 13 100 122 200 203 300 301"))
-   (display "202 203"))
+   (display "1 13 100 122 200 203 300 301 900 907"))
+;   (display "900 907"))
    
  (if (< (length (command-line)) 2)
      (begin
