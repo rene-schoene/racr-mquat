@@ -55,24 +55,18 @@
      (Comp
       (lambda (n)
         (debug "Comp:" (->name n))
-        (let ([ics (recur n cons =to-ilp ->Impl*)])
-          (cons
-           (fold-left
-            (lambda (result entry)
-              (cons
-               (append
-                (list (string-append (=ilp-name n) "_requires_" (=ilp-name (car entry)) ": "))
-                (fold-left (lambda (inner impl) (cons* "-" (=ilp-binvar impl) inner)) (list) (cadr entry))
-                (fold-left (lambda (inner impl) (cons* "+" (=ilp-binvar impl) inner)) (list)
-                           (->* (->Impl* (car entry))))
-                (list ">=" 0)) result))
-            (list) (=req-comp-map n))
-           (if (att-value 'request-target? n)
-               (cons
-                (cons (string-append "request_target_" (=ilp-name n) ": ")
-                      (fold-left (lambda (inner impl) (cons* "+" (=ilp-binvar impl) inner))
-                                 (list "=" 1) (->* (->Impl* n))))
-                ics) ics))))) ; list of cons, and else-branch
+        (cons
+         (fold-left
+          (lambda (result entry)
+            (cons
+             (append
+              (list (string-append (=ilp-name n) "_requires_" (=ilp-name (car entry)) ": "))
+              (fold-left (lambda (inner impl) (cons* "-" (=ilp-binvar impl) inner)) (list) (cadr entry))
+              (fold-left (lambda (inner impl) (cons* "+" (=ilp-binvar impl) inner)) (list)
+                         (->* (->Impl* (car entry))))
+              (list ">=" 0)) result))
+          (list) (=req-comp-map n))
+         (recur n cons =to-ilp ->Impl*))))
      (Impl
       (lambda (n)
         (debug "Impl:" (->name n))
@@ -124,11 +118,13 @@
             result)) (list) (=req-comp-map n))))
      (Request
       (lambda (n)
-        (make-constraints
-         (=ilp-nego-reqc (->target n) 'ProvClause comp-eq) ;provs
-         (=ilp-nego-reqc n comp-max-eq) ;max-reqs
-         (=ilp-nego-reqc n comp-min-eq) #t)))) ;min-reqs,request?
-    
+        (cons (cons "request_target: " (fold-left (lambda (result impl) (cons* "+" (=ilp-binvar impl) result))
+                                                  (list "=" 1) (->* (->Impl* (->target n)))))
+              (make-constraints
+               (=ilp-nego-reqc (->target n) 'ProvClause comp-eq) ;provs
+               (=ilp-nego-reqc n comp-max-eq) ;max-reqs
+               (=ilp-nego-reqc n comp-min-eq) #t))))) ;min-reqs,request?
+     
     (define (make-constraints provs max-reqs min-reqs request?)
       (fold-left ; fold over provisions
        (lambda (constraints prov-entry)
@@ -155,7 +151,7 @@
                             ; req for max: - (maximum - val) = val - maximum
                             (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
                             (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
-            (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov "request?" request?)
+            (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
             (append
              (list (string-append (=ilp-name prov) "_" (comp->name comp) ": "))
              (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)

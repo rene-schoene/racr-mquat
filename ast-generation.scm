@@ -45,9 +45,8 @@
  
  ; returns (mp-names prop-first-comp SWRoot)
  (define (create-sw load freq num-comp impl-per-comp mode-per-impl reqc)
-   (define prop-al (list)) (define last-comp-nr #f) (define last-comp #f) (define first-comp #f) (define mp-name 'size)
-   (define (new-comp comp comp-nr) (set! last-comp-nr comp-nr) (set! last-comp comp)
-     (unless first-comp (set! first-comp comp-nr)))
+   (define prop-al (list)) (define last-comp-nr #f) (define last-comp #f) (define mp-name 'size)
+   (define (new-comp comp comp-nr) (set! last-comp-nr comp-nr) (set! last-comp comp))
    (let* ([node-name (lambda (ident lon) (string->symbol (fold-right (lambda (n s) (string-append s "-" (number->string n)))
                                                                      (symbol->string ident) lon)))]
           [make-sw-prop (lambda (n) (list (:Property mquat-spec (node-name 'prop (list n)) 'u 'runtime 'increasing 'max)
@@ -81,11 +80,11 @@
                                        (prop comp))))]
           [sw-root (:SWRoot
                     mquat-spec (call-n-times (lambda (n) (let ([comp (make-comp n)]) (new-comp comp n) comp)) num-comp))])
-     (list (list mp-name) (car (prop first-comp)) sw-root)))
+     (list (list mp-name) (car (prop last-comp-nr)) sw-root)))
  
  (define (create-request mp-names prop)
    (let ([make-req (lambda (p max digits offset) (:ReqClause mquat-spec p comp-min-eq (rand max digits offset)))]
-         [target (ast-parent (ast-parent prop))])
+         [target (<<- prop)])
      (:Request
       mquat-spec
       (map (lambda (mp-name) (:MetaParameter mquat-spec mp-name (rand 100 2 0))) mp-names)

@@ -28,7 +28,7 @@
    (run-test-one))
  
  (define (run-test-one)
-   (let* ([ast (create-system mquat-spec 10 0 1 1 2)]
+   (let* ([ast (create-system 10 0 1 1 2)]
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))]
           [was-debugging? debugging?])
      (debug "Running test one")
@@ -43,8 +43,6 @@
      (rw* rt 'load #f ast) (sit "profiling/one/07-every-comp-rand" ast)
      (rw* rt 'load #f ast) (sit "profiling/one/08-every-comp-rand" ast)
      (set!debugging was-debugging?)))
- 
- (define (test) (create-system mquat-spec 10 0 1 1 2))
  
  (when (find (lambda (arg) (string=? "all" arg)) (command-line))
    (run-tests)))
