@@ -212,10 +212,8 @@
                      (list) (->* (->Impl* n)))]
                [maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 lop))]
                [f (if (eq? comp comp-max-eq)
-                      (lambda (val)
-                        (prepend-sign (- maximum val))) ; for max: (maximum - val)
-                      (lambda (val)
-                        (prepend-sign val)))]) ; for other: val
+                      (lambda (val) (prepend-sign (- maximum val))) ; for max: (maximum - val)
+                      (lambda (val) (prepend-sign val)))]) ; for other: val
           (append (list (string-append (=ilp-name n) "_" (=ilp-name prop) "_"
                                        (=ilp-name pe) "_" (comp->name comp) ": "))
                   (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)

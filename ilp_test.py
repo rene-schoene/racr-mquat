@@ -20,6 +20,7 @@ def get_ranges():
 	if intervals.failed:
 		print "Could not get intervals"
 		print intervals.stdout
+		print intervals.stderr
 		sys.exit(1)
 	result = []
 	lb = False

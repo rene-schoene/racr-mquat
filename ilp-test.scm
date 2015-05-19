@@ -42,8 +42,11 @@
      (rewrite-terminal 'value clause (lambda _ new-value))
      (rewrite-terminal 'comp clause comparator)))
  
+ (define no-freq-hw-clauses (lambda _ (lambda (p) (if (eq? freq-name p) #f (list make-prov comp-eq (lambda _ 0.5))))))
+ (define no-freq-sw-clauses (lambda _ (lambda (p comp-nr) (if (eq? freq-name p) #f #t))))
+ 
  (define (run-test id-string)
-   (set!no-frequency) ; only use property load for system creation
+;   (set!no-frequency) ; only use property load for system creation
    (let ([id (string->number id-string)])
      (cond
        [(< id 100)  (two-modes id)]
@@ -55,20 +58,18 @@
  
  (define (two-modes id)
    ; General description: 2 modes, first mode is better
-   (let ([ast (create-system 2 0 1 1 2)])
+   (let* ([ast (create-system 2 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
      (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-1-2)
      (case id
        [(1) ; Description: no further constraints
         ; Expected outcome: first mode (mode-1-1-1) is deployed on either res-1 or res-2
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
         (save-ilp tmp-lp ast)]
 
        [(2) ; Description: mode-1-1-1 does not meet its requirements (max-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2)
         (remove-request-constraints ast)
@@ -76,7 +77,6 @@
 
        [(3) ; Description: mode-1-1-1 does not meet its requirements (min-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req not met
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2)
         (remove-request-constraints ast)
@@ -84,7 +84,6 @@
  
        [(4) ; Description: mode-1-1-1 does not meet request constraint (max-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
         (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
@@ -93,7 +92,6 @@
  
        [(5) ; Description: mode-1-1-1 does not meet request constraint (min-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-min-eq 4)
         (change-sw-prov ast 'prop-1 3 'mode-1-1-1) ; min-req not met
@@ -102,7 +100,6 @@
 
        [(6) ; Description: Reqs only met on res-1
         ; Expected outcome: first mode (mode-1-1-1) is deployed on res-1
-        (change-hw-prov ast 'load 0.5 'res-1)
         (change-hw-prov ast 'load 0.9 'res-2)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
@@ -111,7 +108,6 @@
        [(7) ; Description: Reqs only met on res-2
         ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1)
-        (change-hw-prov ast 'load 0.5 'res-2)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
         (save-ilp tmp-lp ast)]
@@ -119,7 +115,6 @@
        [(8) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet its requirements at all (only max-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1)
-        (change-hw-prov ast 'load 0.5 'res-2)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met on both resources
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2) ; max-req not met on res-1
         (remove-request-constraints ast)
@@ -128,7 +123,6 @@
        [(9) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet its requirements at all (min-eq and max-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1)
-        (change-hw-prov ast 'load 0.5 'res-2)
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-1) ; min-req not met on both resources
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2) ; max-req not met on res-1
         (remove-request-constraints ast)
@@ -136,7 +130,6 @@
 
        [(10) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet its requirements at all (only min-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
-        (change-hw-prov ast 'load 0.5 'res-1)
         (change-hw-prov ast 'load 0.9 'res-2)
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-1) ; min-req not met on both resources
         (change-sw-req ast 'load comp-min-eq 0.8 'mode-1-1-2) ; min-req not met on res-1
@@ -146,7 +139,6 @@
        [(11) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet request constraint (only max-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1)
-        (change-hw-prov ast 'load 0.5 'res-2)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
         (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 3 'mode-1-1-2)
@@ -156,7 +148,6 @@
        [(12) ; Description: Reqs only met on res-2, mode-1-1-2 does not meet request constraint (req:min-eq and res:max-eq)
         ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1)
-        (change-hw-prov ast 'load 0.5 'res-2)
         (change-req-constraint ast 'prop-1 comp-min-eq 4)
         (change-sw-prov ast 'prop-1 7 'mode-1-1-1)
         (change-sw-prov ast 'prop-1 3 'mode-1-1-2) ; min-req not met
@@ -166,7 +157,6 @@
        [(13) ; Description: Reqs only met on res-1, mode-1-1-1 does not meet request constraint (req:max-eq and res:min-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on res-1
         (change-hw-prov ast 'load 0.9 'res-1)
-        (change-hw-prov ast 'load 0.5 'res-2)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
         (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 3 'mode-1-1-2)
@@ -176,7 +166,6 @@
        [(14) ; Description: Reqs only met on res-1, mode-1-1-2 does not meet request constraint (only min-eq)
         ; Expected outcome: first mode (mode-1-1-1) is deployed on res-1
         (change-hw-prov ast 'load 0.9 'res-1)
-        (change-hw-prov ast 'load 0.5 'res-2)
         (change-req-constraint ast 'prop-1 comp-min-eq 4)
         (change-sw-prov ast 'prop-1 7 'mode-1-1-1)
         (change-sw-prov ast 'prop-1 3 'mode-1-1-2) ; min-req not met
@@ -187,7 +176,7 @@
  
  (define (two-impls id)
    ; General description: 2 impls with each 2 modes, first modes are better, first impl is better
-   (let ([ast (create-system 3 0 1 2 2)])
+   (let ([ast (create-system 3 0 1 2 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
      (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'mode-1-1-2)
      (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-2-1)
@@ -195,14 +184,12 @@
      (case id
        [(100) ; Description: normal load constraints
         ; Expected outcome: mode-1-1-1 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
         (save-ilp tmp-lp ast)]
 
        [(101) ; Description: mode-1-1-1 does not meet its requirements (max-eq)
         ; Expected outcome: mode-1-1-2 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (remove-request-constraints ast)
@@ -210,7 +197,6 @@
 
        [(102) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (both max-eq)
         ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-2) ; max-req not met
@@ -220,7 +206,6 @@
        [(103) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (min-eq and max-eq)
         ; Interesting: complete impl not meeting reqs
         ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req not met
@@ -230,7 +215,6 @@
        [(104) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (both min-eq)
         ; Interesting: one mode per impl not meeting reqs (only min reqs)
         ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req not met
@@ -240,7 +224,6 @@
        [(105) ; Description: mode-1-1-1 and mode-1-2-1 do not meet their requirements (min-eq and max-eq)
         ; Interesting: one mode per impl not meeting reqs
         ; Expected outcome: mode-1-1-2 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req not met
@@ -249,7 +232,6 @@
 
        [(106) ; Description: only mode-1-2-2 meet its requirements (others mix of max-eq)
         ; Expected outcome: mode-1-2-2 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req not met
@@ -259,7 +241,6 @@
 
        [(107) ; Description: only mode-1-2-2 meet its requirements (all min-eq)
         ; Expected outcome: mode-1-2-2 is deployed on res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req not met
@@ -269,7 +250,6 @@
 
        [(108) ; Description: Reqs only met on res-2 and res-3 (max-eq)
         ; Expected outcome: first mode (mode-1-1-1) is deployed on either res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
@@ -285,8 +265,7 @@
 
        [(110) ; Description: Reqs only met on res-2 (max-eq)
         ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
-        (change-hw-prov ast 'load 0.9)
-        (change-hw-prov ast 'load 0.5 'res-2)
+        (change-hw-prov ast 'load 0.9 'res-1 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
         (save-ilp tmp-lp ast)]
@@ -304,7 +283,6 @@
         ; Expected outcome: mode-1-1-2 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.4 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (remove-request-constraints ast)
@@ -315,7 +293,6 @@
         ; Expected outcome: mode-1-2-1 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.4 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-2) ; max-req not met
@@ -328,7 +305,6 @@
         ; Expected outcome: mode-1-2-1 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.4 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-2) ; min-req not met
@@ -341,7 +317,6 @@
         ; Expected outcome: mode-1-2-1 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.4 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-1) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-2) ; min-req not met
@@ -354,7 +329,6 @@
         ; Expected outcome: mode-1-1-2 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.4 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-2-1) ; min-req not met
@@ -366,7 +340,6 @@
         ; Expected outcome: mode-1-2-2 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.4 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-2) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-2-1) ; min-req not met
@@ -379,7 +352,6 @@
         ; Expected outcome: mode-1-2-2 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-hw-prov ast 'load 0.4 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-1) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-2) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-2-1) ; min-req not met
@@ -392,7 +364,6 @@
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-3
         (change-hw-prov ast 'load 0.4 'res-1)
         (change-hw-prov ast 'load 0.9 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-min-eq 4)
         (change-sw-prov ast 'prop-1 7)
@@ -418,7 +389,6 @@
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-3
         (change-hw-prov ast 'load 0.4 'res-1)
         (change-hw-prov ast 'load 0.9 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
         (change-sw-prov ast 'prop-1 1)
@@ -508,7 +478,7 @@
  (define (two-comps id)
    ; General description: 2 comps with each 2 impls with each 2 modes, first comps, first impls and first modes are better
    ; All modes of comp-1 require prop-2 <= 20, where by default all modes provide sufficiently prop-2 = 10
-   (let ([ast (create-system 3 0 2 2 2 (lambda (mode-name) #t))])
+   (let ([ast (create-system 3 0 2 2 2 (list (lambda (impl) #t) no-freq-sw-clauses no-freq-hw-clauses #f))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
      (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'mode-1-1-2)
      (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-2-1)
@@ -522,14 +492,12 @@
      (case id
        [(200) ; Description: normal load constraints
         ; Expected outcome: both, mode-1-1-1 and mode-2-1-1 are deployed on either res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
         (save-ilp tmp-lp ast)]
 
        [(201) ; Description: only impl-2-2 meets requirement of comp-1
         ; Expected outcome: both, mode-1-1-1 and mode-2-2-1 are deployed on either res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
         (change-sw-prov ast 'prop-2 40 'mode-2-1-1 'mode-2-1-2) ; max-req not met
@@ -538,7 +506,6 @@
        [(202) ; Description: mode-2-1-1 not meet hw-reqs (max-eq), mode-1-1-1 not meet request constraint (max-eq)
         ; mode-2-2-1 and mode-2-2-2 not meet comp-1 reqs (max-eq)
         ; Expected outcome: both, mode-1-1-2 and mode-2-1-2 are deployed on either res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-2-1-1)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
@@ -552,7 +519,6 @@
         ; Reqs only met at res-3 at all
         ; Expected outcome: both, mode-1-1-2 and mode-2-1-2 are deployed on res-3
         (change-hw-prov ast 'load 1.0 'res-1 'res-2)
-        (change-hw-prov ast 'load 0.5 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-2-1-1)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
@@ -566,7 +532,8 @@
  (define (two-comps-reqc id)
    ; General description: 2 comps with each 2 impls with each 2 modes, first comps, first impls and first modes are better
    ; Only the first impl of comp-1 require prop-2 <= 20, where by default all modes provide sufficiently prop-2 = 10
-   (let ([ast (create-system 3 0 2 2 2 (lambda (impl-name) (eq? impl-name 'impl-1-1)))])
+   (let ([ast (create-system 3 0 2 2 2 (list (lambda (impl) (eq? impl 'impl-1-1))
+                                             no-freq-sw-clauses no-freq-hw-clauses #f) )])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
      (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'mode-1-1-2)
      (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-2-1)
@@ -580,14 +547,12 @@
      (case id
        [(300) ; Description: normal load constraints
         ; Expected outcome: only mode-1-2-1 is deployed on either res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-request-constraints ast)
         (save-ilp tmp-lp ast)]
        
        [(301) ; Description: modes of impl-1-2 do not meet their requirements
         ; Expected outcome: both, mode-1-1-1 and mode-2-1-1 are deployed on either res-1, res-2 or res-3
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-2-1 'mode-1-2-2) ; max-req not met
         (remove-request-constraints ast)
@@ -595,11 +560,21 @@
        
        [else (display (string-append "Unknown test case id '" id "'\n"))])))
  
+ (define (two-resource-types id)
+   (let ([ast (create-system 2 0 1 2 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
+     (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
+     (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'mode-1-1-2)
+     (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-2-1)
+     (change-sw-prov ast pn-energy (+ 25 (/ id 1e3)) 'mode-1-2-2)
+     
+     (case id
+       [(400) #t]
+       [else (display (string-append "Unknown test case id '" id "'\n"))])))
  (define (unsolvable id)
    ; General description: Systems without a solution, thus, no optimal solution
    (case id
      [(900) ; All hw-reqs not met (min-eq)
-      (let [(ast (create-system 3 0 1 1 2))]
+      (let [(ast (create-system 3 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f)))]
         (change-hw-prov ast 'load 0.4)
         (change-sw-req ast 'load comp-min-eq 0.7)
         (remove-request-constraints ast)
@@ -614,7 +589,6 @@
 
      [(902) ; Request constraint not met for any mode of the target component (min-eq)
       (let [(ast (create-system 3 0 1 2 3))]
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-1 2)
         (change-req-constraint ast 'prop-1 comp-min-eq 15)
@@ -622,22 +596,20 @@
 
      [(903) ; Request constraint not met for any mode of the target component (max-eq)
       (let [(ast (create-system 3 0 1 2 3))]
-        (change-hw-prov ast 'load 0.5)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-1 7)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
         (save-ilp tmp-lp ast))]
 
      [(904) ; Requirement on second component not met by any of its modes (max-eq)
-      (let [(ast (create-system 3 0 2 2 2 (lambda _ #t)))]
-        (change-hw-prov ast 'load 0.5)
+      (let [(ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-2 7 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
         (change-sw-req ast 'prop-2 comp-max-eq 4 'mode-1-1-1 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
         (save-ilp tmp-lp ast))]
 
      [(905) ; Requirement on second component not met by any of its modes (min-eq)
-      (let [(ast (create-system 3 0 2 2 2 (lambda _ #t)))]
+      (let [(ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-hw-prov ast 'load 0.8)
         (change-sw-req ast 'load comp-max-eq 0.3)
         (change-sw-prov ast 'prop-2 2 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
@@ -645,15 +617,14 @@
         (save-ilp tmp-lp ast))]
 
      [(906) ; Requirement on third component not met by any of its modes (max-eq)
-      (let [(ast (create-system 3 0 3 2 2 (lambda _ #t)))]
-        (change-hw-prov ast 'load 0.5)
+      (let [(ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-3 7 'mode-3-1-1 'mode-3-1-2 'mode-3-2-1 'mode-3-2-2)
         (change-sw-req ast 'prop-3 comp-max-eq 4 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
         (save-ilp tmp-lp ast))]
 
      [(907) ; Requirement on third component not met by any of its modes (min-eq)
-      (let [(ast (create-system 3 0 3 2 2 (lambda _ #t)))]
+      (let [(ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-hw-prov ast 'load 0.8)
         (change-sw-req ast 'load comp-max-eq 0.3)
         (change-sw-prov ast 'prop-3 2 'mode-3-1-1 'mode-3-1-2 'mode-3-2-1 'mode-3-2-2)
@@ -893,7 +864,7 @@
  (define (display-ranges)
    (display "1 13 100 122 200 203 300 301 900 907"))
 ;   (display "900 907"))
-   
+ 
  (if (< (length (command-line)) 2)
      (begin
        (display "Usage: ilp-test.scm action cmds")
