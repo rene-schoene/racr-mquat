@@ -3,7 +3,7 @@
 (library
  (mquat ast-generation)
  (export create-hw create-sw create-system rand
-         freq-name load-name mp-name prop make-prov make-req)
+         freq-name load-name mp-name node-name prop make-prov make-req)
  (import (rnrs) (racr core) (srfi :27)
          (mquat constants) (mquat ast) (mquat main) (mquat utils))
  
@@ -19,7 +19,6 @@
  (define (make-type nr) (:ResourceType mquat-spec (node-name 'type (list nr)) (list load freq)))
  (define (type nr)
    (let ([entry (assq nr types-al)])
-     (debug nr entry)
      (if entry (cdr entry) (let ([new (make-type (length types-al))])
                              (set! types-al (cons (cons nr new) types-al)) new))))
  (define prop-al (list)) (define last-comp-nr #f) (define last-comp #f)
@@ -84,22 +83,19 @@
  (define (create-hw num-pe num-subs ud-clauses ud-types)
    (with-specification
     mquat-spec
-    (let* ([res-name (lambda (outer-id n) (string->symbol (string-append (symbol->string outer-id) "-" (number->string n))))]
-           [type-nr? (ud-types res-name)])
-      (letrec ([make-subs (lambda (outer-id total subs)
-                            ;(debug '~make-subs total subs)
-                            (call-n-times (lambda (sub-n)
-                                            (make-res (res-name outer-id sub-n)
-                                                      (floor (/ (- total 1) subs)) subs)) (min total subs)))]
-               [make-res
-                (lambda (id total subs)
-                  ;(debug id total subs)
+    (letrec ([make-subs (lambda (outer-id total subs)
+                          (call-n-times (lambda (sub-n)
+                                          (make-res (node-name outer-id (list sub-n))
+                                                    (floor (/ (- total 1) subs)) subs)) (min total subs)))]
+             [make-res
+              (lambda (id total subs)
+                (let ([type-nr? (ud-types id)])
                   (:Resource mquat-spec
-                             id (if type-nr? (type type-nr?) (type 0)) (make-subs id total subs)
+                             id (type (if type-nr? type-nr? 0)) (make-subs id total subs)
                              (filter something (list (create-hw-clause ud-clauses id load)
-                                                     (create-hw-clause ud-clauses id freq)))))])
-        (let ([subs (make-subs 'res num-pe (if (= 0 num-subs) num-pe num-subs))])
-          (:HWRoot mquat-spec (map cdr types-al) subs))))))
+                                                     (create-hw-clause ud-clauses id freq))))))])
+      (let ([subs (make-subs 'res num-pe (if (= 0 num-subs) num-pe num-subs))])
+        (:HWRoot mquat-spec (map cdr types-al) subs)))))
  
  ; udfs: function (mode-name → function (property → clause))
  ; returns the SWRoot
@@ -112,7 +108,6 @@
                                                            (create-sw-clause ud-clauses name comp (car ps))
                                                            (create-sw-clause ud-clauses name comp (cadr ps))))]
                               [req-cl? (and req? (create-sw-clause ud-clauses name comp (car (prop last-comp-nr))))])
-                         (debug name cls req-cl?)
                          (:Mode mquat-spec name (if req-cl? (cons req-cl? cls) cls))))]
           [make-impl (lambda (comp impl)
                        (let* ([lon (list impl comp)]
@@ -124,7 +119,6 @@
                           (if does-req? (list last-comp) (list)) ; reqcomps
                           #f #f)))]
           [make-comp (lambda (comp) (let ([lon (list comp)])
-                                      ;(debug lon comp)
                                       (:Comp
                                        mquat-spec (node-name 'comp lon)
                                        (call-n-times (lambda (impl) (make-impl comp impl)) impl-per-comp) #f

@@ -16,7 +16,7 @@
  (define (->name n)           (ast-child 'name n))
  (define (->Impl* n)          (ast-child 'Impl* n))
  (define (->selected-impl n)  (ast-child 'selectedImpl n))
- (define (->Property* n)      (ast-child 'Property n))
+ (define (->Property* n)      (ast-child 'Property* n))
  (define (->deployed-on n)    (ast-child 'deployedon n))
  (define (->selected-mode n)  (ast-child 'selectedmode n))
  (define (->Mode* n)          (ast-child 'Mode* n))
