@@ -8,8 +8,8 @@ from constants import RACR_BIN, MQUAT_BIN
 run_racket = True
 
 @task
-def run():
-	for lb,ub in get_ranges():
+def run(*ranges):
+	for lb,ub in get_ranges() if ranges == () else parse_ranges(ranges):
 		ILPTest.create_ts(range(lb,ub+1))
 	suite = unittest.TestLoader().loadTestsFromTestCase(ILPTest)
 	unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
@@ -32,6 +32,12 @@ def get_ranges():
 			lb = False
 	print "Ranges:", result
 	return result
+
+def parse_ranges(ranges):
+	if len(ranges) == 1:
+		return [(int(ranges[0]), int(ranges[0]))]
+	else:
+		return [(int(ranges[i]), int(ranges[i+1])) for i in xrange(0, len(ranges), 2)]
 
 def read_solution(fname):
 	status = 0 # 0=search for column activities, 1=skip line, 2=name, 3=values
@@ -84,7 +90,7 @@ def write_solution(sol, fname):
 
 class ILPTest(unittest.TestCase):
 
-	longMessage = True
+	longMessage = False
 	fname_lp_racket = "test/tmp.lp"
 
 	@staticmethod
@@ -139,7 +145,7 @@ class ILPTest(unittest.TestCase):
 	def create_ts(cls, test_numbers):
 		for test_nr in test_numbers:
 			test_func = cls.make_t_function(cls, test_nr)
-			setattr(cls, 'test_{0}'.format(test_nr), test_func)
+			setattr(cls, 'test_{0:03d}'.format(test_nr), test_func)
 
 	@staticmethod
 	def make_t_function(self, test_nr):
@@ -148,4 +154,4 @@ class ILPTest(unittest.TestCase):
 		return test
 
 if __name__ == '__main__':
-	run()
+	print parse_ranges(sys.argv[1:])
