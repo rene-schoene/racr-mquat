@@ -3,7 +3,7 @@
 (library
  (mquat ast-generation)
  (export create-hw create-sw create-system rand
-         freq-name load-name mp-name node-name prop make-prov make-req)
+         freq-name load-name mp-name node-name make-prov make-req)
  (import (rnrs) (racr core) (srfi :27)
          (mquat constants) (mquat ast) (mquat main) (mquat utils))
  
@@ -21,20 +21,19 @@
    (let ([entry (assq nr types-al)])
      (if entry (cdr entry) (let ([new (make-type (length types-al))])
                              (set! types-al (cons (cons nr new) types-al)) new))))
- (define prop-al (list)) (define last-comp-nr #f) (define last-comp #f)
- (define (new-comp comp comp-nr) (set! last-comp-nr comp-nr) (set! last-comp comp))
+ (define prop-al (list)) 
  (define (make-sw-prop n) (list (:Property mquat-spec (node-name 'prop (list n)) 'u 'runtime 'increasing 'max)
                                 (:Property mquat-spec pn-energy 'J 'runtime 'decreasing 'sum)))
  (define (node-name ident lon) (string->symbol (fold-right (lambda (n s) (string-append s "-" (number->string n)))
-                                                                     (symbol->string ident) lon)))
+                                                           (symbol->string ident) lon)))
  (define (prop n)
    (let ([entry (assq n prop-al)])
      (if entry (cdr entry) (let ([new (make-sw-prop n)]) (set! prop-al (cons (cons n new) prop-al)) new))))
  
  (define (call-n-times proc n) (letrec ([cnt (lambda (n) (if (>= 0 n) (list) (cons (proc n) (cnt (- n 1)))))]) (cnt n)))
- (define (random n) (random-integer n)) ;find a suitable impl
+ (define (random n) (random-integer n))
  (define (rand max digits offset) (let ([factor (expt 10 digits)])
-                                    (lambda _ (inexact (+ offset (/ (random (* factor max)) factor))))))
+                                    (lambda _ (+ offset (inexact (/ (random (* factor max)) factor))))))
  
  (define (something v) v)
  (define (make-prov property comparator value) (:ProvClause mquat-spec property comparator value))
@@ -43,19 +42,20 @@
  ;;; AST-Generation
  (define (default-hw-clause-gen property-name)
    (cond
-     ((eq? property-name load-name) (list make-prov comp-eq (rand 1 3 0))) ; load = 0.001 - 1.000
-     ((eq? property-name freq-name) (list make-prov comp-eq (rand 500 2 500))) ; freq = 500.01 - 1000.00
+     ((eq? property-name load-name) (list make-prov comp-eq (rand 50 2 0))) ; provided load = [0.01, 50.00]
+     ((eq? property-name freq-name) (list make-prov comp-eq (rand 1000 2 500))) ; provided freq = [500.01 - 1000.00]
      (else (error "default-hw-clause-gen" "Wrong property" property-name))))
 
  (define (default-sw-clause-gen property-name comp-nr)
    (let ([ps (prop comp-nr)]
          [comp-nr-1 (+ comp-nr 1)])
      (cond
-       ((eq? property-name load-name) (list make-req comp-max-eq (rand 1 2 0)))
-       ((eq? property-name freq-name) (list make-req comp-max-eq (rand 480 1 510)))
-       ((eq? property-name (->name (car ps))) (list make-prov comp-eq (rand comp-nr 3 0)))
-       ((eq? property-name pn-energy) (list make-prov comp-eq (rand 100 3 0)))
-       ((eq? property-name (->name (car (prop comp-nr-1)))) (list make-req comp-max-eq (rand comp-nr-1 2 0)))
+       ((eq? property-name load-name) (list make-req comp-max-eq (rand 100 2 50))) ; required load max [50.01, 100.00]
+       ((eq? property-name freq-name) (list make-req comp-min-eq (rand 500 2 0))) ; required freq min [0.01, 500.00]
+       ((eq? property-name (->name (car ps))) (list make-prov comp-eq (rand 10 2 5))) ; provided prop-n = [5.01 - 10.00]
+       ((eq? property-name pn-energy) (list make-prov comp-eq (rand 100 3 0))) ; provided energy = [0.001 - 100.000]
+       ; required prop-m max [10.01, 20.00]
+       ((eq? property-name (->name (car (prop comp-nr-1)))) (list make-req comp-max-eq (rand 20 2 10)))
        (else (error "default-sw-clause-gen" "no suitable property" property-name (->name (car (prop comp-nr-1))) comp-nr)))))
 
  (define (create-hw-clause udfs name property)
@@ -98,8 +98,10 @@
         (:HWRoot mquat-spec (map cdr types-al) subs)))))
  
  ; udfs: function (mode-name → function (property → clause))
- ; returns the SWRoot
+ ; returns the (cons SWRoot last-comp-nr)
  (define (create-sw num-comp impl-per-comp mode-per-impl ud-clauses reqc)
+   (define last-comp-nr #f) (define last-comp #f)
+   (define (new-comp comp comp-nr) (set! last-comp-nr comp-nr) (set! last-comp comp))
    (let* ([make-mode (lambda (comp impl-lon mode req?)
                        (let* ([ps (prop comp)]
                               [name (node-name 'mode (cons mode impl-lon))]
@@ -125,9 +127,9 @@
                                        (prop comp))))]
           [sw-root (:SWRoot
                     mquat-spec (call-n-times (lambda (n) (let ([comp (make-comp n)]) (new-comp comp n) comp)) num-comp))])
-     sw-root))
+     (cons sw-root last-comp-nr)))
  
- (define (create-request)
+ (define (create-request last-comp-nr)
    (let* ([make-req (lambda (p max digits offset) (:ReqClause mquat-spec p comp-min-eq (rand max digits offset)))]
           [target-property (car (prop last-comp-nr))]
           [target (<<- target-property)])
@@ -166,5 +168,8 @@
    (set! types-al (list)) (set! prop-al (list))
    (set! load (:Property mquat-spec load-name '% 'runtime 'decreasing agg-sum))
    (set! freq (:Property mquat-spec freq-name 'MHz 'runtime 'increasing agg-max))
-   (:Root mquat-spec (create-hw num-pe num-pe-subs ud-hw-clauses ud-types)
-          (create-sw num-comp impl-per-comp mode-per-impl ud-sw-clauses sw-reqc) (create-request))))
+   (let* ([sw-result (create-sw num-comp impl-per-comp mode-per-impl ud-sw-clauses sw-reqc)]
+          [sw-root (car sw-result)]
+          [last-comp-nr (cdr sw-result)])
+     (:Root mquat-spec (create-hw num-pe num-pe-subs ud-hw-clauses ud-types)
+            sw-root (create-request last-comp-nr)))))
