@@ -227,7 +227,7 @@
        [(100) ; Description: normal load constraints
         ; Expected outcome: mode-1-1-1 is deployed on res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
-        (remove-req-constraints)]
+        (remove-req-constraints ast)]
 
        [(101) ; Description: mode-1-1-1 does not meet its requirements (max-eq)
         ; Expected outcome: mode-1-1-2 is deployed on res-1, res-2 or res-3
@@ -539,6 +539,18 @@
         (change-sw-prov ast 'prop-1 4 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
         (change-sw-prov ast 'prop-2 40 'mode-2-2-1 'mode-2-2-2)] ; max-req not met
 
+       [(204) ; Description: mode-2-2-2 meet hw-reqs at res-1 (max-eq), mode-1-2-2 meet hw-req at res-2 (min-eq)
+        ; mode-2-1-*, mode-2-2-1, mode-1-1-* and mode-1-2-1 not meeting reqs
+        ; Reqs not met at res-3
+        ; Expected outcome: mode-1-2-2 at res-2 and mode-2-2-2 on res-1
+        (change-hw-prov ast 'load 0.3 'res-1)
+        (change-hw-prov ast 'load 0.5 'res-3)
+        (change-hw-prov ast 'load 0.7 'res-2)
+        (change-sw-req ast 'load comp-max-eq 0.2)
+        (change-sw-req ast 'load comp-max-eq 0.4 'mode-2-2-2)
+        (change-sw-req ast 'load comp-min-eq 0.6 'mode-1-2-2)
+        (remove-req-constraints ast)]
+
        [else (wrong-id two-comps id)])
      (save-ilp tmp-lp ast)))
 
@@ -665,7 +677,8 @@
        (debug "#create new comp" comp-nr)
        (let ([new (:Comp mquat-spec (node-name 'comp (list comp-nr)) (list) #f 
                                          (list (:Property mquat-spec (node-name 'prop (list comp-nr))
-                                                          '1 'runtime 'increasing 'sum)))])
+                                                          '1 'runtime 'increasing 'sum)
+                                               (:Property mquat-spec pn-energy 'J 'runtime 'decreasing 'sum)))])
          (rewrite-add (->Comp* (->SWRoot ast)) new) new))
      (define (find-create l prefix lon make-new)
        (let ([name (node-name prefix lon)])
@@ -674,7 +687,7 @@
      (define (add-impl comp-nr impl-nr reqcomps)
        (debug "#create new impl" comp-nr impl-nr reqcomps)
        (let ([new (:Impl mquat-spec (node-name 'impl (list impl-nr comp-nr)) (list)
-                         (map (lambda (c) (find-create-comp comp-nr)) reqcomps) #f #f)])
+                         (map (lambda (nr) (find-create-comp nr)) reqcomps) #f #f)])
          (rewrite-add (->Impl* (find-create-comp comp-nr)) new) new))
      (define (find-create-impl comp-nr impl-nr reqcomps) (find-create (->Impl* (find-create-comp comp-nr)) 'impl
                                                                       (list impl-nr comp-nr)
@@ -688,10 +701,9 @@
                                                                  (->Property* comp)))]
               [load (find-prop-hw load-name)]
               [energy (find-prop-sw pn-energy (find-create-comp comp-nr))]
-              [prev-p (and req-comp-nr (find-prop-sw (node-name 'prop req-comp-nr) (find-create-comp req-comp-nr)))]
+              [prev-p (and req-comp-nr (find-prop-sw (node-name 'prop (list req-comp-nr)) (find-create-comp req-comp-nr)))]
               [this-p (find-prop-sw (node-name 'prop (list comp-nr)) (find-create-comp comp-nr))]
-              [properties (list (:Property mquat-spec (node-name 'prop (list comp-nr)) '1 'runtime 'increasing 'sum))]
-              [clauses (filter (lambda (c) c) (list (:ProvClause mquat-spec load comp-max-eq load-f)
+              [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec load comp-max-eq load-f)
                                                     (:ProvClause mquat-spec energy comp-max-eq energy-f)
                                                     (:ProvClause mquat-spec this-p comp-max-eq prov-f)
                                                     (and req-comp-nr (:ReqClause mquat-spec prev-p comp-max-eq prev-f))))]
@@ -710,15 +722,41 @@
         ; Expected outcome: (new) mode-1-1-3 on either res-1 or res-2
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)
-        (add-mode 1 1 3 #f (lambda _ 0.8) (lambda _ (prov-obj 20 id)) (lambda _ 2) #f)
-        (remove-req-constraints ast)]
+        (add-mode 1 1 3 #f (lambda _ 0.8) (lambda _ (prov-obj 20 id)) (lambda _ 2) #f)]
 
        [(602) ; New mode of a new second impl requiring less
         ; Expected outcome: (new) mode-1-2-1 on either res-1 or res-2
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)
-        (add-mode 1 2 1 #f (lambda _ 0.8) (lambda _ (prov-obj 20 id)) (lambda _ 2) #f)
-        (remove-req-constraints ast)]
+        (add-mode 1 2 1 #f (lambda _ 0.8) (lambda _ (prov-obj 20 id)) (lambda _ 2) #f)]
+
+       [(603) ; New component using the existing comp, with one impl and one mode
+        ; Expected outcome: mode-1-1-1 and (new) mode-2-1-1, both on either res-1 or res-2
+        (change-sw-req ast 'load comp-max-eq 0.8)
+        (change-sw-prov ast 'prop-1 4)
+        (remove-req-constraints ast)
+        (save-ilp tmp-lp ast)
+        (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))
+        (rewrite-terminal 'target (<=request ast) (find-create-comp 2))]
+
+       [(604) ; New component using the existing comp, with one impl and one mode
+        ; High load on res-1, high load required for comp-1-modes, low load required for new comp/mode
+        ; Expected outcome: mode-1-1-1 on res-1 and (new) mode-2-1-1 on res-2
+        (change-sw-req ast 'load comp-min-eq 0.9)
+        (change-hw-prov ast 'load 0.91 'res-1)
+        (change-sw-prov ast 'prop-1 4)
+        (remove-req-constraints ast)
+        (save-ilp tmp-lp ast)
+        (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))
+        (rewrite-terminal 'target (<=request ast) (find-create-comp 2))]
+
+       [(605) ; New component using the existing comp, with one impl and one mode. Request still targets old component.
+        ; Expected outcome: mode-1-1-1 on either res-1 or res-2
+        (change-sw-req ast 'load comp-max-eq 0.8)
+        (change-sw-prov ast 'prop-1 4)
+        (remove-req-constraints ast)
+        (save-ilp tmp-lp ast)
+        (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))]
 
        [else (wrong-id new-software id)])
      (save-ilp tmp-lp ast) ast))
@@ -786,29 +824,31 @@
 
      [else (wrong-id unsolvable id)]))
  
- (define (read-solution table fname error)
-   (when (not (file-exists? fname)) (error (string-append "File " fname " not found.")))
+ (define (read-solution table fname)
+   (when (not (file-exists? fname)) (error 'read-solution "File not found." fname))
    (with-input-from-file fname
      (lambda ()
        (for-each (lambda (entry) (hashtable-set! table (car entry) (cdr entry))) (read)))))
  
  (define (check-test id-s obj fname)
-   (call/cc
-    (lambda (error)
+;   (call/cc
+;    (lambda (error)
       (let* ([table (make-hashtable string-hash string=?)]
-             [val (lambda (name) (or (hashtable-ref table name #f) (error (string-append name " not found\n"))))]
+             [val (lambda (name) (or (hashtable-ref table name #f) (error #f "Var not found" name)))]
              [contains? (lambda (name) (hashtable-contains? table name))]
              [id (string->number id-s)]
-             [test-obj (lambda (expected-base actual id) (if (not (= actual (+ expected-base (/ id 1e3))))
-                                                             (error "Wrong objective value")))]
-             [test-assert (lambda (msg expr) (if (not expr) (error msg)))])
+             [test-obj (lambda (expected-base actual id) (let ([expected (+ expected-base (/ id 1e3))])
+                                                           (if (not (= actual expected))
+                                                               (error #f "Wrong objective value, expected first, given last"
+                                                                      expected actual))))]
+             [test-assert (lambda (msg expr) (if (not expr) (error #f msg)))])
         (define (val=? base expected op lres)
           (if (null? lres) (lambda (name) (= (val name) expected))
               (let ([=name (lambda (base res-nr) (string-append base "#res_" (number->string res-nr)))])
                 (op (lambda (res-nr) (= (val (=name base res-nr)) expected)) lres))))
         (define (val=1? base . lres) (val=? base 1 exists  lres))
         (define (val=0? base . lres) (val=? base 0 for-all lres))
-        (read-solution table fname error)
+        (read-solution table fname)
         (for-each (lambda (key) (debug key ":" (hashtable-ref table key #f))) (vector->list (hashtable-keys table)))
         ; impl deployment
         (case id
@@ -830,16 +870,27 @@
            (test-assert "impl-2-2 not deployed" (val=1? "b#comp_2#impl_2_2"))
            (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
            (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))]
+          [(204)
+           (test-assert "impl-1-2 not deployed" (val=1? "b#comp_1#impl_1_2"))
+           (test-assert "impl-2-2 not deployed" (val=1? "b#comp_2#impl_2_2"))
+           (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))]
           [(300)
            (test-assert "impl-1-2 not deployed" (val=1? "b#comp_1#impl_1_2"))
            (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
            (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))
            (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))]
-          [(900 901 501 503 600)
-           (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))]
           [(402 902 903)
            (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))
            (test-assert "impl-2 deployed"       (val=0? "b#comp_1#impl_1_2"))]
+          [(501 503 600 900 901)
+           (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))]
+          [(603 604)
+           (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2-1 not deployed" (val=1? "b#comp_2#impl_2_1"))]
+          [(605)
+           (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
+           (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))]
           [(904 905)
            (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
            (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
@@ -852,13 +903,13 @@
            (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))
            (test-assert "impl-3-1 deployed"     (val=0? "b#comp_3#impl_3_1"))
            (test-assert "impl-3-2 deployed"     (val=0? "b#comp_3#impl_3_2"))]
-          [else (error (string-append "Unknown test case id '" id-s " for impls'\n"))])
+          [else (error #f "Unknown test case id for impls" id)])
         
         ; mode-deployment
         (case id
-          [(1 500)       (test-assert "mode-1-1-1 not deployed on 12"  (val=1? "b#comp_1##mode_1_1_1" 1 2))
+          [(1 500)       (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1##mode_1_1_1" 1 2))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-          [(2 3 4 5)     (test-assert "mode-1-1-2 not deployed on 12"  (val=1? "b#comp_1##mode_1_1_2" 1 2))
+          [(2 3 4 5)     (test-assert "mode-1-1-2 not deployed"        (val=1? "b#comp_1##mode_1_1_2" 1 2))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
           [(6 14)        (test-assert "mode-1-1-1 not deployed on 1"   (val=1? "b#comp_1##mode_1_1_1" 1))
                          (test-assert "mode-1-1-1 deployed on 2"       (val=0? "b#comp_1##mode_1_1_1" 2))
@@ -872,26 +923,26 @@
           [(8 9 10 11)   (test-assert "mode-1-1-2 not deployed on 2"   (val=1? "b#comp_1##mode_1_1_2" 2))
                          (test-assert "mode-1-1-2 deployed on 1"       (val=0? "b#comp_1##mode_1_1_2" 1))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
-          [(15)          (test-assert "mode-1-1-1 not deployed on 12"  (val=1? "b#comp_1#impl_1_1#" 1 2))
+          [(15)          (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#" 1 2))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#" 1 2))]
-          [(16 17 18 19) (test-assert "mode-1-2-1 not deployed on 12"  (val=1? "b#comp_1#impl_1_2#" 1 2))
+          [(16 17 18 19) (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#" 1 2))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#" 1 2))]
           [(20 21)       (test-assert "mode-1-2-1 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#" 2))
                          (test-assert "mode-1-2-1 deployed on 1"       (val=0? "b#comp_1#impl_1_2#" 1))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#" 1 2))]
-          [(100)         (test-assert "mode-1-1-1 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+          [(100)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(101 105)     (test-assert "mode-1-1-2 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+          [(101 105)     (test-assert "mode-1-1-2 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(102 103 104) (test-assert "mode-1-2-1 not deployed on 123" (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+          [(102 103 104) (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-          [(106 107)     (test-assert "mode-1-2-2 not deployed on 123" (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
+          [(106 107)     (test-assert "mode-1-2-2 not deployed"        (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
@@ -935,24 +986,24 @@
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-          [(200 301)     (test-assert "mode-1-1-1 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "mode-2-1-1 not deployed on 123" (val=1? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+          [(200 301)     (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-2-1-1 not deployed"        (val=1? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
                          (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
                          (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
                          (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-          [(201)         (test-assert "mode-1-1-1 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                         (test-assert "mode-2-2-1 not deployed on 123" (val=1? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
+          [(201)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-2-2-1 not deployed"        (val=1? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
                          (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
                          (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
                          (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-          [(202)         (test-assert "mode-1-1-2 not deployed on 123" (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                         (test-assert "mode-2-1-2 not deployed on 123" (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+          [(202)         (test-assert "mode-1-1-2 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-2-1-2 not deployed"        (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
@@ -961,13 +1012,25 @@
                          (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
           [(203)         (test-assert "mode-1-1-2 not deployed on 3"   (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 3))
                          (test-assert "mode-2-1-2 not deployed on 3"   (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 3))
+                         (test-assert "mode-1-1-2 deployed on 12"      (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2))
+                         (test-assert "mode-2-1-2 deployed on 12"      (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
                          (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
                          (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
                          (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-          [(300)         (test-assert "mode-1-2-1 not deployed on 123" (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+          [(204)         (test-assert "mode-1-2-2 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2))
+                         (test-assert "mode-2-2-2 not deployed on 1"   (val=1? "b#comp_2#impl_2_2#mode_2_2_2" 1))
+                         (test-assert "mode-1-2-2 deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 3))
+                         (test-assert "mode-2-2-2 deployed on 23"      (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 2 3))
+                         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                         (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
+                         (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
+                         (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))]
+          [(300)         (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
@@ -997,12 +1060,23 @@
           [(502)         (test-assert "mode-1-1-1 not deployed on 3"   (val=1? "b#comp_1##mode_1_1_1" 3))
                          (test-assert "mode-1-1-1 deployed on 12"      (val=0? "b#comp_1##mode_1_1_1" 1 2))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2 3))]
-          [(601)         (test-assert "mode-1-1-3 not deployed on 12"  (val=1? "b#comp_1##mode_1_1_3" 1 2))
+          [(601)         (test-assert "mode-1-1-3 not deployed"        (val=1? "b#comp_1##mode_1_1_3" 1 2))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-          [(602)         (test-assert "mode-1-2-1 not deployed on 12"  (val=1? "b#comp_1#impl_1_2#" 1 2))
+          [(602)         (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#" 1 2))
                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2))]
+          [(603)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1##mode_1_1_1" 1 2))
+                         (test-assert "mode-2-1-1 not deployed"        (val=1? "b#comp_2##" 1 2))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
+          [(604)         (test-assert "mode-1-1-1 not deployed on 1"   (val=1? "b#comp_1##mode_1_1_1" 1))
+                         (test-assert "mode-2-1-1 not deployed on 2"   (val=1? "b#comp_2##" 2))
+                         (test-assert "mode-1-1-1 deployed on 2"       (val=0? "b#comp_1##mode_1_1_1" 2))
+                         (test-assert "mode-2-1-1 deployed on 1"       (val=0? "b#comp_2##" 1))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
+          [(605)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1##mode_1_1_1" 1 2))
+                         (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))
+                         (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2##" 1 2))]
           [(900 901 501 503 600) (test-assert "mode-1-1-1 deployed"    (val=0? "b#comp_1##mode_1_1_1" 1 2))
                          (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
           [(902 903)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
@@ -1032,22 +1106,22 @@
                          (test-assert "mode-3-2-1 deployed"            (val=0? "b#comp_3#impl_3_2#mode_3_2_1" 1 2 3))
                          (test-assert "mode-3-2-2 deployed"            (val=0? "b#comp_3#impl_3_2#mode_3_2_1" 1 2 3))]
 
-          [else (error (string-append "Unknown test case id '" id-s " for modes'\n"))])
+          [else (error #f "Unknown test case id for modes" id)])
         (case id
-          [(1 6 7 12 14 15 100 108 109 110 111 400 404 500 502) (test-obj 10 obj id)]
+          [(1 6 7 12 14 15 100 108 109 110 111 400 404 500 502 605) (test-obj 10 obj id)]
           [(101 105 112 116 119 120 121 122) (test-obj 15 obj id)]
           [(2 3 4 5 8 9 10 11 13 16 17 18 19 20 21 102 103 104 113 114 115 300 401 601 602) (test-obj 20 obj id)]
           [(106 107 117 118 123 124 125 126 403) (test-obj 25 obj id)]
+          [(603 604) (test-obj 30 obj id)]
           [(200 301) (test-obj 40 obj id)] ;10+30
           [(201) (test-obj 50 obj id)] ;10+40
           [(202 203) (test-obj 50 obj id)] ;15+35
-          [(402 501 503 600 900 901 902 903 904 905 906 907) (test-assert "Wrong objective" (eq? 0.0 obj))]
-          [else (error (string-append "Unknown test case id '" id-s " for objectives'\n"))])
-        #f))))
+          [(204) (test-obj 70 obj id)] ;25+45
+          [(402 501 503 600 900 901 902 903 904 905 906 907) (test-assert "Objective not zero." (eq? 0.0 obj))]
+          [else (error #f "Unknown test case id for objectives" id)])));))
  
  (define (display-ranges)
-;   (display "1 13 100 122 200 203 300 301 900 907"))
-   (display "1 21"))
+   (display "1 21 100 126 200 204 300 301 400 404 500 503 600 605 900 907"))
  
  (if (< (length (command-line)) 2)
      (begin
@@ -1066,7 +1140,5 @@
        (when (string=? "check" (cadr (command-line))) ; expect "check" id obj fname
          (set!debugging #t)
          (let* ([cmds (cddr (command-line))]
-                [id-s (car cmds)] [obj (string->number (cadr cmds))] [fname (caddr cmds)]
-                [error (check-test id-s obj fname)])
-           (when error (display error) (exit 1))
-           (exit 0))))))
+                [id-s (car cmds)] [obj (string->number (cadr cmds))] [fname (caddr cmds)])
+           (check-test id-s obj fname))))))
