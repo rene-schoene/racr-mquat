@@ -135,7 +135,7 @@
           [target (<<- target-property)])
      (:Request
       mquat-spec
-      (list (:MetaParameter mquat-spec mp-name (rand 100 2 0)))
+      (list (:MetaParameter mquat-spec mp-name ((rand 100 2 0))))
       target (list (make-req target-property 1 2 0)) #f)))
  
  ; Creates a new system.
