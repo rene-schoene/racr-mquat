@@ -7,6 +7,13 @@ from constants import RACR_BIN, MQUAT_BIN
 
 @task
 def measure_racket():
+	dirs = local('racket -S %s -S %s ilp-measurement.scm dirs' % (RACR_BIN, MQUAT_BIN), capture = True).split()
+	if not os.path.exists('profiling'):
+		os.mkdir('profiling')
+	for d in dirs:
+		name = 'profiling/%s' % d
+		if not os.path.exists(name):
+			os.mkdir(name)
 	local('racket -S %s -S %s ilp-measurement.scm all' % (RACR_BIN, MQUAT_BIN))
 
 results = 'results.csv'
@@ -20,11 +27,11 @@ def measure_glpsol(*dirs):
 		dirs = glob('profiling/*/')
 		
 	for d in dirs:
+		os.chdir(old_cd)
 		if not os.path.isdir(d):
 		  print red("Not a valid directory: %s" % d)
 		  continue
-	
-		os.chdir(old_cd)
+		print d
 		os.chdir(d)
 		with open(results, 'w') as fd:
 			writer = csv.writer(fd)
