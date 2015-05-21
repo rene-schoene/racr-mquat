@@ -28,7 +28,7 @@
               (list 13 50 0 50 2 2))))
    
  (define (rw comp-name restype prop-name new-value ast)
-   (debug comp-name prop-name new-value ast)
+;   (debug comp-name prop-name new-value ast)
    (rewrite-terminal 'value (=provided-clause (find (lambda (pe) (eq? (->name pe) comp-name))
                                                               (=every-pe ast)) prop-name restype)
                      (lambda _ new-value)))
@@ -44,7 +44,6 @@
           [result (time-it (lambda _ (save-ilp (string-append name ".lp") ast)))])
      (save-to-file (string-append name ".lp.time") (list (time-second (cdr result)) (time-nanosecond (cdr result))))))
 
- 
  (define (cst id-s specs) ; [c]reate-[s]ystem-[t]imed
    (let* ([name (string-append "profiling/" id-s "/specs")]
           [result (time-it (lambda _ (apply create-system specs)))])
@@ -54,6 +53,7 @@
  (define (run-test id-s specs)
    (let* ([ast (cst id-s specs)]
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))])
+     (display id-s) (display " ") (flush-output-port)
      (sit id-s "01-init" ast)
      (rw 'res-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast)
      (rw 'res-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast)

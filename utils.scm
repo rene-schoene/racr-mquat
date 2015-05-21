@@ -55,7 +55,7 @@
    (set! debugging b))
  (define (debugging?) debugging)
  ; Displays the given arguments
- (define (debug . args)
+ (define (debug0 . args)
   (letrec
       ([D (lambda (loa) ; [l]ist [o]f [a]rgs
             (cond
@@ -74,6 +74,10 @@
                ((ast-node? s) (if (ast-has-child? 'name s) (P (ast-child 'name s)) "<node>"))
                (else "?")))])
     (when debugging (display (D args)) (display "\n"))))
+ 
+ (define-syntax debug
+   (syntax-rules ()
+     [(_ args ...) (and debugging (debug0 args ...))]))
  
  ;; Text save
  

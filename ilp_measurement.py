@@ -60,6 +60,7 @@ def measure_glpsol(*dirs):
 @task
 def conflate_results():
 	local('tail -n +1 profiling/*/results.csv > profiling/all-results')
+	local('tail -n +1 profiling/*/specs > profiling/all-specs')
 
 @task
 def t(*dirs):
