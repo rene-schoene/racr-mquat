@@ -53,7 +53,7 @@
  (define (run-test id-s specs)
    (let* ([ast (cst id-s specs)]
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))])
-     (display id-s) (display " ") (flush-output-port)
+     (display id-s) (display " ") (flush-output-port (current-output-port))
      (sit id-s "01-init" ast)
      (rw 'res-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast)
      (rw 'res-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast)

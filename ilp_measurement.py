@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 
 import sys, re, os, csv, timeit
+from datetime import datetime
+from glob import glob
 from fabric.colors import red
-from fabric.api import task, local, lcd
+from fabric.api import task, local, lcd, hide
 from constants import RACR_BIN, MQUAT_BIN
 
+# TODO: add *dirs parameter
 @task
 def measure_racket():
 	dirs = local('racket -S %s -S %s ilp-measurement.scm dirs' % (RACR_BIN, MQUAT_BIN), capture = True).split()
@@ -15,52 +18,98 @@ def measure_racket():
 		if not os.path.exists(name):
 			os.mkdir(name)
 	local('racket -S %s -S %s ilp-measurement.scm all' % (RACR_BIN, MQUAT_BIN))
+	conflate_results()
 
-results = 'results.csv'
-header = ['step', 'ilp-gen', 'rows', 'cols', 'non-zero', 'ilp-sol', 't-ilp-sol']
+gen_results = 'gen.csv'
+gen_header  = ['timestamp', 'dir', 'step', 'ilp-gen'] # generation of ilp
+
+sol_results = 'sol.csv'
+sol_header  = ['timestamp', 'dir', 'step', 'rows', 'cols', 'non-zero', 'ilp-sol', 'ti-ilp-sol'] # solving of ilp
+
+all_results = 'all.csv'
+
+def dirname(d):
+	return os.path.split(os.path.dirname(d))[-1]
 
 @task
-def measure_glpsol(*dirs):
+def measure_glpsol(pathname = '*'):
 	old_cd = os.getcwd()
-	if dirs == ():
-		from glob import glob
-		dirs = glob('profiling/*/')
-		
+	dirs = glob('profiling/%s/' % pathname)
+	dirs.sort()
 	for d in dirs:
-		os.chdir(old_cd)
 		if not os.path.isdir(d):
 		  print red("Not a valid directory: %s" % d)
 		  continue
-		print d
+		print d,':',
 		os.chdir(d)
-		with open(results, 'w') as fd:
+		add_header = not os.path.exists(sol_results)
+		with open(sol_results, 'a') as fd:
 			writer = csv.writer(fd)
-			writer.writerow(header)
+			if add_header:
+				writer.writerow(sol_header)
 			files = os.listdir('.')
 			files.sort()
 			for ilp in files:
 				if not ilp.endswith('.lp'):
 					continue
 				start = timeit.default_timer()
-				out = local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')), capture = True)
+				with hide('running'):
+					out = local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')), capture = True)
 				stop = timeit.default_timer()
+				today = datetime.today()
 				if re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
 					duration = re.search('Time used:[\s]*(.*?) secs', out).group(1)
-					rows, cols, nonzeros = re.search('(\d+) rows, (\d+) columns, (\d+) non-zeros', out).groups()
-					print 'Solution found for %s in %s secs (timeit: %s secs)' % (ilp, duration, stop - start)
+					# stats=row,col,nonzero
+					stats = re.search('(\d+) rows, (\d+) columns, (\d+) non-zeros', out).groups()
+					sys.stdout.write('.')
 				else:
-					print red('No solution found for %s' % ilp)
+					sys.stdout.write(red('!'))
 					duration = -1
-				with open(ilp+'.time') as tfd:
-					ilp_gen_time = '.'.join(tfd.readline().split())
-				writer.writerow([ilp.rsplit('.', 1)[0], ilp_gen_time, rows, cols, nonzeros, duration, stop-start])
-	os.chdir(old_cd)
-	conflate_results()
+				sys.stdout.flush()
+				row = list((today.isoformat(),dirname(d), ilp.rsplit('.', 1)[0]) + stats + (duration, stop-start))
+				writer.writerow(row)
+		os.chdir(old_cd)
+		print ' done'
 
 @task
-def conflate_results():
-	local('tail -n +1 profiling/*/results.csv > profiling/all-results')
+def conflate_results(pathname = '*', remove = None):
+	old_cd = os.getcwd()
+	dirs = glob('profiling/%s/' % pathname)
+	for d in dirs:
+		if not os.path.isdir(d):
+		  print red("Not a valid directory: %s" % d)
+		  continue
+		os.chdir(d)
+		sys.stdout.write('.')
+		sys.stdout.flush()
+		
+		add_header = not os.path.exists(gen_results)
+		# gen-results
+		with open(gen_results, 'a') as fd:
+			writer = csv.writer(fd)
+			if add_header:
+				writer.writerow(gen_header)
+
+			files = glob('*.lp.time')
+			files.sort()
+			for f in files:
+				mod = datetime.fromtimestamp(os.path.getctime(f))
+				with open(f) as fd:
+					gen_time = '.'.join(fd.readline().split())
+				row = [mod.isoformat(),dirname(d), f.split('.')[0], gen_time]
+				#print row
+				writer.writerow(row)
+				if remove:
+					#os.remove(f)
+					print 'remove ' + f
+		os.chdir(old_cd)
+	print ' done'
+
 	local('tail -n +1 profiling/*/specs > profiling/all-specs')
+	local('tail -qn +2 profiling/gen-header profiling/*/%s > profiling/all-gen-results.csv' % gen_results)
+
+	# sol-results
+	local('tail -qn +2 profiling/sol-header profiling/*/%s> profiling/all-sol-results.csv' % sol_results)
 
 @task
 def t(*dirs):

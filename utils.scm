@@ -102,6 +102,12 @@
    (with-output-to-file path
      (lambda () (for-each (lambda (x) (print-per-line x #t)) values) (newline))))
  
+ (define (with-append-output-to-file path thunk)
+;   (let ([former-port (current-output-port)])
+   (let ([port (open-file-output-port path (file-options no-create no-truncate))])
+     (call-with-port port thunk)
+     (close-output-port port)));)
+   
  ;; Measurement
  
  ; Execute the given 0-arg procedure and returns (time-diff result)
