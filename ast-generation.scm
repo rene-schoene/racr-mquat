@@ -62,7 +62,6 @@
             [make-res
              (lambda (id total subs)
                (let ([type-nr? (ud-types id)])
-                 (debug id "has type" (if type-nr? type-nr? 0))
                  (:Resource mquat-spec
                             id (type (if type-nr? type-nr? 0)) (make-subs id total subs)
                             (filter something (list (create-hw-clause ud-clauses id load)
@@ -82,25 +81,33 @@
    (define (prop n)
      (let ([entry (assq n prop-al)])
        (if entry (cdr entry) (let ([new (make-sw-prop n)]) (set! prop-al (cons (cons n new) prop-al)) new))))
-   (define (default-sw-clause-gen property-name comp-nr)
-     (let ([ps (prop comp-nr)]
-           [comp-nr-1 (+ comp-nr 1)])
-       (cond
-         ((eq? property-name load-name) (list make-req comp-max-eq (rand 100 2 50))) ; required load max [50.01, 100.00]
-         ((eq? property-name freq-name) (list make-req comp-min-eq (rand 500 2 0))) ; required freq min [0.01, 500.00]
-         ((eq? property-name (->name (car ps))) (list make-prov comp-eq (rand 10 2 5))) ; provided prop-n = [5.01 - 10.00]
-         ((eq? property-name pn-energy) (list make-prov comp-eq (rand 100 3 0))) ; provided energy = [0.001 - 100.000]
-         ; required prop-m max [10.01, 20.00]
-         ((eq? property-name (->name (car (prop comp-nr-1)))) (list make-req comp-max-eq (rand 20 2 10)))
-         (else (error "default-sw-clause-gen" "no suitable property" property-name (->name (car (prop comp-nr-1))) comp-nr)))))
-   (define (create-sw-clause udfs name comp-nr property)
-     (let ([f (create-clause udfs default-sw-clause-gen name)]
-           [real-property (=real property)])
-       (if f (let ([args (f (->name real-property) comp-nr)])
-               (if (eq? args #t) (set! args (default-sw-clause-gen (->name real-property) comp-nr)))
-               (if args ((car args) real-property (cadr args) (caddr args)) #f)) #f)))
-   (define (make-mode comp impl-lon mode req?)
-     (let* ([ps (prop comp)]
+   (define (make-mode comp impl-lon mode req? valid!?)
+     (let* ([valid!? (and valid!? (= 1 mode))]
+            [default-sw-clause-gen
+              (lambda (property-name comp-nr)
+                (let ([ps (prop comp-nr)]
+                      [comp-nr+1 (+ comp-nr 1)])
+                  (cond
+                    ; required load max [50.01, 100.00] if valid!?, [0.01 - 100.00] otherwise
+                    ((eq? property-name load-name) (list make-req comp-max-eq (if valid!? (rand 100 2 50) (rand 100 2 0))))
+                    ; required freq min [0.01, 500.00]
+                    ((eq? property-name freq-name) (list make-req comp-min-eq (rand 500 2 0)))
+                    ; provided prop-n = [5.01 - 10.00] if valid!?, [0.01 - 10.00] otherwise
+                    ((eq? property-name (->name (car ps))) (list make-prov comp-eq (if valid!? (rand 10 2 5) (rand 10 2 0))))
+                    ; provided energy = [0.001 - 100.000]
+                    ((eq? property-name pn-energy) (list make-prov comp-eq (rand 100 3 0)))
+                    ; required prop-m max [10.01, 20.00]
+                    ((eq? property-name (->name (car (prop comp-nr+1)))) (list make-req comp-max-eq (rand 20 2 10)))
+                    (else (error "default-sw-clause-gen" "no suitable property"
+                                 property-name (->name (car (prop comp-nr+1))) comp-nr)))))]
+            [create-sw-clause
+             (lambda (udfs name comp-nr property)
+               (let ([f (create-clause udfs default-sw-clause-gen name)]
+                     [real-property (=real property)])
+                 (if f (let ([args (f (->name real-property) comp-nr)])
+                         (if (eq? args #t) (set! args (default-sw-clause-gen (->name real-property) comp-nr)))
+                         (if args ((car args) real-property (cadr args) (caddr args)) #f)) #f)))]
+            [ps (prop comp)]
             [name (node-name 'mode (cons mode impl-lon))]
             [cls (filter something (list (create-sw-clause ud-clauses name comp load)
                                          (create-sw-clause ud-clauses name comp freq)
@@ -113,7 +120,7 @@
             [name (node-name 'impl lon)]
             [does-req? (and last-comp-nr (reqc name))])
        (:Impl mquat-spec name
-              (call-n-times (lambda (mode) (make-mode comp lon mode does-req?)) mode-per-impl) ; Mode*
+              (call-n-times (lambda (mode) (make-mode comp lon mode does-req? (= 1 impl))) mode-per-impl) ; Mode*
               (if does-req? (list last-comp) (list)) #f #f))) ; reqcomps selected-mode deployed-on
    (define (make-comp comp) (:Comp mquat-spec (node-name 'comp (list comp))
                                    (call-n-times (lambda (impl) (make-impl comp impl)) impl-per-comp) #f
