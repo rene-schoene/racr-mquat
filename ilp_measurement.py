@@ -18,10 +18,11 @@ def measure_racket():
 		if not os.path.exists(name):
 			os.mkdir(name)
 	local('racket -S %s -S %s ilp-measurement.scm all' % (RACR_BIN, MQUAT_BIN))
-	conflate_results()
+	conflate_results(skip_sol = True)
 
 gen_results = 'gen.csv'
 gen_header  = ['timestamp', 'dir', 'step', 'ilp-gen'] # generation of ilp
+gen_old_dir = '.old'
 
 sol_results = 'sol.csv'
 sol_header  = ['timestamp', 'dir', 'step', 'rows', 'cols', 'non-zero', 'ilp-sol', 'ti-ilp-sol'] # solving of ilp
@@ -32,7 +33,7 @@ def dirname(d):
 	return os.path.split(os.path.dirname(d))[-1]
 
 @task
-def measure_glpsol(pathname = '*'):
+def measure_glpsol(pathname = '*', skip_conflate = False):
 	old_cd = os.getcwd()
 	dirs = glob('profiling/%s/' % pathname)
 	dirs.sort()
@@ -40,7 +41,7 @@ def measure_glpsol(pathname = '*'):
 		if not os.path.isdir(d):
 		  print red("Not a valid directory: %s" % d)
 		  continue
-		print d,':',
+		sys.stdout.write(d+':')
 		os.chdir(d)
 		add_header = not os.path.exists(sol_results)
 		with open(sol_results, 'a') as fd:
@@ -70,46 +71,51 @@ def measure_glpsol(pathname = '*'):
 				writer.writerow(row)
 		os.chdir(old_cd)
 		print ' done'
+	if not skip_conflate:
+		conflate_results(pathname = pathname, skip_gen = True)
 
 @task
-def conflate_results(pathname = '*', remove = None):
-	old_cd = os.getcwd()
-	dirs = glob('profiling/%s/' % pathname)
-	for d in dirs:
-		if not os.path.isdir(d):
-		  print red("Not a valid directory: %s" % d)
-		  continue
-		os.chdir(d)
-		sys.stdout.write('.')
-		sys.stdout.flush()
-		
-		add_header = not os.path.exists(gen_results)
-		# gen-results
-		with open(gen_results, 'a') as fd:
-			writer = csv.writer(fd)
-			if add_header:
-				writer.writerow(gen_header)
+def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
+	if not skip_gen:
+		old_cd = os.getcwd()
+		dirs = glob('profiling/%s/' % pathname)
+		sys.stdout.write('Conflating gen-results:')
+		for d in dirs:
+			if not os.path.isdir(d):
+			  print red("Not a valid directory: %s" % d)
+			  continue
+			os.chdir(d)
+			sys.stdout.write('.')
+			sys.stdout.flush()
+			if not os.path.exists(gen_old_dir):
+				os.mkdir(gen_old_dir)
+			
+			add_header = not os.path.exists(gen_results)
+			# gen-results
+			with open(gen_results, 'a') as fd:
+				writer = csv.writer(fd)
+				if add_header:
+					writer.writerow(gen_header)
 
-			files = glob('*.lp.time')
-			files.sort()
-			for f in files:
-				mod = datetime.fromtimestamp(os.path.getctime(f))
-				with open(f) as fd:
-					gen_time = '.'.join(fd.readline().split())
-				row = [mod.isoformat(),dirname(d), f.split('.')[0], gen_time]
-				#print row
-				writer.writerow(row)
-				if remove:
-					#os.remove(f)
-					print 'remove ' + f
-		os.chdir(old_cd)
-	print ' done'
+				files = glob('*.lp.time')
+				files.sort()
+				for f in files:
+					mod = datetime.fromtimestamp(os.path.getctime(f))
+					with open(f) as fd:
+						gen_time = '.'.join(fd.readline().split())
+					row = [mod.isoformat(),dirname(d), f.split('.')[0], gen_time]
+					#print row
+					writer.writerow(row)
+					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
+			os.chdir(old_cd)
+		print ' done'
+		local('tail -qn +2 profiling/gen-header profiling/*/%s > profiling/all-gen-results.csv' % gen_results)
 
 	local('tail -n +1 profiling/*/specs > profiling/all-specs')
-	local('tail -qn +2 profiling/gen-header profiling/*/%s > profiling/all-gen-results.csv' % gen_results)
 
-	# sol-results
-	local('tail -qn +2 profiling/sol-header profiling/*/%s> profiling/all-sol-results.csv' % sol_results)
+	if not skip_sol:
+		# sol-results
+		local('tail -qn +2 profiling/sol-header profiling/*/%s> profiling/all-sol-results.csv' % sol_results)
 
 @task
 def t(*dirs):
