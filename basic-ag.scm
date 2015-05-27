@@ -3,7 +3,7 @@
 (library
  (mquat basic-ag)
  (export add-basic-ags
-         =req-comp-map =req-comp-min =req-comp-all =objective-val =clauses-met?
+         =req-comp-map =req-comp-min =req-comp-all =real =objective-val =clauses-met?
          =eval =eval-on =value-of =actual-value =provided-clause =mode-to-use =selected? =deployed? =hw?
          <=request <=impl <=comp =every-pe =every-mode =every-impl =search-prov-clause =search-req-clause)
  (import (rnrs) (racr core)
@@ -12,6 +12,7 @@
  (define (=req-comp-map n)     (att-value 'req-comp-map n))
  (define (=req-comp-min n)     (att-value 'req-comp-min n))
  (define (=req-comp-all n)     (att-value 'req-comp-all n))
+ (define (=real n)             (att-value 'real n))
  (define (=objective-val n)    (att-value 'objective-value n))
  (define (=clauses-met? n)     (att-value 'clauses-met? n))
  (define (=eval n)             (att-value 'eval n))
@@ -74,6 +75,12 @@
      req-comp-all
      (Comp (lambda (n) (fold-left (lambda (result impl) (union result (ast-child 'reqcomps impl))) (list) (->* (->Impl* n))))))
     
+    ; Returns the real property the property-ref references, or the real property itself
+    (ag-rule
+     real
+     (RealProperty (lambda (n) n))
+     (PropertyRef  (lambda (n) (=real (ast-child 'ref n)))))
+    
     ; Returns the objective value for the current configuration
     (ag-rule
      objective-value
@@ -99,8 +106,8 @@
      actual-value
      (ReqClause
       (lambda (n)
-        (let ([propName (->name (->return-type n))]
-              [target (<<- (->return-type n))])
+        (let ([propName (->name (=real (->return-type n)))]
+              [target (<<- (=real (->return-type n)))])
           ((->value (if (ast-subtype? target 'ResourceType)
                         ; hw → search in deployedon for name and type
                         (=provided-clause (->deployed-on (<=impl n)) propName target)
@@ -125,7 +132,7 @@
           (if (eq? (->type n) type) ; if n has correct type ...
               (let ([found-clause
                      (ast-find-child ; (1) ... then try to find a child in n ...
-                      (lambda (index clause) (eq? (->name (->return-type clause)) name))
+                      (lambda (index clause) (eq? (->name (=real (->return-type clause))) name))
                       (->ProvClause* n))])
                 (if found-clause ; (1.q) if a child was found ...
                     found-clause ; (1.1) ... return it
@@ -143,7 +150,7 @@
         (debug "search" name "in" (->name n))
         (ast-find-child
          (lambda (index clause)
-           (and (ast-subtype? clause subtype) (eq? (->name (->return-type clause)) name)))
+           (and (ast-subtype? clause subtype) (eq? (->name (=real (->return-type clause))) name)))
          (->Clause* n)))))
     
     ; Get request from every node
@@ -182,8 +189,9 @@
     ; Return either the selected-mode or the first mode
     (ag-rule mode-to-use (Impl (lambda (n) (or (->selected-mode n) (ast-child 1 (->Mode* n))))))
     
-    ; Returns #t, if the property belongs to a ResourceType
-    (ag-rule hw? (Property (lambda (n) (ast-subtype? (<<- n) 'ResourceType))))
+    ; Returns #t, if the property belongs to a ResourceType or to the HWRoot (i.e. a general hardware property)
+    (ag-rule hw? (Property (lambda (n) (let ([parent (<<- (=real n))])
+                                         (or (ast-subtype? parent 'ResourceType) (ast-subtype? parent 'HWRoot))))))
 
     ; Returns a list containing every resource
     (ag-rule every-pe (Root (lambda (n) (=res* (->HWRoot n)))))

@@ -8,13 +8,10 @@
  
  (define example-ast
    (let* ([make-simple-prop ; kind=runtime, direction=decreasing
-           (lambda (name unit agg) (:Property mquat-spec name unit 'runtime 'decreasing agg))]
+           (lambda (name unit agg) (:RealProperty mquat-spec name unit 'runtime 'decreasing agg))]
           [load (make-simple-prop 'server-load '% agg-sum)]
           [freq (make-simple-prop 'cpu-frequency 'Mhz agg-max)] ; TODO add some clauses referencing this
-          [energy-c1 (make-simple-prop pn-energy 'Joule agg-sum)]
-          [energy-c2 (make-simple-prop pn-energy 'Joule agg-sum)]
-          [rt-C1 (make-simple-prop 'response-time-C1 'ms agg-sum)]
-          [rt-C2 (make-simple-prop 'response-time-C2 'ms agg-sum)]
+          [energy (make-simple-prop pn-energy 'Joule agg-sum)]
           [Cubieboard (:ResourceType mquat-spec 'Cubieboard (list load freq))]
           [make-cubie
            (lambda (name f-load)
@@ -30,6 +27,8 @@
                      (:ProvClause mquat-spec c-energy comp-eq prov-e-f)
                      (:ProvClause mquat-spec rt comp-eq prov-rt-f)
                      other-reqs)))]
+          [energy-c2 (:PropertyRef mquat-spec energy)]
+          [rt-C2 (make-simple-prop 'response-time-C2 'ms agg-sum)]
           [part-impl2a
            (let
                [(mode2a
@@ -47,6 +46,8 @@
                   'dynamic-mode-2a))] ;name of Mode
              (:Impl mquat-spec 'Part-Impl2a (list mode2a) (list) cubie1 mode2a))]
           [comp2 (:Comp mquat-spec 'Depth2-Component (list part-impl2a) part-impl2a (list rt-C2 energy-c2))]
+          [energy-c1 (:PropertyRef mquat-spec energy)]
+          [rt-C1 (make-simple-prop 'response-time-C1 'ms agg-sum)]
           [c1-impl1a
            (let
                [(mode1a (make-simple-mode

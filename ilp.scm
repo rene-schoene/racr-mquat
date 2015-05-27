@@ -173,7 +173,7 @@
            (if (and (ast-subtype? clause clausetype) (eq? (->comparator clause) comparator))
                (fold-left ; fold over pe
                 (lambda (inner pe)
-                  (add-to-al inner (->return-type clause)
+                  (add-to-al inner (=real (->return-type clause))
                              (list (=eval-on clause pe) (=ilp-binvar-deployed n pe))))
                 result (=every-pe n))
                result))
@@ -183,7 +183,7 @@
         (fold-left
          (lambda (result clause)
            (if (eq? (->comparator clause) comparator)
-               (add-to-al result (->return-type clause) (list (=eval-on clause #f) "")) ;use arbitrary target #f
+               (add-to-al result (=real (->return-type clause)) (list (=eval-on clause #f) "")) ;use arbitrary target #f
                result))
          (list) (->* (->Constraints n))))))
     
@@ -223,11 +223,13 @@
      (Mode (lambda (n comp prop pe) (recur n append =ilp-nego-hw0 ->Clause* comp prop pe)))
      (Clause
       (lambda (n comp prop pe)
-        (if (and (eq? prop (->return-type n))
-                 (eq? comp (->comparator n))
-                 (eq? (->type pe) (<<- (->return-type n))))
-            (list (list (=eval-on n pe) (=ilp-binvar-deployed (<<- n) pe)))
-            (list))))) ;empty pair if not a suitable clause
+        (let ([real-return-type (=real (->return-type n))])
+          (if (and (eq? prop real-return-type)
+                   (eq? comp (->comparator n))
+                   (or (eq? (->type pe) (<<- real-return-type))
+                       (ast-subtype? (<<- real-return-type) 'HWRoot)))
+              (list (list (=eval-on n pe) (=ilp-binvar-deployed (<<- n) pe)))
+              (list)))))) ;empty pair if not a suitable clause
     
     (ag-rule
      required-hw-properties
@@ -236,7 +238,7 @@
      (Mode (lambda (n) (recur n union =req-hw-properties ->Clause*)))
      (Clause
       (lambda (n)
-        (let ([prop (->return-type n)])
+        (let ([prop (=real (->return-type n))])
           (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
               (list (list (->comparator n) prop)) (list))))))
     

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import re, unittest, os, shutil, sys
 from fabric.api import lcd, local, task, warn_only, quiet
@@ -8,8 +9,14 @@ from constants import RACR_BIN, MQUAT_BIN
 run_racket = True
 
 @task
-def run(*ranges):
-	for lb,ub in get_ranges() if ranges == () else parse_ranges(ranges):
+def run(*given_ranges):
+	supported_ranges = get_ranges()
+	ranges = parse_ranges(supported_ranges, given_ranges)
+#	print ranges
+	if not ranges:
+		print 'No test matches %s. Aborting.' % given_ranges
+		sys.exit(1)
+	for lb,ub in ranges:
 		ILPTest.create_ts(range(lb,ub+1))
 	suite = unittest.TestLoader().loadTestsFromTestCase(ILPTest)
 	unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
@@ -33,11 +40,52 @@ def get_ranges():
 	print "Ranges:", result
 	return result
 
-def parse_ranges(ranges):
-	if len(ranges) == 1:
-		return [(int(ranges[0]), int(ranges[0]))]
+def intersect(a0, a1, b0, b1):
+	"""
+|	  Case 1		Case 2		Case 3
+|	  ======		======		======
+|	a0   a1		  a0   a1	a0   a1
+|	 -----		   -----	 -----
+|	   -----	 -----				 -----
+|	  b0   b1	b0   b1				b0   b1
+|	    ↓			↓			↓
+|	   ---		   ---		  False
+|	  b0 a1		  a0 b1
+	"""
+	if a0 <= b0:
+		if a1 < b0:
+			return False
+		return (b0, a1 if a1<b1 else b1)
 	else:
-		return [(int(ranges[i]), int(ranges[i+1])) for i in xrange(0, len(ranges), 2)]
+		return intersect(b0,b1,a0,a1)
+
+@task
+def test_merge(a0,a1,b0,b1,c0,c1):
+	print merge_ranges( [(int(a0),int(a1)),(int(b0),int(b1))], [(int(c0),int(c1))] )
+
+def notFalse(item):
+	return item is not False
+
+def flatten(l):
+	return [item for sublist in l for item in sublist]
+	
+def merge_ranges(supported_ranges, given_ranges):
+	# filter for empty intervals
+	return filter(notFalse,
+		flatten(map(lambda (s_min,s_max):
+			map(lambda (g_min, g_max): intersect(s_min, s_max, g_min, g_max), given_ranges),
+		supported_ranges)))
+
+def parse_ranges(supported_ranges, ranges):
+	if ranges == ():
+		return supported_ranges
+	if ranges[0].endswith("+"):
+		ranges = (ranges[0][:-1], sys.maxint)
+	ranges = map(int, ranges)
+	if len(ranges) == 1:
+		return merge_ranges(supported_ranges, [(ranges[0], ranges[0])])
+	else:
+		return merge_ranges(supported_ranges, [(ranges[i], ranges[i+1]) for i in xrange(0, len(ranges), 2)])
 
 def read_solution(fname):
 	status = 0 # 0=search for column activities, 1=skip line, 2=name, 3=values

@@ -40,7 +40,8 @@
  
  (define (change-req-constraint ast name comparator new-value)
    (debug (->* (->Constraints (<=request ast))))
-   (let ([clause (ast-find-child (lambda (i child) (eq? (->name (->return-type child)) name)) (->Constraints (<=request ast)))])
+   (let ([clause (ast-find-child (lambda (i child) (eq? (->name (=real (->return-type child))) name))
+                                 (->Constraints (<=request ast)))])
      (rewrite-terminal 'value clause (lambda _ new-value))
      (rewrite-terminal 'comp clause comparator)))
  
@@ -640,10 +641,10 @@
        [else (wrong-id two-comps-reqc id)])
      (save-ilp tmp-lp ast)))
  
- ; XXX Currently not working due to PropertyRefs bug XXX
  (define (two-resource-types id)
    ; General description: 1 comp, 2 impls with 2 modes each. Two different resources types and, thus,
    ; dynamical value functions within modes (type-0:res-2 → max load 0.7, type-1:res-1,res-3 → max load 0.3)
+   ; Normally only deployable on resource of type-0 (which is only res-2)
    (let* ([hw-types (lambda (res-name) (if (or (eq? res-name 'res-1) (eq? res-name 'res-3)) 1 #f))]
           [load-f (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 0.3 0.7))]
           [sw-clauses (lambda _ (lambda (p comp-nr) (if (eq? load-name p) (list make-req comp-max-eq load-f)
@@ -653,7 +654,6 @@
      (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'mode-1-1-2)
      (change-sw-prov ast pn-energy (+ 20 (/ id 1e3)) 'mode-1-2-1)
      (change-sw-prov ast pn-energy (+ 25 (/ id 1e3)) 'mode-1-2-2)
-     (change-sw-req ast 'load comp-max-eq 0.8)
      
      (case id
        [(400) ; No further constraints
@@ -666,14 +666,14 @@
         (change-sw-prov ast 'prop-1 7 'mode-1-2-1 'mode-1-2-2)
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
        
-       [(402) ; Dynamic provision value for requested property
-        ; Expected outcome: No solution
-        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 3 7)))
+       [(402) ; Dynamic provision value for requested property, on type-1 it's 7, on type-0 it's 3
+        ; Expected outcome: No solution, since provision only met on type-1, but all modes only deployable on type-0-resources
+        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 7 3)))
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
        
        [(403) ; Dynamic provision value for requested property only for first three modes
         ; Expected outcome: mode-1-2-2 on res-2
-        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 3 7))
+        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 7 3))
                         'mode-1-1-1 'mode-1-1-2 'mode-1-2-1)
         (change-sw-prov ast 'prop-1 (lambda (lomp target) 7) 'mode-1-2-2)
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
@@ -728,13 +728,14 @@
 
  (define (new-software id)
    ; General description: New software (comp,impl,mode) entering the system, enabling new configurations
-   (let ([ast (create-system 2 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
+   (let* ([ast (create-system 2 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))]
+          [energy (ast-find-child (lambda (i child) (eq? (->name child) pn-energy)) (->RealProperty* (->SWRoot ast)))])
      (define (add-comp comp-nr)
        (debug "#create new comp" comp-nr)
        (let ([new (:Comp mquat-spec (node-name 'comp (list comp-nr)) (list) #f 
-                                         (list (:Property mquat-spec (node-name 'prop (list comp-nr))
+                                         (list (:RealProperty mquat-spec (node-name 'prop (list comp-nr))
                                                           '1 'runtime 'increasing 'sum)
-                                               (:Property mquat-spec pn-energy 'J 'runtime 'decreasing 'sum)))])
+                                               (:PropertyRef mquat-spec energy)))])
          (rewrite-add (->Comp* (->SWRoot ast)) new) new))
      (define (find-create l prefix lon make-new)
        (let ([name (node-name prefix lon)])
@@ -751,9 +752,9 @@
      (define (add-mode comp-nr impl-nr mode-nr req-comp-nr load-f energy-f prov-f prev-f)
        (debug "#create new mode" comp-nr impl-nr mode-nr req-comp-nr)
        (let* ([impl (find-create-impl comp-nr impl-nr (if req-comp-nr (list req-comp-nr) (list)))]
-              [find-prop-hw (lambda (name) (ast-find-child (lambda (i child) (eq? (->name child) name))
+              [find-prop-hw (lambda (name) (ast-find-child (lambda (i child) (eq? (->name (=real child)) name))
                                                             (->Property* (car (->* (->ResourceType* (->HWRoot ast)))))))]
-              [find-prop-sw (lambda (name comp) (ast-find-child (lambda (i child) (eq? (->name child) name))
+              [find-prop-sw (lambda (name comp) (ast-find-child (lambda (i child) (eq? (->name (=real child)) name))
                                                                  (->Property* comp)))]
               [load (find-prop-hw load-name)]
               [energy (find-prop-sw pn-energy (find-create-comp comp-nr))]
@@ -1127,6 +1128,10 @@
                       (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
                       (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
                       (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
+       [(402)         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
+                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
+                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
+                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
        [(403)         (test-assert "mode-1-2-2 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2))
                       (test-assert "mode-1-2-2 deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 3))
                       (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
@@ -1206,7 +1211,7 @@
        [else (error #f "Unknown test case id for objectives" id)])))
  
  (define (display-ranges)
-   (display "1 21 100 126 200 204 300 301 400 404 500 503 600 605 900 907"))
+   (display "1 16 30 36 100 126 200 204 300 301 400 404 500 503 600 605 900 907"))
  
  (if (< (length (command-line)) 2)
      (begin
