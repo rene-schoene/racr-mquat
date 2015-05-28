@@ -29,11 +29,13 @@
               (list 14 60 0 50 2 2)
               (list 15 70 0 50 2 2)
               (list 16 80 0 50 2 2)
-              (list 17 90 0 50 2 2)
-              (list 18 90 0 60 2 2)
-              (list 19 90 0 70 2 2)
-              (list 20 90 0 80 2 2)
-              (list 21 90 0 90 2 2))))
+              (list 17 80 0 60 2 2)
+              (list 18 80 0 70 2 2)
+              (list 19 80 0 80 2 2)
+              (list 20 90 0 60 2 2)
+              (list 21 90 0 70 2 2)
+              (list 22 90 0 80 2 2)
+              (list 23 90 0 90 2 2))))
    
  (define (rw comp-name restype prop-name new-value ast)
 ;   (debug comp-name prop-name new-value ast)
@@ -48,9 +50,10 @@
     (=every-pe ast)))
  
  (define (sit id-s suffix ast) ; [s]ave-[i]lp-[t]imed
-   (let* ([name (string-append "profiling/" id-s "/" suffix)]
-          [result (time-it (lambda _ (save-ilp (string-append name ".lp") ast)))])
-     (save-to-file (string-append name ".lp.time") (list (time-second (cdr result)) (time-nanosecond (cdr result))))))
+   (let* ([name (string-append "profiling/" id-s "/" suffix ".lp")]
+          [result (time-it (lambda _ (=to-ilp ast)))])
+     (save-to-file name (car result))
+     (save-to-file (string-append name ".time") (list (time-second (cdr result)) (time-nanosecond (cdr result))))))
 
  (define (cst id-s specs) ; [c]reate-[s]ystem-[t]imed
    (let* ([name (string-append "profiling/" id-s "/specs")]

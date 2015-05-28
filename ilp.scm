@@ -2,7 +2,7 @@
 
 (library
  (mquat ilp)
- (export add-ilp-ags save-ilp make-ilp)
+ (export add-ilp-ags save-ilp make-ilp =to-ilp)
  (import (rnrs) (racr core) (racr testing)
          (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
  

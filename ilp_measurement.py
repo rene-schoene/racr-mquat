@@ -4,21 +4,33 @@ import sys, re, os, csv, timeit
 from datetime import datetime
 from glob import glob
 from fabric.colors import red
-from fabric.api import task, local, lcd, hide
+from fabric.api import task, local, hide, quiet
 from constants import RACR_BIN, MQUAT_BIN
 
-# TODO: add *dirs parameter
-@task
-def measure_racket():
-	dirs = local('racket -S %s -S %s ilp-measurement.scm dirs' % (RACR_BIN, MQUAT_BIN), capture = True).split()
+def checked_local(cmd, abort_on_error = True):
+	with quiet():
+		out = local(cmd, capture = True)
+	if out.failed:
+		print '"%s" not successful, stdout:\n%s\nstderr:\n%s' % (cmd, out.stdout, out.stderr)
+		if abort_on_error:
+			sys.exit(1)
+	return out
+
+def setup_profiling_dirs():
+	dirs = checked_local('racket -S %s -S %s ilp-measurement.scm dirs' % (RACR_BIN, MQUAT_BIN)).split()
 	if not os.path.exists('profiling'):
 		os.mkdir('profiling')
 	for d in dirs:
 		name = 'profiling/%s' % d
 		if not os.path.exists(name):
 			os.mkdir(name)
-	local('racket -S %s -S %s ilp-measurement.scm all' % (RACR_BIN, MQUAT_BIN))
-	conflate_results(skip_sol = True)
+
+@task
+def measure_racket(number = 1, *dirs):
+	setup_profiling_dirs()
+	for _ in xrange(int(number)):
+		local('racket -S %s -S %s ilp-measurement.scm %s' % (RACR_BIN, MQUAT_BIN, 'all' if dirs == () else ' '.join(dirs)))
+		conflate_results(skip_sol = True)
 
 gen_results = 'gen.csv'
 gen_header  = ['timestamp', 'dir', 'step', 'ilp-gen'] # generation of ilp
@@ -33,7 +45,7 @@ def dirname(d):
 	return os.path.split(os.path.dirname(d))[-1]
 
 @task
-def measure_glpsol(pathname = '*', skip_conflate = False):
+def measure_glpsol(pathname = '*', number = 1, skip_conflate = False):
 	old_cd = os.getcwd()
 	dirs = glob('profiling/%s/' % pathname)
 	dirs.sort()
@@ -53,22 +65,22 @@ def measure_glpsol(pathname = '*', skip_conflate = False):
 			for ilp in files:
 				if not ilp.endswith('.lp'):
 					continue
-				start = timeit.default_timer()
-				with hide('running'):
-					out = local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')), capture = True)
-				stop = timeit.default_timer()
-				today = datetime.today()
-				if re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
-					duration = re.search('Time used:[\s]*(.*?) secs', out).group(1)
-					# stats=row,col,nonzero
-					stats = re.search('(\d+) rows, (\d+) columns, (\d+) non-zeros', out).groups()
-					sys.stdout.write('.')
-				else:
-					sys.stdout.write(red('!'))
-					duration = -1
-				sys.stdout.flush()
-				row = list((today.isoformat(),dirname(d), ilp.rsplit('.', 1)[0]) + stats + (duration, stop-start))
-				writer.writerow(row)
+				for _ in xrange(int(number)):
+					start = timeit.default_timer()
+					out = checked_local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')))
+					stop = timeit.default_timer()
+					today = datetime.today()
+					if re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
+						duration = re.search('Time used:[\s]*(.*?) secs', out).group(1)
+						# stats=row,col,nonzero
+						stats = re.search('(\d+) rows, (\d+) columns, (\d+) non-zeros', out).groups()
+						sys.stdout.write('.')
+					else:
+						sys.stdout.write(red('!'))
+						duration = -1
+					sys.stdout.flush()
+					row = list((today.isoformat(),dirname(d), ilp.rsplit('.', 1)[0]) + stats + (duration, stop-start))
+					writer.writerow(row)
 		os.chdir(old_cd)
 		print ' done'
 	if not skip_conflate:
@@ -117,13 +129,6 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 		# sol-results
 		local('tail -qn +2 profiling/sol-header profiling/*/%s> profiling/all-sol-results.csv' % sol_results)
 
-@task
-def t(*dirs):
-	print dirs
-	if dirs == ():
-		from glob import glob
-		dirs = glob('profiling/*/')
-	print dirs
-
 if __name__ == '__main__':
-	measure()
+	measure_racket()
+	measure_glpsol()
