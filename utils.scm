@@ -73,7 +73,7 @@
                ((procedure? s) "<proc>")
                ((ast-node? s) (if (ast-has-child? 'name s) (P (ast-child 'name s)) "<node>"))
                (else "?")))])
-    (when debugging (display (D args)) (display "\n"))))
+    (display (D args)) (display "\n") (when (not (null? args)) (car args))))
  
  (define-syntax debug
    (syntax-rules ()

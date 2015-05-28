@@ -20,8 +20,8 @@
  
  (define (call-n-times proc n) (letrec ([cnt (lambda (n) (if (>= 0 n) (list) (cons (proc n) (cnt (- n 1)))))]) (cnt n)))
  (define (random n) (random-integer n))
- (define (rand max digits offset) (let ([factor (expt 10 digits)])
-                                    (lambda _ (+ offset (inexact (/ (random (* factor max)) factor))))))
+ (define (rand maxVal digits offset) (let ([factor (expt 10 digits)])
+                                    (lambda _ (+ offset (inexact (/ (random (* factor maxVal)) factor))))))
  
  (define (something v) v)
  (define (make-prov property comparator value) (:ProvClause mquat-spec property comparator value))
@@ -131,7 +131,7 @@
      (cons sw-root (car (prop last-comp-nr)))))
  
  (define (create-request target-property)
-   (let* ([make-req (lambda (p max digits offset) (:ReqClause mquat-spec p comp-min-eq (rand max digits offset)))]
+   (let* ([make-req (lambda (p maxVal digits offset) (:ReqClause mquat-spec p comp-min-eq (rand maxVal digits offset)))]
           [target (<<- target-property)])
      (:Request
       mquat-spec
@@ -146,8 +146,8 @@
  ; mode-per-impl: number of modes per implementation
  ; [opts:         a list with (sw-reqc, ud-sw-clauses, ud-hw-clauses, ud-types). Each element eq? #f uses default behavior.]
  ;  sw-reqc:      a function, given a impl name, returns, whether this impl should require the previous created component
- ;  ud-sw-clauses:   a function, given a name of a resource, returns a clause-function
- ;  ud-hw-clauses:   a function, given a name of a mode, returns a clause-function
+ ;  ud-sw-clauses:   a function, given a name of a mode, returns a clause-function
+ ;  ud-hw-clauses:   a function, given a name of a resource, returns a clause-function
  ;   clause-function: a function given a name of the property, returns either #t (use default),
  ;    #f (do not include this property), or a list of (make-{prov|req} comparator value-function) (which is used instead)
  ;  ud-types:     a function, given a name of a resource, returns either #f, or the number of the resource type

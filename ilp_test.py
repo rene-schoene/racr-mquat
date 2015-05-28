@@ -14,7 +14,7 @@ def run(*given_ranges):
 	ranges = parse_ranges(supported_ranges, given_ranges)
 #	print ranges
 	if not ranges:
-		print 'No test matches %s. Aborting.' % given_ranges
+		print 'No test matches %s. Aborting.' % list(given_ranges)
 		sys.exit(1)
 	for lb,ub in ranges:
 		ILPTest.create_ts(range(lb,ub+1))

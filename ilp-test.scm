@@ -52,17 +52,19 @@
  
  (define (run-test id-string)
 ;   (set!no-frequency) ; only use property load for system creation
-   (let ([id (string->number id-string)])
+   (let ([id (string->number id-string)]
+         [between (lambda (lb val ub) (and (>= val lb) (<= val ub)))])
      (cond
-       [(< id 100)  (two-modes id)]
-       [(< id 200)  (two-impls id)]
-       [(< id 300)  (two-comps id)]
-       [(< id 400)  (two-comps-reqc id)]
-       [(< id 500)  (two-resource-types id)]
-       [(< id 600)  (new-resources id)]
-       [(< id 700)  (new-software id)]
-       [(>= id 900) (unsolvable id)]
-       [else (wrong-id id) 1])))
+       [(between   0 id  40) (two-modes id)]
+       [(between 100 id 130) (two-impls id)]
+       [(between 200 id 210) (two-comps id)]
+       [(between 300 id 310) (two-comps-reqc id)]
+       [(between 400 id 410) (two-resource-types id)]
+       [(between 500 id 510) (new-resources id)]
+       [(between 600 id 610) (new-software id)]
+       [(between 700 id 710) (tree-res id)]
+       [(between 900 id 920) (unsolvable id)]
+       [else (wrong-id run-test id)])))
  
  (define (two-modes id)
    (cond
@@ -816,7 +818,35 @@
         (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))]
 
        [else (wrong-id new-software id)])
-     (save-ilp tmp-lp ast) ast))
+     (save-ilp tmp-lp ast)))
+ 
+ (define (tree-res id)
+   ; General description: Tree hardware structure with different hardware types on each level
+   ; Top level has 3 PEs and type-0, second level has 9 PEs and type-1, third level has 18 PEs and type-2
+   (let* ([type-nr (lambda (res-name) (/ (- (string-length (symbol->string res-name)) 5) 2))]
+          [load-f (lambda (lomp target) (case (type-nr (->name target)) [(0) 0.2] [(1) 0.4] [(2) 0.7]))]
+          [sw-clauses (lambda _ (lambda (p comp-nr) (if (eq? load-name p) (list make-req comp-max-eq load-f)
+                                                        ((no-freq-sw-clauses) p comp-nr))))]
+          [ast (create-system 30 3 1 1 2 (list #f sw-clauses no-freq-hw-clauses type-nr))])
+     (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) 'mode-1-1-1)
+     (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) 'mode-1-1-2)
+     (case id
+       [(700) ; No further constraints
+        ; Expected outcome: mode-1-1-1 on one of the 18 type-2 resources
+        (remove-req-constraints ast)]
+       
+       [(701) ; Lower load (0.3)
+        ; Expected outcome: mode-1-1-1 on either type-1 or type-2 resources
+        (change-hw-prov ast 'load 0.3)
+        (remove-req-constraints ast)]
+       
+       [(702) ; Even lower load (0.1)
+        ; Expected outcome: mode-1-1-1 on an arbitrary resource
+        (change-hw-prov ast 'load 0.1)
+        (remove-req-constraints ast)]
+ 
+       [else (wrong-id tree-res id)])
+     (save-ilp tmp-lp ast)))
  
  (define (unsolvable id)
    ; General description: Systems without a solution, thus, no optimal solution
@@ -899,15 +929,23 @@
           [test-assert (lambda (msg expr) (if (not expr) (error #f msg)))])
      (define (val=? base expected op lres)
        (if (null? lres) (lambda (name) (= (val name) expected))
-           (let ([=name (lambda (base res-nr) (string-append base "#res_" (number->string res-nr)))])
-             (op (lambda (res-nr) (= (val (=name base res-nr)) expected)) lres))))
+           (let ([=name (lambda (base res-nr)
+                          (if (number? res-nr) (string-append base "#res_" (number->string res-nr))
+                              (fold-left (lambda (result nr) (string-append result "_" (number->string nr)))
+                                         (string-append base "#res") res-nr)))])
+             (op (lambda (res-nr) (= (val (=name base res-nr)) expected)) (if (list? (car lres)) (car lres) lres)))))
      (define (val=1? base . lres) (val=? base 1 exists  lres))
      (define (val=0? base . lres) (val=? base 0 for-all lres))
+     (define (mrl2 l1 l2) (fold-left (lambda (result e1) (append result (map (lambda (e2) (list e1 e2)) l2))) (list) l1))
+     (define (mrl3 l1 l2 l3)
+       (fold-left (lambda (result e1)
+                    (append result (fold-left (lambda (inner e2) (append inner (map (lambda (e3) (list e1 e2 e3)) l3)))
+                                              (list) l2))) (list) l1))
      (read-solution table fname)
      (for-each (lambda (key) (debug key ":" (hashtable-ref table key #f))) (vector->list (hashtable-keys table)))
      ; impl deployment
      (case id
-       [(1 2 3 4 5 6 7 8 9 10 11 12 13 14 500 502 601)
+       [(1 2 3 4 5 6 7 8 9 10 11 12 13 14 500 502 601 700 701 702)
         (test-assert "impl not deployed"     (val=1? "b#comp_1#"))]
        [(30 100 101 105 112 116 119 120 121 122 129 400 401 403 404 602)
         (test-assert "impl-1 not deployed"   (val=1? "b#comp_1#impl_1_1"))
@@ -1161,6 +1199,27 @@
        [(605)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1##mode_1_1_1" 1 2))
                       (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))
                       (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2##" 1 2))]
+       [(700)         (test-assert "mode-1-1-1 not deployed on t3"
+                                   (val=1? "b#comp_1##mode_1_1_1" (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))))
+                      (test-assert "mode-1-1-1 deployed on t1"      (val=0? "b#comp_1##mode_1_1_1" 1 2 3))
+                      (test-assert "mode-1-1-1 deployed on t2"
+                                   (val=0? "b#comp_1##mode_1_1_1" (mrl2 (list 1 2 3) (list 1 2 3))))
+                      (test-assert "mode-1-1-2 deployed"
+                                   (val=0? "b#comp_1##mode_1_1_2" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))]
+       [(701)         (test-assert "mode-1-1-1 not deployed on t1 or t2"
+                                   (val=1? "b#comp_1##mode_1_1_1" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                                          (mrl2 (list 1 2 3) (list 1 2 3)))))
+                      (test-assert "mode-1-1-1 deployed on t1"      (val=0? "b#comp_1##mode_1_1_1" 1 2 3))
+                      (test-assert "mode-1-1-2 deployed"
+                                   (val=0? "b#comp_1##mode_1_1_2" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))]
+       [(702)         (test-assert "mode-1-1-1 not deployed on t1 or t2"
+                                   (val=1? "b#comp_1##mode_1_1_1" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))
+                      (test-assert "mode-1-1-2 deployed"
+                                   (val=0? "b#comp_1##mode_1_1_2" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))]
        [(900 901 501 503 600) (test-assert "mode-1-1-1 deployed"    (val=0? "b#comp_1##mode_1_1_1" 1 2))
                               (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
        [(902 903)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
@@ -1192,7 +1251,7 @@
        [else (error #f "Unknown test case id for modes" id)])
 
      (case id
-       [(1 6 7 12 14 15 30 100 108 109 110 111 127 400 404 500 502 605)
+       [(1 6 7 12 14 15 30 100 108 109 110 111 127 400 404 500 502 605 700 701 702)
                   (test-obj 10 obj id)]
        [(101 105 112 116 119 120 121 122 128)
                   (test-obj 15 obj id)]
@@ -1211,7 +1270,7 @@
        [else (error #f "Unknown test case id for objectives" id)])))
  
  (define (display-ranges)
-   (display "1 16 30 36 100 126 200 204 300 301 400 404 500 503 600 605 900 907"))
+   (display "1 16 30 36 100 126 200 204 300 301 400 404 500 503 600 605 700 702 900 907"))
  
  (if (< (length (command-line)) 2)
      (begin
