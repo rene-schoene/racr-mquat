@@ -78,66 +78,56 @@
            ; Expected outcome: first mode (mode-1-1-1) is deployed on either res-1 or res-2
            (change-sw-req ast 'load comp-max-eq 0.8)
            (remove-req-constraints ast)]
-          
           [(2) ; Description: mode-1-1-1 does not meet its requirements (max-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
            (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
            (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2)
            (remove-req-constraints ast)]
-          
           [(3) ; Description: mode-1-1-1 does not meet its requirements (min-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
            (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req not met
            (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2)
            (remove-req-constraints ast)]
-          
           [(4) ; Description: mode-1-1-1 does not meet request constraint (max-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
            (change-sw-req ast 'load comp-max-eq 0.8)
            (change-req-constraint ast 'prop-1 comp-max-eq 4)
            (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
            (change-sw-prov ast 'prop-1 3 'mode-1-1-2)]
-          
           [(5) ; Description: mode-1-1-1 does not meet request constraint (min-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-2
            (change-sw-req ast 'load comp-max-eq 0.8)
            (change-req-constraint ast 'prop-1 comp-min-eq 4)
            (change-sw-prov ast 'prop-1 3 'mode-1-1-1) ; min-req not met
            (change-sw-prov ast 'prop-1 7 'mode-1-1-2)]
-          
           [(6) ; Description: Reqs only met on res-1
            ; Expected outcome: first mode (mode-1-1-1) is deployed on res-1
            (change-hw-prov ast 'load 0.9 'res-2)
            (change-sw-req ast 'load comp-max-eq 0.8)
            (remove-req-constraints ast)]
-          
           [(7) ; Description: Reqs only met on res-2
            ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-1)
            (change-sw-req ast 'load comp-max-eq 0.8)
            (remove-req-constraints ast)]
-          
           [(8) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet its requirements at all (only max-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-1)
            (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met on both resources
            (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2) ; max-req not met on res-1
            (remove-req-constraints ast)]
-          
           [(9) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet its requirements at all (min-eq and max-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-1)
            (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-1) ; min-req not met on both resources
            (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-1-2) ; max-req not met on res-1
            (remove-req-constraints ast)]
-          
           [(10) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet its requirements at all (only min-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-2)
            (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-1) ; min-req not met on both resources
            (change-sw-req ast 'load comp-min-eq 0.8 'mode-1-1-2) ; min-req not met on res-1
            (remove-req-constraints ast)]
-          
           [(11) ; Description: Reqs only met on res-2, mode-1-1-1 does not meet request constraint (only max-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-1)
@@ -145,7 +135,6 @@
            (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
            (change-sw-prov ast 'prop-1 3 'mode-1-1-2)
            (change-sw-req ast 'load comp-max-eq 0.8)] ; max-req not met on res-1
-          
           [(12) ; Description: Reqs only met on res-2, mode-1-1-2 does not meet request constraint (req:min-eq and res:max-eq)
            ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-1)
@@ -153,7 +142,6 @@
            (change-sw-prov ast 'prop-1 7 'mode-1-1-1)
            (change-sw-prov ast 'prop-1 3 'mode-1-1-2) ; min-req not met
            (change-sw-req ast 'load comp-max-eq 0.8)] ; max-req not met on res-1
-          
           [(13) ; Description: Reqs only met on res-1, mode-1-1-1 does not meet request constraint (req:max-eq and res:min-eq)
            ; Expected outcome: second mode (mode-1-1-2) is deployed on res-1
            (change-hw-prov ast 'load 0.9 'res-1)
@@ -161,7 +149,6 @@
            (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
            (change-sw-prov ast 'prop-1 3 'mode-1-1-2)
            (change-sw-req ast 'load comp-min-eq 0.8)] ; max-req not met on res-2
-          
           [(14) ; Description: Reqs only met on res-1, mode-1-1-2 does not meet request constraint (only min-eq)
            ; Expected outcome: first mode (mode-1-1-1) is deployed on res-1
            (change-hw-prov ast 'load 0.9 'res-1)
@@ -169,14 +156,12 @@
            (change-sw-prov ast 'prop-1 7 'mode-1-1-1)
            (change-sw-prov ast 'prop-1 3 'mode-1-1-2) ; min-req not met
            (change-sw-req ast 'load comp-min-eq 0.8)] ; min-req not met on res-2
-          
           [(15) ; Description: Dynamic provision function, mp-value + 5. mp-value = 10. Required >= 14.
            ; Expected outcome: mode-1-1-1 is deployed
            (change-req-constraint ast 'prop-1 comp-min-eq 14)
            (change-req-mp-value ast 10)
            (change-sw-prov ast 'prop-1 (lambda (lomp target) (+ 5 (=value-of lomp mp-name))) 'mode-1-1-1)
            (change-sw-prov ast 'prop-1 20 'mode-1-1-2)]
-          
           [(16) ; Description: Dynamic provision function, mp-value + 5. mp-value = 3. Required >= 14.
            ; Expected outcome: mode-1-1-2 is deployed
            (change-req-constraint ast 'prop-1 comp-min-eq 14)
@@ -194,36 +179,30 @@
           [(30) ; No further constraints
            ; Expected outcome: first mode (mode-1-1-1) is deployed on res-1 or res-2
            (remove-req-constraints ast)]
-
           [(31) ; mode-1-1-1 does not meet its requirements (max-eq)
            ; Expected outcome: second mode (mode-1-2-1) is deployed on res-1 or res-2
            (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1)
            (remove-req-constraints ast)]
-
           [(32) ; mode-1-1-1 does not meet its requirements (min-eq)
            ; Expected outcome: second mode (mode-1-2-1) is deployed on res-1 or res-2
            (change-sw-req ast 'load comp-min-eq 0.9 'mode-1-1-1)
            (remove-req-constraints ast)]
-
           [(33) ; mode-1-1-1 does not meet request constraint (max-eq)
            ; Expected outcome: second mode (mode-1-2-1) is deployed on res-1 or res-2
            (change-req-constraint ast 'prop-1 comp-max-eq 4)
            (change-sw-prov ast 'prop-1 7 'mode-1-1-1)
            (change-sw-prov ast 'prop-1 3 'mode-1-2-1)]
-
           [(34) ; mode-1-1-1 does not meet request constraint (min-eq)
            ; Expected outcome: second mode (mode-1-2-1) is deployed on res-1 or res-2
            (change-req-constraint ast 'prop-1 comp-min-eq 4)
            (change-sw-prov ast 'prop-1 3 'mode-1-1-1)
            (change-sw-prov ast 'prop-1 7 'mode-1-2-1)]
-
           [(35) ; Reqs only met on res-2, mode-1-1-1 does not meet request constraint (max-eq)
            ; Expected outcome: second mode (mode-1-2-1) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-1)
            (change-req-constraint ast 'prop-1 comp-max-eq 4)
            (change-sw-prov ast 'prop-1 7 'mode-1-1-1)
            (change-sw-prov ast 'prop-1 3 'mode-1-2-1)]
-
           [(36) ; Reqs only met on res-2, mode-1-1-1 does not meet request constraint (min-eq)
            ; Expected outcome: second mode (mode-1-2-1) is deployed on res-2
            (change-hw-prov ast 'load 0.9 'res-1)
@@ -247,20 +226,17 @@
         ; Expected outcome: mode-1-1-1 is deployed on res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)]
-
        [(101) ; Description: mode-1-1-1 does not meet its requirements (max-eq)
         ; Expected outcome: mode-1-1-2 is deployed on res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (remove-req-constraints ast)]
-
        [(102) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (both max-eq)
         ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-2) ; max-req not met
         (remove-req-constraints ast)]
-
        [(103) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (min-eq and max-eq)
         ; Interesting: complete impl not meeting reqs
         ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
@@ -268,7 +244,6 @@
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req not met
         (remove-req-constraints ast)]
-
        [(104) ; Description: mode-1-1-1 and mode-1-1-2 do not meet their requirements (both min-eq)
         ; Interesting: one mode per impl not meeting reqs (only min reqs)
         ; Expected outcome: mode-1-2-1 is deployed on res-1, res-2 or res-3
@@ -276,7 +251,6 @@
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-2) ; min-req not met
         (remove-req-constraints ast)]
-
        [(105) ; Description: mode-1-1-1 and mode-1-2-1 do not meet their requirements (min-eq and max-eq)
         ; Interesting: one mode per impl not meeting reqs
         ; Expected outcome: mode-1-1-2 is deployed on res-1, res-2 or res-3
@@ -284,7 +258,6 @@
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req not met
         (remove-req-constraints ast)]
-
        [(106) ; Description: only mode-1-2-2 meet its requirements (others mix of max-eq)
         ; Expected outcome: mode-1-2-2 is deployed on res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
@@ -292,7 +265,6 @@
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req not met
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-2-2)
         (remove-req-constraints ast)]
-
        [(107) ; Description: only mode-1-2-2 meet its requirements (all min-eq)
         ; Expected outcome: mode-1-2-2 is deployed on res-1, res-2 or res-3
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-1-1) ; min-req not met
@@ -300,34 +272,29 @@
         (change-sw-req ast 'load comp-min-eq 0.7 'mode-1-2-1) ; min-req not met
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-2-2)
         (remove-req-constraints ast)]
-
        [(108) ; Description: Reqs only met on res-2 and res-3 (max-eq)
-        ; Expected outcome: first mode (mode-1-1-1) is deployed on either res-2 or res-3
+        ; Expected outcome: mode-1-1-1 is deployed on either res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)]
-
        [(109) ; Description: Reqs only met on res-2 and res-3 (min-eq)
-        ; Expected outcome: first mode (mode-1-1-1) is deployed on either res-2 or res-3
+        ; Expected outcome: mode-1-1-1 is deployed on either res-2 or res-3
         (change-hw-prov ast 'load 0.7)
         (change-hw-prov ast 'load 0.3 'res-1)
         (change-sw-req ast 'load comp-min-eq 0.4)
         (remove-req-constraints ast)]
-
        [(110) ; Description: Reqs only met on res-2 (max-eq)
-        ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
+        ; Expected outcome: mode-1-1-1 is deployed on res-2
         (change-hw-prov ast 'load 0.9 'res-1 'res-3)
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)]
-
        [(111) ; Description: Reqs only met on res-2 (min-eq)
-        ; Expected outcome: first mode (mode-1-1-1) is deployed on res-2
+        ; Expected outcome: mode-1-1-1 is deployed on res-2
         (change-hw-prov ast 'load 0.3)
         (change-hw-prov ast 'load 0.7 'res-2)
         (change-sw-req ast 'load comp-min-eq 0.4)
         (remove-req-constraints ast)]
- 
-       [(112) ; Description: Reqs only met on res-2 and res-3
+        [(112) ; Description: Reqs only met on res-2 and res-3
         ; mode-1-1-1 does not meet its requirements (max-eq)
         ; Expected outcome: mode-1-1-2 is deployed on res-2 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
@@ -335,7 +302,6 @@
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (remove-req-constraints ast)]
-
        [(113) ; Description: Reqs only met on res-2 and res-3
         ; mode-1-1-1 and mode-1-1-2 do not meet their requirements (both max-eq)
         ; Expected outcome: mode-1-2-1 is deployed on res-2 or res-3
@@ -345,7 +311,6 @@
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-2) ; max-req not met
         (remove-req-constraints ast)]
-
        [(114) ; Description: Reqs only met on res-2 and res-3
         ; mode-1-1-1 & mode-1-1-2 do not meet their requirements (min-eq and max-eq)
         ; Interesting: complete impl not meeting reqs
@@ -356,7 +321,6 @@
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-2) ; min-req not met
         (remove-req-constraints ast)]
-
        [(115) ; Description: Reqs only met on res-2 and res-3
         ; mode-1-1-1 and mode-1-1-2 do not meet their requirements (both min-eq)
         ; Interesting: one mode per impl not meeting reqs (only min reqs)
@@ -367,7 +331,6 @@
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-1) ; min-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-1-2) ; min-req not met
         (remove-req-constraints ast)]
-
        [(116) ; Description: Reqs only met on res-2 and res-3
         ; mode-1-1-1 and mode-1-2-1 do not meet their requirements (min-eq and max-eq)
         ; Interesting: one mode per impl not meeting reqs
@@ -378,7 +341,6 @@
         (change-sw-req ast 'load comp-max-eq 0.2 'mode-1-1-1) ; max-req not met
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-2-1) ; min-req not met
         (remove-req-constraints ast)]
-
        [(117) ; Description: Reqs only met on res-2 and res-3
         ; only mode-1-2-2 meet its requirements (others mix of max-eq)
         ; Expected outcome: mode-1-2-2 is deployed on res-2 or res-3
@@ -389,7 +351,6 @@
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-2-1) ; min-req not met
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-2-2)
         (remove-req-constraints ast)]
-
        [(118) ; Description: Reqs only met on res-2 and res-3
         ; only mode-1-2-2 meet its requirements (all min-eq)
         ; Expected outcome: mode-1-2-2 is deployed on res-2 or res-3
@@ -400,8 +361,7 @@
         (change-sw-req ast 'load comp-min-eq 1.0 'mode-1-2-1) ; min-req not met
         (change-sw-req ast 'load comp-max-eq 0.8 'mode-1-2-2)
         (remove-req-constraints ast)]
- 
-       [(119) ; Description: Reqs only met on res-1 and res-3 (max-eq),
+        [(119) ; Description: Reqs only met on res-1 and res-3 (max-eq),
         ; mode-1-1-1 and mode 1-2-1 do not meet request constraints (min-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-3
         (change-hw-prov ast 'load 0.4 'res-1)
@@ -411,8 +371,7 @@
         (change-sw-prov ast 'prop-1 7)
         (change-sw-prov ast 'prop-1 3 'mode-1-1-1) ; min-req not met
         (change-sw-prov ast 'prop-1 2 'mode-1-2-1)] ; min-req not met
- 
-       [(120) ; Description: Reqs only met on res-1 and res-3 (min-eq),
+        [(120) ; Description: Reqs only met on res-1 and res-3 (min-eq),
         ; mode-1-1-1 and mode 1-2-1 do not meet request constraints (min-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
@@ -423,8 +382,7 @@
         (change-sw-prov ast 'prop-1 7)
         (change-sw-prov ast 'prop-1 3 'mode-1-1-1) ; min-req not met
         (change-sw-prov ast 'prop-1 2 'mode-1-2-1)] ; min-req not met
- 
-       [(121) ; Description: Reqs only met on res-1 and res-3 (max-eq),
+        [(121) ; Description: Reqs only met on res-1 and res-3 (max-eq),
         ; mode-1-1-1 and mode 1-2-1 do not meet request constraints (max-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-3
         (change-hw-prov ast 'load 0.4 'res-1)
@@ -434,8 +392,7 @@
         (change-sw-prov ast 'prop-1 1)
         (change-sw-prov ast 'prop-1 8 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 7 'mode-1-2-1)] ; max-req not met
- 
-       [(122) ; Description: Reqs only met on res-1 and res-3 (min-eq),
+        [(122) ; Description: Reqs only met on res-1 and res-3 (min-eq),
         ; mode-1-1-1 and mode 1-2-1 do not meet request constraints (max-eq)
         ; Expected outcome: second mode (mode-1-1-2) is deployed on either res-1 or res-3
         (change-hw-prov ast 'load 0.9 'res-1)
@@ -446,8 +403,7 @@
         (change-sw-prov ast 'prop-1 1)
         (change-sw-prov ast 'prop-1 8 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 7 'mode-1-2-1)] ; max-req not met
- 
-       [(123) ; Description: Reqs only met on res-2 and res-3
+        [(123) ; Description: Reqs only met on res-2 and res-3
         ; mode-1-1-1 and mode-1-2-1 do not meet their requirements (max-eq)
         ; mode-1-1-1 and mode-1-1-2 do not meet request constraints (max-eq)
         ; Expected outcome: fourth mode (mode-1-2-2) is deployed on either res-1 or res-2
@@ -461,8 +417,7 @@
         (change-sw-prov ast 'prop-1 1)
         (change-sw-prov ast 'prop-1 8 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 7 'mode-1-1-2)] ; max-req not met
- 
-       [(124) ; Description: Reqs only met on res-2
+        [(124) ; Description: Reqs only met on res-2
         ; mode-1-1-1 and mode-1-2-1 do not meet their requirements (max-eq)
         ; mode-1-1-1 and mode-1-1-2 do not meet request constraints (max-eq)
         ; Expected outcome: fourth mode (mode-1-2-2) is deployed on res-2
@@ -476,8 +431,7 @@
         (change-sw-prov ast 'prop-1 1)
         (change-sw-prov ast 'prop-1 8 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 7 'mode-1-1-2)] ; max-req not met
- 
-       [(125) ; Description: Reqs only met on res-2 and res-3
+        [(125) ; Description: Reqs only met on res-2 and res-3
         ; mode-1-1-1 and mode-1-2-1 do not meet their requirements (min-eq)
         ; mode-1-1-1 and mode-1-1-2 do not meet request constraints (min-eq)
         ; Expected outcome: fourth mode (mode-1-2-2) is deployed on either res-1 or res-2
@@ -491,8 +445,7 @@
         (change-sw-prov ast 'prop-1 4)
         (change-sw-prov ast 'prop-1 1 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 2 'mode-1-1-2)] ; max-req not met
- 
-       [(126) ; Description: Reqs only met on res-2
+        [(126) ; Description: Reqs only met on res-2
         ; mode-1-1-1 and mode-1-2-1 do not meet their requirements (min-eq)
         ; mode-1-1-1 and mode-1-1-2 do not meet request constraints (min-eq)
         ; Expected outcome: fourth mode (mode-1-2-2) is deployed on res-2
@@ -506,7 +459,6 @@
         (change-sw-prov ast 'prop-1 4)
         (change-sw-prov ast 'prop-1 1 'mode-1-1-1) ; min-req not met
         (change-sw-prov ast 'prop-1 2 'mode-1-1-2)] ; min-req not met
-          
        [(127 128 129)
         ; Description: Dynamic provision function, mp-value + 5|10|15|20.
         (change-req-constraint ast 'prop-1 comp-min-eq 30)
@@ -518,11 +470,9 @@
           [(127) ; mp-value = 30. Required >= 30.
            ; Expected outcome: mode-1-1-1 is deployed
            (change-req-mp-value ast 30)]
-          
           [(128) ; Description: Dynamic provision function, mp-value + 5|10|15|20. mp-value = 20. Required >= 30.
            ; Expected outcome: mode-1-1-2 is deployed
            (change-req-mp-value ast 20)]
-          
           [(129) ; Description: Dynamic provision function, mp-value + 5|10|15|20. mp-value = 10. Required >= 30.
            ; Expected outcome: mode-1-2-2 is deployed
            (change-req-mp-value ast 10)])]
@@ -549,13 +499,11 @@
         ; Expected outcome: both, mode-1-1-1 and mode-2-1-1 are deployed on either res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)]
-
        [(201) ; Description: only impl-2-2 meets requirement of comp-1
         ; Expected outcome: both, mode-1-1-1 and mode-2-2-1 are deployed on either res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)
         (change-sw-prov ast 'prop-2 40 'mode-2-1-1 'mode-2-1-2)] ; max-req not met
-
        [(202) ; Description: mode-2-1-1 not meet hw-reqs (max-eq), mode-1-1-1 not meet request constraint (max-eq)
         ; mode-2-2-1 and mode-2-2-2 not meet comp-1 reqs (max-eq)
         ; Expected outcome: both, mode-1-1-2 and mode-2-1-2 are deployed on either res-1, res-2 or res-3
@@ -565,7 +513,6 @@
         (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 4 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
         (change-sw-prov ast 'prop-2 40 'mode-2-2-1 'mode-2-2-2)] ; max-req not met
-
        [(203) ; Description: mode-2-1-1 not meet hw-reqs (max-eq), mode-1-1-1 not meet request constraint (max-eq)
         ; mode-2-2-1 and mode-2-2-2 not meet comp-1 reqs (max-eq)
         ; Reqs only met at res-3 at all
@@ -577,7 +524,6 @@
         (change-sw-prov ast 'prop-1 7 'mode-1-1-1) ; max-req not met
         (change-sw-prov ast 'prop-1 4 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
         (change-sw-prov ast 'prop-2 40 'mode-2-2-1 'mode-2-2-2)] ; max-req not met
-
        [(204) ; Description: mode-2-2-2 meet hw-reqs at res-1 (max-eq), mode-1-2-2 meet hw-req at res-2 (min-eq)
         ; mode-2-1-*, mode-2-2-1, mode-1-1-* and mode-1-2-1 not meeting reqs
         ; Reqs not met at res-3
@@ -589,7 +535,6 @@
         (change-sw-req ast 'load comp-max-eq 0.4 'mode-2-2-2)
         (change-sw-req ast 'load comp-min-eq 0.6 'mode-1-2-2)
         (remove-req-constraints ast)]
-          
        [(205 206 207) ; Description: Dynamic provision function, mp-value +/- 5|10|15|20 for comp-1/comp-2.
         ; All modes of comp-1 require prop-2 <= 20. Request constrains prop-1 >= 30.
         (change-req-constraint ast 'prop-1 comp-min-eq 30)
@@ -633,7 +578,6 @@
         ; Expected outcome: only mode-1-2-1 is deployed on either res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
         (remove-req-constraints ast)]
-       
        [(301) ; Description: modes of impl-1-2 do not meet their requirements
         ; Expected outcome: both, mode-1-1-1 and mode-2-1-1 are deployed on either res-1, res-2 or res-3
         (change-sw-req ast 'load comp-max-eq 0.8)
@@ -661,25 +605,21 @@
        [(400) ; No further constraints
         ; Expected outcome: mode-1-1-1 on res-2
         (remove-req-constraints ast)]
-       
        [(401) ; Impl-1-1 does not meet request constraint
-        ; Expected outcome: mode-1-2-1 on either res-2
+        ; Expected outcome: mode-1-2-1 on res-2
         (change-sw-prov ast 'prop-1 3 'mode-1-1-1 'mode-1-1-2)
         (change-sw-prov ast 'prop-1 7 'mode-1-2-1 'mode-1-2-2)
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
-       
        [(402) ; Dynamic provision value for requested property, on type-1 it's 7, on type-0 it's 3
         ; Expected outcome: No solution, since provision only met on type-1, but all modes only deployable on type-0-resources
         (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 7 3)))
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
-       
        [(403) ; Dynamic provision value for requested property only for first three modes
         ; Expected outcome: mode-1-2-2 on res-2
         (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 7 3))
                         'mode-1-1-1 'mode-1-1-2 'mode-1-2-1)
         (change-sw-prov ast 'prop-1 (lambda (lomp target) 7) 'mode-1-2-2)
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
-       
        [(404) ; Low load of 0.2
         ; Expected outcome: mode-1-1-1 on any res
         (change-hw-prov ast 'load 0.2)
@@ -703,12 +643,10 @@
        [(500) ; No further constraints
         ; Expected outcome: mode-1-1-1 on either res-1 or res-2
         (remove-req-constraints ast)]
-
        [(501) ; High load
         ; Expected outcome: No solution
         (change-hw-prov ast 'load 0.9)
         (remove-req-constraints ast)]
-
        [(502) ; High load, but a fresh resource available
         ; Expected outcome: mode-1-1-1 on (new) res-3
         (change-hw-prov ast 'load 0.9)
@@ -716,7 +654,6 @@
         (add-resource 'res-3 (car (->* (->SubResources (->HWRoot ast)))) (->HWRoot ast))
         (change-hw-prov ast 'load 0.5 'res-3)
         (remove-req-constraints ast)]
-
        [(503) ; High load, new resource available, but still no viable solution
         ; Expected outcome: No solution
         (change-hw-prov ast 'load 0.9)
@@ -776,20 +713,17 @@
        [(600) ; No further constraints
         ; Expected outcome: No solution
         (remove-req-constraints ast)]
-
        [(601) ; New mode of first impl requiring less
         ; Expected outcome: (new) mode-1-1-3 on either res-1 or res-2
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)
         (add-mode 1 1 3 #f (lambda _ 0.8) (lambda _ (prov-obj 20 id)) (lambda _ 2) #f)]
-
        [(602) ; New mode of a new second impl requiring less
         ; Expected outcome: (new) mode-1-2-1 on either res-1 or res-2
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)
         (add-mode 1 2 1 #f (lambda _ 0.8) (lambda _ (prov-obj 20 id)) (lambda _ 2) #f)]
-
-       [(603) ; New component using the existing comp, with one impl and one mode
+       [(603) ; New component with one impl and one mode and using the existing comp
         ; Expected outcome: mode-1-1-1 and (new) mode-2-1-1, both on either res-1 or res-2
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-1 4)
@@ -797,8 +731,7 @@
         (save-ilp tmp-lp ast)
         (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))
         (rewrite-terminal 'target (<=request ast) (find-create-comp 2))]
-
-       [(604) ; New component using the existing comp, with one impl and one mode
+       [(604) ; New component with one impl and one mode and using the existing comp
         ; High load on res-1, high load required for comp-1-modes, low load required for new comp/mode
         ; Expected outcome: mode-1-1-1 on res-1 and (new) mode-2-1-1 on res-2
         (change-sw-req ast 'load comp-min-eq 0.9)
@@ -808,7 +741,6 @@
         (save-ilp tmp-lp ast)
         (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))
         (rewrite-terminal 'target (<=request ast) (find-create-comp 2))]
-
        [(605) ; New component using the existing comp, with one impl and one mode. Request still targets old component.
         ; Expected outcome: mode-1-1-1 on either res-1 or res-2
         (change-sw-req ast 'load comp-max-eq 0.8)
@@ -834,12 +766,10 @@
        [(700) ; No further constraints
         ; Expected outcome: mode-1-1-1 on one of the 18 type-2 resources
         (remove-req-constraints ast)]
-       
        [(701) ; Lower load (0.3)
         ; Expected outcome: mode-1-1-1 on either type-1 or type-2 resources
         (change-hw-prov ast 'load 0.3)
         (remove-req-constraints ast)]
-       
        [(702) ; Even lower load (0.1)
         ; Expected outcome: mode-1-1-1 on an arbitrary resource
         (change-hw-prov ast 'load 0.1)
@@ -857,35 +787,30 @@
         (change-sw-req ast 'load comp-min-eq 0.7)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast))]
-
      [(901) ; All hw-reqs not met (max-eq)
       (let [(ast (create-system 3 0 1 1 2))]
         (change-hw-prov ast 'load 0.8)
         (change-sw-req ast 'load comp-max-eq 0.3)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast))]
-
      [(902) ; Request constraint not met for any mode of the target component (min-eq)
       (let [(ast (create-system 3 0 1 2 3))]
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-1 2)
         (change-req-constraint ast 'prop-1 comp-min-eq 15)
         (save-ilp tmp-lp ast))]
-
      [(903) ; Request constraint not met for any mode of the target component (max-eq)
       (let [(ast (create-system 3 0 1 2 3))]
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-1 7)
         (change-req-constraint ast 'prop-1 comp-max-eq 4)
         (save-ilp tmp-lp ast))]
-
      [(904) ; Requirement on second component not met by any of its modes (max-eq)
       (let [(ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-2 7 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
         (change-sw-req ast 'prop-2 comp-max-eq 4 'mode-1-1-1 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
         (save-ilp tmp-lp ast))]
-
      [(905) ; Requirement on second component not met by any of its modes (min-eq)
       (let [(ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-hw-prov ast 'load 0.8)
@@ -893,14 +818,12 @@
         (change-sw-prov ast 'prop-2 2 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
         (change-sw-req ast 'prop-2 comp-min-eq 15 'mode-1-1-1 'mode-1-1-2 'mode-1-2-1 'mode-1-2-2)
         (save-ilp tmp-lp ast))]
-
      [(906) ; Requirement on third component not met by any of its modes (max-eq)
       (let [(ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-sw-req ast 'load comp-max-eq 0.8)
         (change-sw-prov ast 'prop-3 7 'mode-3-1-1 'mode-3-1-2 'mode-3-2-1 'mode-3-2-2)
         (change-sw-req ast 'prop-3 comp-max-eq 4 'mode-2-1-1 'mode-2-1-2 'mode-2-2-1 'mode-2-2-2)
         (save-ilp tmp-lp ast))]
-
      [(907) ; Requirement on third component not met by any of its modes (min-eq)
       (let [(ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f)))]
         (change-hw-prov ast 'load 0.8)
@@ -919,7 +842,7 @@
  
  (define (check-test id-s obj fname)
    (let* ([table (make-hashtable string-hash string=?)]
-          [val (lambda (name) (or (hashtable-ref table name #f) (error #f "Var not found" name)))]
+          [var-value (lambda (name) (or (hashtable-ref table name #f) (error #f "Var not found" name)))]
           [contains? (lambda (name) (hashtable-contains? table name))]
           [id (string->number id-s)]
           [test-obj (lambda (expected-base actual id) (let ([expected (+ expected-base (/ id 1e3))])
@@ -927,327 +850,250 @@
                                                             (error #f "Wrong objective value, expected first, given last"
                                                                    expected actual))))]
           [test-assert (lambda (msg expr) (if (not expr) (error #f msg)))])
-     (define (val=? base expected op lres)
-       (if (null? lres) (lambda (name) (= (val name) expected))
-           (let ([=name (lambda (base res-nr)
-                          (if (number? res-nr) (string-append base "#res_" (number->string res-nr))
-                              (fold-left (lambda (result nr) (string-append result "_" (number->string nr)))
-                                         (string-append base "#res") res-nr)))])
-             (op (lambda (res-nr) (= (val (=name base res-nr)) expected)) (if (list? (car lres)) (car lres) lres)))))
-     (define (val=1? base . lres) (val=? base 1 exists  lres))
-     (define (val=0? base . lres) (val=? base 0 for-all lres))
+     (define (val=? base expected . lres)
+       (debug lres)
+       (let ([=name (lambda (base res-nr)
+                      (if (number? res-nr) (string-append base "#res_" (number->string res-nr))
+                          (fold-left (lambda (result nr) (string-append result "_" (number->string nr)))
+                                     (string-append base "#res") res-nr)))]
+             [op (if (= expected 0) for-all exists)])
+         (op (lambda (res-nr) (= (var-value (=name base res-nr)) expected)) (if (list? (car lres)) (car lres) lres))))
+     (define (val=1? base . lres) (val=? base 1 lres))
+     (define (val=0? base . lres) (val=? base 0 lres))
      (define (mrl2 l1 l2) (fold-left (lambda (result e1) (append result (map (lambda (e2) (list e1 e2)) l2))) (list) l1))
      (define (mrl3 l1 l2 l3)
        (fold-left (lambda (result e1)
                     (append result (fold-left (lambda (inner e2) (append inner (map (lambda (e3) (list e1 e2 e3)) l3)))
                                               (list) l2))) (list) l1))
+     (define (combine base . lon) (fold-left (lambda (result n) (string-append result "_" (number->string (if n n 1)))) base lon))
+     
+     (define make-name
+       (case-lambda
+         [(c i) (string-append "b#" (combine "comp" c) "#" (if i (combine "impl" c i) ""))]
+         [(c i m) (string-append (make-name c i) "#" (if m (combine "mode" c i m) ""))]))
+     
+     (define make-msg
+       (case-lambda
+         [(name val) (string-append name (if (= 1 val) " not" "") " deployed")]
+         [(name val lres) (fold-left (lambda (result r) (string-append result (if (number? r) (number->string r) "…") ","))
+                                      (string-append (make-msg name val) " on ") lres)]))
+     (define-syntax check-mode
+       (syntax-rules (*)
+         [(_ val (c ... (* (* (r ...)))))
+          (check-mode val (c ... (#f (#f (r ...)))))]
+         [(_ val (c ... (* (m ... (r ...)))))
+          (check-mode val (c ... (#f (m ... (r ...)))))]
+         [(_ val (c ... (i ... (* (r ...)))))
+          (check-mode val (c ... (i ... (#f (r ...)))))]
+         [(_ val (c ... (i ... (m ... (r ...)))))
+          (for-each (lambda (ec)
+                      (for-each (lambda (ei)
+                                  (for-each (lambda (em) (let ([name (make-name ec ei em)]
+                                                               [lres (list r ...)])
+                                                           (test-assert (make-msg name val lres) (val=? name val r ...))))
+                                            (list m ...)))
+                                (list i ...)))
+                    (list c ...))]))
+     (define-syntax check-impl
+       (syntax-rules (*)
+         [(_ val (c ... *))
+          (check-impl val (c ... (#f)))]
+         [(_ val (c ... (i ...)))
+          (for-each (lambda (ec)
+                      (for-each (lambda (ei) (let ([name (make-name ec ei)])
+                                               (test-assert (make-msg name val) (= (var-value name) val))))
+                                (list i ...)))
+                    (list c ...))]))
      (read-solution table fname)
      (for-each (lambda (key) (debug key ":" (hashtable-ref table key #f))) (vector->list (hashtable-keys table)))
      ; impl deployment
      (case id
-       [(1 2 3 4 5 6 7 8 9 10 11 12 13 14 500 502 601 700 701 702)
-        (test-assert "impl not deployed"     (val=1? "b#comp_1#"))]
-       [(30 100 101 105 112 116 119 120 121 122 129 400 401 403 404 602)
-        (test-assert "impl-1 not deployed"   (val=1? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2 deployed"       (val=0? "b#comp_1#impl_1_2"))]
-       [(15 16 31 32 33 34 35 36 102 103 104 106 107 108 109 110 111 113
-            114 115 117 118 123 124 125 126 127 128)
-        (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2 not deployed"   (val=1? "b#comp_1#impl_1_2"))]
-       [(200 202 203 207 301)
-        (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2-1 not deployed" (val=1? "b#comp_2#impl_2_1"))
-        (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
-        (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))]
-       [(201 206)
-        (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2-2 not deployed" (val=1? "b#comp_2#impl_2_2"))
-        (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
-        (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))]
-       [(204 205)
-        (test-assert "impl-1-2 not deployed" (val=1? "b#comp_1#impl_1_2"))
-        (test-assert "impl-2-2 not deployed" (val=1? "b#comp_2#impl_2_2"))
-        (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))]
-       [(300)
-        (test-assert "impl-1-2 not deployed" (val=1? "b#comp_1#impl_1_2"))
-        (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))
-        (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))]
-       [(402 902 903)
-        (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2 deployed"       (val=0? "b#comp_1#impl_1_2"))]
-       [(501 503 600 900 901)
-        (test-assert "impl-1 deployed"       (val=0? "b#comp_1#impl_1_1"))]
-       [(603 604)
-        (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2-1 not deployed" (val=1? "b#comp_2#impl_2_1"))]
-       [(605)
-        (test-assert "impl-1-1 not deployed" (val=1? "b#comp_1#impl_1_1"))
-        (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))]
-       [(904 905)
-        (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
-        (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
-        (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))
-        (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))]
-       [(906 907)
-        (test-assert "impl-1-1 deployed"     (val=0? "b#comp_1#impl_1_1"))
-        (test-assert "impl-1-2 deployed"     (val=0? "b#comp_1#impl_1_2"))
-        (test-assert "impl-2-1 deployed"     (val=0? "b#comp_2#impl_2_1"))
-        (test-assert "impl-2-2 deployed"     (val=0? "b#comp_2#impl_2_2"))
-        (test-assert "impl-3-1 deployed"     (val=0? "b#comp_3#impl_3_1"))
-        (test-assert "impl-3-2 deployed"     (val=0? "b#comp_3#impl_3_2"))]
+       [(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 500 502 601 700 701 702)
+                              (check-impl 1 (1 *))]
+       [(30 100 101 105 108 109 110 111 112 116 119 120 121 122 129 400 404)
+                              (check-impl 1 (1 (1)))
+                              (check-impl 0 (1 (2)))]
+       [(31 32 33 34 35 36 102 103 104 106 107 113 114 115 117 118 123 124 125 126 127 128 401 403 602)
+                              (check-impl 0 (1 (1)))
+                              (check-impl 1 (1 (2)))]
+       [(200 202 203 207 301) (check-impl 1 (1 2 (1)))
+                              (check-impl 0 (1 2 (2)))]
+       [(201 206)             (check-impl 1 (1 (1)))
+                              (check-impl 0 (1 (2)))
+                              (check-impl 0 (2 (1)))
+                              (check-impl 1 (2 (2)))]
+       [(204 205)             (check-impl 1 (1 2 (2)))
+                              (check-impl 0 (1 2 (1)))]
+       [(300)                 (check-impl 0 (1 (1)))
+                              (check-impl 1 (1 (2)))
+                              (check-impl 0 (2 (1 2)))]
+       [(402 902 903)         (check-impl 0 (1 (1 2)))]
+       [(501 503 600 900 901) (check-impl 0 (1 *))]
+       [(603 604)             (check-impl 1 (1 2 *))]
+       [(605)                 (check-impl 1 (1 *))
+                              (check-impl 0 (2 *))]
+       [(904 905)             (check-impl 0 (1 2 (1 2)))]
+       [(906 907)             (check-impl 0 (1 2 3 (1 2)))]
        [else (error #f "Unknown test case id for impls" id)])
      
      ; mode-deployment
      (case id
-       [(1 15 500)    (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1##mode_1_1_1" 1 2))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-       [(2 3 4 5 16)  (test-assert "mode-1-1-2 not deployed"        (val=1? "b#comp_1##mode_1_1_2" 1 2))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
-       [(6 14)        (test-assert "mode-1-1-1 not deployed on 1"   (val=1? "b#comp_1##mode_1_1_1" 1))
-                      (test-assert "mode-1-1-1 deployed on 2"       (val=0? "b#comp_1##mode_1_1_1" 2))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-       [(7 12)        (test-assert "mode-1-1-1 not deployed on 2"   (val=1? "b#comp_1##mode_1_1_1" 2))
-                      (test-assert "mode-1-1-1 deployed on 1"       (val=0? "b#comp_1##mode_1_1_1" 1))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-       [(13)          (test-assert "mode-1-1-2 not deployed on 1"   (val=1? "b#comp_1##mode_1_1_2" 1))
-                      (test-assert "mode-1-1-2 deployed on 2"       (val=0? "b#comp_1##mode_1_1_2" 2))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
-       [(8 9 10 11)   (test-assert "mode-1-1-2 not deployed on 2"   (val=1? "b#comp_1##mode_1_1_2" 2))
-                      (test-assert "mode-1-1-2 deployed on 1"       (val=0? "b#comp_1##mode_1_1_2" 1))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))]
-       [(30)          (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#" 1 2))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#" 1 2))]
-       [(31 32 33 34) (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#" 1 2))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#" 1 2))]
-       [(35 36)       (test-assert "mode-1-2-1 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#" 2))
-                      (test-assert "mode-1-2-1 deployed on 1"       (val=0? "b#comp_1#impl_1_2#" 1))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#" 1 2))]
-       [(100 127)     (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(101 105 128) (test-assert "mode-1-1-2 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(102 103 104) (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(106 107 129) (test-assert "mode-1-2-2 not deployed"        (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-       [(108 109)     (test-assert "mode-1-1-1 not deployed on 23"  (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 2 3))
-                      (test-assert "mode-1-1-1 deployed on 1"       (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(110 111)     (test-assert "mode-1-1-1 not deployed on 2"   (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 2))
-                      (test-assert "mode-1-1-1 deployed on 1"       (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(112 116)     (test-assert "mode-1-1-2 not deployed on 23"  (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 2 3))
-                      (test-assert "mode-1-1-2 deployed on 1"       (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(113 114 115) (test-assert "mode-1-2-1 not deployed on 23"  (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 2 3))
-                      (test-assert "mode-1-2-1 deployed on 1"       (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(117 118)     (test-assert "mode-1-2-2 not deployed on 23"  (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2 3))
-                      (test-assert "mode-1-2-2 deployed on 1"       (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-       [(119 120 121 122) (test-assert "mode-1-1-2 not deployed on 13"  (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 3))
-                          (test-assert "mode-1-1-2 deployed on 2"       (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 2))
-                          (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                          (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                          (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(123 125)     (test-assert "mode-1-2-2 not deployed on 12"  (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2))
-                      (test-assert "mode-1-2-2 deployed on 3"       (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-       [(124 126)     (test-assert "mode-1-2-2 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2))
-                      (test-assert "mode-1-2-2 deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-       [(200 301)     (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-2-1-1 not deployed"        (val=1? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-       [(201)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-2-2-1 not deployed"        (val=1? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-       [(202)         (test-assert "mode-1-1-2 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-2-1-2 not deployed"        (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-       [(203)         (test-assert "mode-1-1-2 not deployed on 3"   (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 3))
-                      (test-assert "mode-2-1-2 not deployed on 3"   (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 3))
-                      (test-assert "mode-1-1-2 deployed on 12"      (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2))
-                      (test-assert "mode-2-1-2 deployed on 12"      (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-       [(204)         (test-assert "mode-1-2-2 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2))
-                      (test-assert "mode-2-2-2 not deployed on 1"   (val=1? "b#comp_2#impl_2_2#mode_2_2_2" 1))
-                      (test-assert "mode-1-2-2 deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 3))
-                      (test-assert "mode-2-2-2 deployed on 23"      (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))]
-       [(205)         (test-assert "mode-1-2-2 not deployed"        (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-2-2 not deployed"        (val=1? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))]
-       [(206)         (test-assert "mode-1-1-2 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-2-2-1 not deployed"        (val=1? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-       [(207)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 not deployed"        (val=1? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-       [(300)         (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_2" 1 2 3))]
-       [(400)         (test-assert "mode-1-1-1 not deployed on 2"   (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 2))
-                      (test-assert "mode-1-1-1 deployed on 13"      (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(401)         (test-assert "mode-1-2-1 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_1" 2))
-                      (test-assert "mode-1-2-1 deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(402)         (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(403)         (test-assert "mode-1-2-2 not deployed on 2"   (val=1? "b#comp_1#impl_1_2#mode_1_2_2" 2))
-                      (test-assert "mode-1-2-2 deployed on 13"      (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 3))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))]
-       [(404)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))]
-       [(502)         (test-assert "mode-1-1-1 not deployed on 3"   (val=1? "b#comp_1##mode_1_1_1" 3))
-                      (test-assert "mode-1-1-1 deployed on 12"      (val=0? "b#comp_1##mode_1_1_1" 1 2))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2 3))]
-       [(601)         (test-assert "mode-1-1-3 not deployed"        (val=1? "b#comp_1##mode_1_1_3" 1 2))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1##mode_1_1_1" 1 2))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-       [(602)         (test-assert "mode-1-2-1 not deployed"        (val=1? "b#comp_1#impl_1_2#" 1 2))
-                      (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2))]
-       [(603)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1##mode_1_1_1" 1 2))
-                      (test-assert "mode-2-1-1 not deployed"        (val=1? "b#comp_2##" 1 2))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-       [(604)         (test-assert "mode-1-1-1 not deployed on 1"   (val=1? "b#comp_1##mode_1_1_1" 1))
-                      (test-assert "mode-2-1-1 not deployed on 2"   (val=1? "b#comp_2##" 2))
-                      (test-assert "mode-1-1-1 deployed on 2"       (val=0? "b#comp_1##mode_1_1_1" 2))
-                      (test-assert "mode-2-1-1 deployed on 1"       (val=0? "b#comp_2##" 1))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-       [(605)         (test-assert "mode-1-1-1 not deployed"        (val=1? "b#comp_1##mode_1_1_1" 1 2))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2##" 1 2))]
-       [(700)         (test-assert "mode-1-1-1 not deployed on t3"
-                                   (val=1? "b#comp_1##mode_1_1_1" (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))))
-                      (test-assert "mode-1-1-1 deployed on t1"      (val=0? "b#comp_1##mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-1 deployed on t2"
-                                   (val=0? "b#comp_1##mode_1_1_1" (mrl2 (list 1 2 3) (list 1 2 3))))
-                      (test-assert "mode-1-1-2 deployed"
-                                   (val=0? "b#comp_1##mode_1_1_2" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
-                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))]
-       [(701)         (test-assert "mode-1-1-1 not deployed on t1 or t2"
-                                   (val=1? "b#comp_1##mode_1_1_1" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
-                                                                          (mrl2 (list 1 2 3) (list 1 2 3)))))
-                      (test-assert "mode-1-1-1 deployed on t1"      (val=0? "b#comp_1##mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"
-                                   (val=0? "b#comp_1##mode_1_1_2" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
-                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))]
-       [(702)         (test-assert "mode-1-1-1 not deployed on t1 or t2"
-                                   (val=1? "b#comp_1##mode_1_1_1" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
-                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))
-                      (test-assert "mode-1-1-2 deployed"
-                                   (val=0? "b#comp_1##mode_1_1_2" (append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
-                                                                          (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3))))]
-       [(900 901 501 503 600) (test-assert "mode-1-1-1 deployed"    (val=0? "b#comp_1##mode_1_1_1" 1 2))
-                              (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1##mode_1_1_2" 1 2))]
-       [(902 903)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-1-3 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_3" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-1-2-3 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_3" 1 2 3))]
-       [(904 905)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))]
-       [(906 907)     (test-assert "mode-1-1-1 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_1" 1 2 3))
-                      (test-assert "mode-1-1-2 deployed"            (val=0? "b#comp_1#impl_1_1#mode_1_1_2" 1 2 3))
-                      (test-assert "mode-1-2-1 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_1" 1 2 3))
-                      (test-assert "mode-1-2-2 deployed"            (val=0? "b#comp_1#impl_1_2#mode_1_2_2" 1 2 3))
-                      (test-assert "mode-2-1-1 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_1" 1 2 3))
-                      (test-assert "mode-2-1-2 deployed"            (val=0? "b#comp_2#impl_2_1#mode_2_1_2" 1 2 3))
-                      (test-assert "mode-2-2-1 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-2-2-2 deployed"            (val=0? "b#comp_2#impl_2_2#mode_2_2_1" 1 2 3))
-                      (test-assert "mode-3-1-1 deployed"            (val=0? "b#comp_3#impl_3_1#mode_3_1_1" 1 2 3))
-                      (test-assert "mode-3-1-2 deployed"            (val=0? "b#comp_3#impl_3_1#mode_3_1_2" 1 2 3))
-                      (test-assert "mode-3-2-1 deployed"            (val=0? "b#comp_3#impl_3_2#mode_3_2_1" 1 2 3))
-                      (test-assert "mode-3-2-2 deployed"            (val=0? "b#comp_3#impl_3_2#mode_3_2_1" 1 2 3))]
+       [(1 15 500)    (check-mode 1 (1 (* (1 (1 2)))))
+                      (check-mode 0 (1 (* (2 (1 2)))))]
+       [(2 3 4 5 16)  (check-mode 0 (1 (* (1 (1 2)))))
+                      (check-mode 1 (1 (* (2 (1 2)))))]
+       [(6 14)        (check-mode 1 (1 (* (1 (1)))))
+                      (check-mode 0 (1 (* (1 (2)))))
+                      (check-mode 0 (1 (* (2 (1 2)))))]
+       [(7 12)        (check-mode 1 (1 (* (1 (2)))))
+                      (check-mode 0 (1 (* (1 (1)))))
+                      (check-mode 0 (1 (* (2 (1 2)))))]
+       [(13)          (check-mode 0 (1 (* (1 (1 2)))))
+                      (check-mode 1 (1 (* (2 (1)))))
+                      (check-mode 0 (1 (* (2 (2)))))]
+       [(8 9 10 11)   (check-mode 0 (1 (* (1 (1 2)))))
+                      (check-mode 1 (1 (* (2 (2)))))
+                      (check-mode 0 (1 (* (2 (1)))))]
+       [(30)          (check-mode 1 (1 (1 (* (1 2)))))
+                      (check-mode 0 (1 (2 (* (1 2)))))]
+       [(31 32 33 34) (check-mode 0 (1 (1 (* (1 2)))))
+                      (check-mode 1 (1 (2 (* (1 2)))))]
+       [(35 36)       (check-mode 0 (1 (1 (* (1 2)))))
+                      (check-mode 1 (1 (2 (* (2)))))
+                      (check-mode 0 (1 (2 (* (1)))))]
+       [(100 127 404) (check-mode 1 (1 (1 (1 (1 2 3)))))
+                      (check-mode 0 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))]
+       [(101 105 128) (check-mode 0 (1 (1 (1 (1 2 3)))))
+                      (check-mode 1 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))]
+       [(102 103 104) (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 1 (1 (2 (1 (1 2 3)))))
+                      (check-mode 0 (1 (2 (2 (1 2 3)))))]
+       [(106 107 129) (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 (1 2 3)))))
+                      (check-mode 1 (1 (2 (2 (1 2 3)))))]
+       [(108 109)     (check-mode 1 (1 (1 (1 (2 3)))))
+                      (check-mode 0 (1 (1 (1 (1)))))
+                      (check-mode 0 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))]
+       [(110 111)     (check-mode 1 (1 (1 (1 (2)))))
+                      (check-mode 0 (1 (1 (1 (1 3)))))
+                      (check-mode 0 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))]
+       [(112 116)     (check-mode 0 (1 (1 (1 (1 2 3)))))
+                      (check-mode 1 (1 (1 (2 (2 3)))))
+                      (check-mode 0 (1 (1 (2 (1)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))]
+       [(113 114 115) (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 1 (1 (2 (1 (2 3)))))
+                      (check-mode 0 (1 (2 (1 (1)))))
+                      (check-mode 0 (1 (2 (2 (1 2 3)))))]
+       [(117 118)     (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 (1 2 3)))))
+                      (check-mode 1 (1 (2 (2 (2 3)))))
+                      (check-mode 0 (1 (2 (2 (1)))))]
+       [(119 120 121 122) (check-mode 0 (1 (1 (1 (1 2 3)))))
+                      (check-mode 1 (1 (1 (2 (1 3)))))
+                      (check-mode 0 (1 (1 (2 (2)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))]
+       [(123 125)     (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 (1 2 3)))))
+                      (check-mode 1 (1 (2 (2 (1 2)))))
+                      (check-mode 0 (1 (2 (2 (3)))))]
+       [(124 126)     (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 (1 2 3)))))
+                      (check-mode 1 (1 (2 (2 (2)))))
+                      (check-mode 0 (1 (2 (2 (1 3)))))]
+       [(200 301)     (check-mode 1 (1 2 (1 (1 (1 2 3)))))
+                      (check-mode 0 (1 2 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 2 (2 (1 2 (1 2 3)))))]
+       [(201)         (check-mode 1 (1 (1 (1 (1 2 3)))))
+                      (check-mode 0 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))
+                      (check-mode 0 (2 (1 (1 2 (1 2 3)))))
+                      (check-mode 1 (2 (2 (1 (1 2 3)))))
+                      (check-mode 0 (2 (2 (2 (1 2 3)))))]
+       [(202)         (check-mode 0 (1 2 (1 (1 (1 2 3)))))
+                      (check-mode 1 (1 2 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 2 (2 (1 2 (1 2 3)))))]
+       [(203)         (check-mode 0 (1 2 (1 (1 (1 2 3)))))
+                      (check-mode 1 (1 2 (1 (2 (3)))))
+                      (check-mode 0 (1 2 (1 (2 (1 2)))))
+                      (check-mode 0 (1 2 (2 (1 2 (1 2 3)))))]
+       [(204)         (check-mode 0 (1 2 (1 (1 2 (1 2 3)))))
+                      (check-mode 0 (1 2 (2 (1 (1 2 3)))))
+                      (check-mode 1 (1 (2 (2 (2)))))
+                      (check-mode 0 (1 (2 (2 (1 3)))))
+                      (check-mode 1 (2 (2 (2 (1)))))
+                      (check-mode 0 (2 (2 (2 (2 3)))))]
+       [(205)         (check-mode 0 (1 2 (1 (1 2 (1 2 3)))))
+                      (check-mode 0 (1 2 (2 (1 (1 2 3)))))
+                      (check-mode 1 (1 2 (2 (2 (1 2 3)))))]
+       [(206)         (check-mode 0 (1 (1 (1 (1 2 3)))))
+                      (check-mode 1 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))
+                      (check-mode 0 (2 (1 (1 2 (1 2 3)))))
+                      (check-mode 1 (2 (2 (1 (1 2 3)))))
+                      (check-mode 0 (2 (2 (2 (1 2 3)))))]
+       [(207)         (check-mode 1 (1 (1 (1 (1 2 3)))))
+                      (check-mode 0 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))
+                      (check-mode 0 (2 (1 (1 (1 2 3)))))
+                      (check-mode 1 (2 (1 (2 (1 2 3)))))
+                      (check-mode 0 (2 (2 (1 2 (1 2 3)))))]
+       [(300)         (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 1 (1 (2 (1 (1 2 3)))))
+                      (check-mode 0 (1 (2 (2 (1 2 3)))))
+                      (check-mode 0 (2 (1 2 (1 2 (1 2 3)))))]
+       [(400)         (check-mode 1 (1 (1 (1 (2)))))
+                      (check-mode 0 (1 (1 (1 (1 3)))))
+                      (check-mode 0 (1 (1 (2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 2 (1 2 3)))))]
+       [(401)         (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 1 (1 (2 (1 (2)))))
+                      (check-mode 0 (1 (2 (1 (1 3)))))
+                      (check-mode 0 (1 (2 (2 (1 2 3)))))]
+       [(402)         (check-mode 0 (1 (1 2 (1 2 (1 2 3)))))]
+       [(403)         (check-mode 0 (1 (1 (1 2 (1 2 3)))))
+                      (check-mode 0 (1 (2 (1 (1 2 3)))))
+                      (check-mode 1 (1 (2 (2 (2)))))
+                      (check-mode 0 (1 (2 (2 (1 3)))))]
+       [(502)         (check-mode 1 (1 (* (1 (3)))))
+                      (check-mode 0 (1 (* (1 (1 2)))))
+                      (check-mode 0 (1 (* (2 (1 2 3)))))]
+       [(601)         (check-mode 1 (1 (* (3 (1 2)))))
+                      (check-mode 0 (1 (* (1 2 (1 2)))))]
+       [(602)         (check-mode 1 (1 (2 (* (1 2)))))
+                      (check-mode 0 (1 (1 (1 2 (1 2)))))]
+       [(603)         (check-mode 1 (1 (* (1 (1 2)))))
+                      (check-mode 0 (1 (* (2 (1 2)))))
+                      (check-mode 1 (2 (* (* (1 2)))))]
+       [(604)         (check-mode 1 (1 (* (1 (1)))))
+                      (check-mode 0 (1 (* (1 (2)))))
+                      (check-mode 0 (1 (* (2 (1 2)))))
+                      (check-mode 1 (2 (* (* (2)))))
+                      (check-mode 0 (2 (* (* (1)))))]
+       [(605)         (check-mode 1 (1 (* (1 (1 2)))))
+                      (check-mode 0 (1 (* (2 (1 2)))))
+                      (check-mode 0 (2 (* (* (1 2)))))]
+       [(700)         (check-mode 1 (1 (* (1 ((mrl3 (list 1 2 3) (list 1 2 3) (list 1 2)))))))
+                      (check-mode 0 (1 (* (1 ((append (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3)))))))
+                      (check-mode 0 (1 (* (2 ((append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                      (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3)))))))]
+       [(701)         (check-mode 1 (1 (* (1 ((append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                      (mrl2 (list 1 2 3) (list 1 2 3))))))))
+                      (check-mode 0 (1 (* (1 (1 2 3)))))
+                      (check-mode 0 (1 (* (2 ((append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                      (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3)))))))]
+       [(702)         (check-mode 1 (1 (* (1 ((append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                      (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3)))))))
+                      (check-mode 0 (1 (* (2 ((append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))
+                                                      (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3)))))))]
+       [(900 901 501 503 600) (check-mode 0 (1 (* (1 2 (1 2)))))]
+       [(902 903)     (check-mode 0 (1 (2 (1 2 3 (1 2)))))]
+       [(904 905)     (check-mode 0 (1 2 (1 2 (1 2 (1 2)))))]
+       [(906 907)     (check-mode 0 (1 2 3 (1 2 (1 2 (1 2)))))]
        [else (error #f "Unknown test case id for modes" id)])
 
      (case id
@@ -1270,7 +1116,7 @@
        [else (error #f "Unknown test case id for objectives" id)])))
  
  (define (display-ranges)
-   (display "1 16 30 36 100 126 200 204 300 301 400 404 500 503 600 605 700 702 900 907"))
+   (display "1 16 30 36 100 126 200 207 300 301 400 404 500 503 600 605 700 702 900 907"))
  
  (if (< (length (command-line)) 2)
      (begin
