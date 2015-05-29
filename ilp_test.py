@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import re, unittest, os, shutil, sys
+import re, threading, os, shutil, sys, timeit
 try:
 	from fabric.api import local, quiet, task
 	from fabric.colors import red
@@ -10,6 +10,7 @@ except ImportError:
 from constants import RACR_BIN, MQUAT_BIN
 
 run_racket = True
+NUM_PROCESSORS = 2
 
 @task
 def run(*given_ranges):
@@ -19,10 +20,26 @@ def run(*given_ranges):
 	if not ranges:
 		print 'No test matches %s. Aborting.' % list(given_ranges)
 		sys.exit(1)
+	test_ids = []
 	for lb,ub in ranges:
-		ILPTest.create_ts(range(lb,ub+1))
-	suite = unittest.TestLoader().loadTestsFromTestCase(ILPTest)
-	unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
+		test_ids.extend(range(lb,ub+1))
+	progress = TestProgress(test_ids)
+	number_tests = len(test_ids)
+	threads = []
+	start = timeit.default_timer()
+	for i in xrange(NUM_PROCESSORS):
+		t = threading.Thread(target = loop, args = (progress,i))
+		threads.append(t)
+		t.start()
+	for t in threads:
+		t.join()
+	stop = timeit.default_timer()
+	if progress.has_failures():
+		print '=' * 30
+		print 'FAILURE\n%s' % progress.failure_msg
+	else:
+		print 'OK'
+	print '\nRan {0} tests in {1:.3f}s\n'.format(number_tests - len(test_ids), stop - start)
 
 def get_ranges():
 	with quiet():
@@ -135,70 +152,103 @@ def write_solution(sol, fname):
 			fd.write('("%s" . %s)\n' % (key, value))
 		fd.write(')\n')
 
-class ILPTest(unittest.TestCase):
+class TestProgress:
+	
+	def __init__(self, test_ids):
+		self.failure_msg = None
+		self.available = True
+		self.C = threading.Condition()
+		self.test_ids = test_ids
+	
+	def next_nr(self):
+		self.C.acquire()
+		while not self.available:
+			self.C.wait()
+		try:
+			nr = None if self.has_failures() else self.test_ids.pop(0)
+		except IndexError:
+			nr = None
+		self.C.release()
+		return nr
+	
+	def failure(self, test_id, msg):
+		self.C.acquire()
+		self.failure_msg = 'Test-Case %d FAILED\n%s' % (test_id, msg)
+		self.C.notify()
+		self.C.release()
+	
+	def has_failures(self):
+		return self.failure_msg is not None
 
-	longMessage = False
-	fname_lp_racket = "test/tmp.lp"
+def loop(progress, thread_id):
+	working = True
+	while working:
+		nr = progress.next_nr()
+		if not nr:
+			working = False
+		else:
+			try:
+				run_case(nr, thread_id)
+			except AssertionError as e:
+				working = False
+				progress.failure(nr, e.message)
+#		progress.notify()
 
-	@staticmethod
-	def solution_file(test_nr):
-		return "test/%s.sol" % test_nr
+	
+def assertTrue(expr, msg):
+	if not expr:
+		raise AssertionError(msg)
 
-	@staticmethod
-	def scheme_solution_file(test_nr):
-		return "test/%s.scsol" % test_nr
+def tmp_lp(thread_nr):
+	return "test/tmp_%s.lp" % thread_nr
 
-	@staticmethod
-	def lp_file(test_nr):
-		return "test/%s.lp" % test_nr
+def solution_file(test_nr):
+	return "test/%s.sol" % test_nr
 
-	def local_quiet(self, cmd):
-		""" Runs the command quietly, asserts successfull execution and returns stdout """
-		with quiet():
-			out = local(cmd, capture = True)
-			self.assertTrue(out.succeeded, '"%s" not successful, stdout:\n%s\nstderr:\n%s' % (cmd, out.stdout, out.stderr))
-			return out
+def scheme_solution_file(test_nr):
+	return "test/%s.scsol" % test_nr
 
-	def run_case(self, test_nr):
-		## Run Racket to generate ILP
-		fname_sol = self.solution_file(test_nr)
-		fname_lp_python = self.lp_file(test_nr)
-		fname_scheme_sol = self.scheme_solution_file(test_nr)
-		if run_racket:
-			if os.path.exists(self.fname_lp_racket):
-				os.remove(self.fname_lp_racket)
-			if os.path.exists(fname_sol):
-				os.remove(fname_sol)
-			out = self.local_quiet('racket -S %s -S %s ilp-test.scm run %s' % (RACR_BIN, MQUAT_BIN, test_nr))
-			self.assertTrue(os.path.exists(self.fname_lp_racket), "ILP was not generated\n%s" % out)
-			shutil.copyfile(self.fname_lp_racket, fname_lp_python)
-		
-		## Solve the ILP with glpsol
-		out = self.local_quiet('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol))
-		self.assertTrue(os.path.exists(fname_sol), "No solution file created")
-		obj,sol = read_solution(fname_sol)
-		
-		## Write the solution to fname_sc_sol
-		write_solution(sol, fname_scheme_sol)
+def lp_file(test_nr):
+	return "test/%s.lp" % test_nr
 
-		if not re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
-			## No solution found
-			pass
-		
-		## Check solution with Racket
-		self.local_quiet('racket -S %s -S %s ilp-test.scm check %s %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, obj, fname_scheme_sol))
+def local_quiet(cmd):
+	""" Runs the command quietly, asserts successfull execution and returns stdout """
+	with quiet():
+		out = local(cmd, capture = True)
+		assertTrue(out.succeeded, '"%s" not successful, stdout:\n%s\nstderr:\n%s' % (cmd, out.stdout, out.stderr))
+		return out
 
-	@classmethod
-	def create_ts(cls, test_numbers):
-		for test_nr in test_numbers:
-			test_func = cls.make_t_function(cls, test_nr)
-			setattr(cls, 'test_{0:03d}'.format(test_nr), test_func)
+def run_case(test_nr, thread_id):
+	sys.stdout.write(str(test_nr))
+	sys.stdout.flush()
+	## Run Racket to generate ILP
+	fname_sol = solution_file(test_nr)
+	fname_lp_python = lp_file(test_nr)
+	fname_scheme_sol = scheme_solution_file(test_nr)
+	if run_racket:
+		fname_lp_racket = tmp_lp(thread_id)
+		if os.path.exists(fname_lp_racket):
+			os.remove(fname_lp_racket)
+		if os.path.exists(fname_sol):
+			os.remove(fname_sol)
+		out = local_quiet('racket -S %s -S %s ilp-test.scm run %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, fname_lp_racket))
+		assertTrue(os.path.exists(fname_lp_racket), "ILP was not generated\n%s" % out)
+		shutil.move(fname_lp_racket, fname_lp_python)
+	
+	## Solve the ILP with glpsol
+	out = local_quiet('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol))
+	assertTrue(os.path.exists(fname_sol), "No solution file created")
+	obj,sol = read_solution(fname_sol)
+	
+	## Write the solution to fname_sc_sol
+	write_solution(sol, fname_scheme_sol)
 
-	@staticmethod
-	def make_t_function(self, test_nr):
-		def test(self):
-			self.run_case(test_nr)
-		return test
+	if not re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
+		## No solution found
+		pass
+	
+	## Check solution with Racket
+	local_quiet('racket -S %s -S %s ilp-test.scm check %s %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, obj, fname_scheme_sol))
 
 if __name__ == '__main__':
 	print run(sys.argv[1:])

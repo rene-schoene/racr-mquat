@@ -1122,15 +1122,17 @@
      (begin
        (display "Usage: ilp-test.scm action cmds")
        (display " action = ranges → no cmds, outputs valid inclusive intervals for test case ids")
-       (display " action = run → cmds = id, outputs nothing")
+       (display " action = run → cmds = id tmp-file, outputs nothing")
        (display " action = check → cmds id objective-value file-name, outputs error messages on failures\n"))
      (begin
        (when (string=? "ranges" (cadr (command-line))) ; expect just "ranges"
          (display-ranges))
-       (when (string=? "run" (cadr (command-line))) ; expect "run" id
+       (when (string=? "run" (cadr (command-line))) ; expect "run" id tmp-file
          (set!debugging #f)
          (let* ([cmds (cddr (command-line))]
-                [id-s (car cmds)])
+                [id-s (car cmds)]
+                [tmp-file (cadr cmds)])
+           (set! tmp-lp tmp-file)
            (run-test id-s)))
        (when (string=? "check" (cadr (command-line))) ; expect "check" id obj fname
          (set!debugging #t)

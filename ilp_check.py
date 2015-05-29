@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from ilp_test import read_solution, ILPTest
+from ilp_test import read_solution
 try:
 	from fabric.api import local, task
 except ImportError:
