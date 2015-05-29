@@ -2,8 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import re, unittest, os, shutil, sys
-from fabric.api import lcd, local, task, warn_only, quiet
-from fabric.colors import red
+try:
+	from fabric.api import local, quiet, task
+	from fabric.colors import red
+except ImportError:
+	from fabric_workaround import local, quiet, red, task
 from constants import RACR_BIN, MQUAT_BIN
 
 run_racket = True
@@ -22,7 +25,7 @@ def run(*given_ranges):
 	unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
 
 def get_ranges():
-	with warn_only():
+	with quiet():
 		intervals = local('racket -S %s -S %s ilp-test.scm ranges' % (RACR_BIN, MQUAT_BIN), capture=True)
 	if intervals.failed:
 		print "Could not get intervals"
@@ -58,10 +61,6 @@ def intersect(a0, a1, b0, b1):
 		return (b0, a1 if a1<b1 else b1)
 	else:
 		return intersect(b0,b1,a0,a1)
-
-@task
-def test_merge(a0,a1,b0,b1,c0,c1):
-	print merge_ranges( [(int(a0),int(a1)),(int(b0),int(b1))], [(int(c0),int(c1))] )
 
 def notFalse(item):
 	return item is not False
@@ -202,4 +201,4 @@ class ILPTest(unittest.TestCase):
 		return test
 
 if __name__ == '__main__':
-	print parse_ranges(sys.argv[1:])
+	print run(sys.argv[1:])

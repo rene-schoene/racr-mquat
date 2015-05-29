@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
 from ilp_test import read_solution, ILPTest
-from fabric.api import task, local
+try:
+	from fabric.api import local, task
+except ImportError:
+	from fabric_workaround import local, task
 import json
 import codecs
 

@@ -3,8 +3,11 @@
 import sys, re, os, csv, timeit
 from datetime import datetime
 from glob import glob
-from fabric.colors import red
-from fabric.api import task, local, hide, quiet
+try:
+	from fabric.colors import red
+	from fabric.api import local, hide, quiet, task
+except ImportError:
+	from fabric_workaround import task, local, hide, quiet, red
 from constants import RACR_BIN, MQUAT_BIN
 
 def checked_local(cmd, abort_on_error = True):
@@ -26,11 +29,20 @@ def setup_profiling_dirs():
 			os.mkdir(name)
 
 @task
-def measure_racket(number = 1, *dirs):
+def racket_n(number, *dirs):
+	do_racket(number,dirs)
+
+@task
+def racket(*dirs):
+	do_racket(1,dirs)
+	
+def do_racket(number,dirs):
+	total_start = timeit.default_timer()
 	setup_profiling_dirs()
 	for _ in xrange(int(number)):
 		local('racket -S %s -S %s ilp-measurement.scm %s' % (RACR_BIN, MQUAT_BIN, 'all' if dirs == () else ' '.join(dirs)))
 		conflate_results(skip_sol = True)
+	print ' done in %s sec' % (timeit.default_timer() - total_start)
 
 gen_results = 'gen.csv'
 gen_header  = ['timestamp', 'dir', 'step', 'ilp-gen'] # generation of ilp
@@ -45,7 +57,15 @@ def dirname(d):
 	return os.path.split(os.path.dirname(d))[-1]
 
 @task
-def measure_glpsol(pathname = '*', number = 1, skip_conflate = False):
+def glpsol(pathname = '*', skip_conflate = False):
+	do_glpsol(1, pathname, skip_conflate)
+
+@task
+def glpsol_n(number, pathname = '*', skip_conflate = False):
+	do_glpsol(number, pathname, skip_conflate)
+
+def do_glpsol(number, pathname, skip_conflate):
+	total_start = timeit.default_timer()
 	old_cd = os.getcwd()
 	dirs = glob('profiling/%s/' % pathname)
 	dirs.sort()
@@ -53,7 +73,7 @@ def measure_glpsol(pathname = '*', number = 1, skip_conflate = False):
 		if not os.path.isdir(d):
 		  print red("Not a valid directory: %s" % d)
 		  continue
-		sys.stdout.write(d+':')
+		sys.stdout.write(d)
 		os.chdir(d)
 		add_header = not os.path.exists(sol_results)
 		with open(sol_results, 'a') as fd:
@@ -65,6 +85,7 @@ def measure_glpsol(pathname = '*', number = 1, skip_conflate = False):
 			for ilp in files:
 				if not ilp.endswith('.lp'):
 					continue
+				sys.stdout.write(':')
 				for _ in xrange(int(number)):
 					start = timeit.default_timer()
 					out = checked_local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')))
@@ -82,7 +103,7 @@ def measure_glpsol(pathname = '*', number = 1, skip_conflate = False):
 					row = list((today.isoformat(),dirname(d), ilp.rsplit('.', 1)[0]) + stats + (duration, stop-start))
 					writer.writerow(row)
 		os.chdir(old_cd)
-		print ' done'
+		print ' done in %s sec' % (timeit.default_timer() - total_start)
 	if not skip_conflate:
 		conflate_results(pathname = pathname, skip_gen = True)
 
@@ -130,5 +151,5 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 		local('tail -qn +2 profiling/sol-header profiling/*/%s> profiling/all-sol-results.csv' % sol_results)
 
 if __name__ == '__main__':
-	measure_racket()
-	measure_glpsol()
+	racket()
+	glpsol()
