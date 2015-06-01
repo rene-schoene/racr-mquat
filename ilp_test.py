@@ -12,7 +12,7 @@ from constants import RACR_BIN, MQUAT_BIN
 run_racket = True
 NUM_PROCESSORS = 2
 
-@task
+@task(default = True)
 def run(*given_ranges):
 	supported_ranges = get_ranges()
 	ranges = parse_ranges(supported_ranges, given_ranges)

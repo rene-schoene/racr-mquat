@@ -10,6 +10,16 @@ except ImportError:
 	from fabric_workaround import task, local, hide, quiet, red
 from constants import RACR_BIN, MQUAT_BIN
 
+class timed(object):
+
+	def __enter__(self, msg = ' done in %s sec'):
+		self.start = timeit.default_timer()
+		self.msg = msg
+		return self
+	def __exit__(self, ex_type, value, traceback):
+		self.stop = timeit.default_timer() - self.start
+		print self.msg % self.stop
+
 def checked_local(cmd, abort_on_error = True):
 	with quiet():
 		out = local(cmd, capture = True)
@@ -28,21 +38,21 @@ def setup_profiling_dirs():
 		if not os.path.exists(name):
 			os.mkdir(name)
 
-@task
+@task(name = 'racket-n')
 def racket_n(number, *dirs):
 	do_racket(number,dirs)
 
 @task
 def racket(*dirs):
 	do_racket(1,dirs)
-	
-def do_racket(number,dirs):
-	total_start = timeit.default_timer()
-	setup_profiling_dirs()
-	for _ in xrange(int(number)):
-		local('racket -S %s -S %s ilp-measurement.scm %s' % (RACR_BIN, MQUAT_BIN, 'all' if dirs == () else ' '.join(dirs)))
-		conflate_results(skip_sol = True)
-	print ' done in %s sec' % (timeit.default_timer() - total_start)
+
+def do_racket(number, dirs):
+	with timed():
+		setup_profiling_dirs()
+		for _ in xrange(int(number)):
+			local('racket -S %s -S %s ilp-measurement.scm %s' % (RACR_BIN, MQUAT_BIN, 'all' if dirs == () else ' '.join(dirs)))
+			print '\n'
+			conflate_results(skip_sol = True)
 
 gen_results = 'gen.csv'
 gen_header  = ['timestamp', 'dir', 'step', 'ilp-gen'] # generation of ilp
@@ -60,54 +70,55 @@ def dirname(d):
 def glpsol(pathname = '*', skip_conflate = False):
 	do_glpsol(1, pathname, skip_conflate)
 
-@task
+@task(name = 'glpsol-n')
 def glpsol_n(number, pathname = '*', skip_conflate = False):
 	do_glpsol(number, pathname, skip_conflate)
 
 def do_glpsol(number, pathname, skip_conflate):
-	total_start = timeit.default_timer()
 	old_cd = os.getcwd()
 	dirs = glob('profiling/%s/' % pathname)
 	dirs.sort()
 	for d in dirs:
 		if not os.path.isdir(d):
-		  print red("Not a valid directory: %s" % d)
-		  continue
-		sys.stdout.write(d)
-		os.chdir(d)
-		add_header = not os.path.exists(sol_results)
-		with open(sol_results, 'a') as fd:
-			writer = csv.writer(fd)
-			if add_header:
-				writer.writerow(sol_header)
-			files = os.listdir('.')
-			files.sort()
-			for ilp in files:
-				if not ilp.endswith('.lp'):
-					continue
-				sys.stdout.write(':')
+			print red("Not a valid directory: %s" % d)
+			continue
+		with timed():
+			total_start = timeit.default_timer()
+			sys.stdout.write(d)
+			os.chdir(d)
+			add_header = not os.path.exists(sol_results)
+			with open(sol_results, 'a') as fd:
+				writer = csv.writer(fd)
+				if add_header:
+					writer.writerow(sol_header)
+				files = os.listdir('.')
+				files.sort()
 				for _ in xrange(int(number)):
-					start = timeit.default_timer()
-					out = checked_local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')))
-					stop = timeit.default_timer()
-					today = datetime.today()
-					if re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
-						duration = re.search('Time used:[\s]*(.*?) secs', out).group(1)
-						# stats=row,col,nonzero
-						stats = re.search('(\d+) rows, (\d+) columns, (\d+) non-zeros', out).groups()
-						sys.stdout.write('.')
-					else:
-						sys.stdout.write(red('!'))
-						duration = -1
-					sys.stdout.flush()
-					row = list((today.isoformat(),dirname(d), ilp.rsplit('.', 1)[0]) + stats + (duration, stop-start))
-					writer.writerow(row)
-		os.chdir(old_cd)
-		print ' done in %s sec' % (timeit.default_timer() - total_start)
+					sys.stdout.write(':')
+					for ilp in files:
+						if not ilp.endswith('.lp'):
+							continue
+						start = timeit.default_timer()
+						out = checked_local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')))
+						stop = timeit.default_timer()
+						today = datetime.today()
+						if re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
+							duration = re.search('Time used:[\s]*(.*?) secs', out).group(1)
+							# stats=row,col,nonzero
+							stats = re.search('(\d+) rows, (\d+) columns, (\d+) non-zeros', out).groups()
+							sys.stdout.write('.')
+						else:
+							sys.stdout.write(red('!'))
+							duration = -1
+						sys.stdout.flush()
+						row = list((today.isoformat(),dirname(d), ilp.rsplit('.', 1)[0]) +
+									stats + (duration, stop-start))
+						writer.writerow(row)
+			os.chdir(old_cd)
 	if not skip_conflate:
 		conflate_results(pathname = pathname, skip_gen = True)
 
-@task
+@task(name = 'conflate-results')
 def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 	if not skip_gen:
 		old_cd = os.getcwd()
