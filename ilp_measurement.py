@@ -67,14 +67,17 @@ def dirname(d):
 	return os.path.split(os.path.dirname(d))[-1]
 
 @task
-def glpsol(pathname = '*', skip_conflate = False):
-	do_glpsol(1, pathname, skip_conflate)
+def sol(solver, pathname = '*', skip_conflate = False):
+	do_sol(solver, 1, pathname, skip_conflate)
 
 @task(name = 'glpsol-n')
-def glpsol_n(number, pathname = '*', skip_conflate = False):
-	do_glpsol(number, pathname, skip_conflate)
+def sol_n(solver, number, pathname = '*', skip_conflate = False):
+	do_sol(number, pathname, skip_conflate)
 
-def do_glpsol(number, pathname, skip_conflate):
+params = { 'glpsol' : ['glpsol --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
+	   'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
+
+def do_sol(solver, number, pathname, skip_conflate):
 	old_cd = os.getcwd()
 	dirs = glob('profiling/%s/' % pathname)
 	dirs.sort()
@@ -99,13 +102,13 @@ def do_glpsol(number, pathname, skip_conflate):
 						if not ilp.endswith('.lp'):
 							continue
 						start = timeit.default_timer()
-						out = checked_local('glpsol --lp %s -w %s' % (ilp, ilp.replace('lp','sol')))
+						out = checked_local(params[solver][0].format(lp = ilp, sol = ilp.replace('lp','sol')))
 						stop = timeit.default_timer()
 						today = datetime.today()
-						if re.search('INTEGER OPTIMAL SOLUTION FOUND', out):
-							duration = re.search('Time used:[\s]*(.*?) secs', out).group(1)
+						if re.search(params[solver][1], out):
+							duration = re.search(params[solver][2], out).group(1)
 							# stats=row,col,nonzero
-							stats = re.search('(\d+) rows, (\d+) columns, (\d+) non-zeros', out).groups()
+							stats = re.search(params[solver][3], out).groups()
 							sys.stdout.write('.')
 						else:
 							sys.stdout.write(red('!'))
