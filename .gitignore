@@ -1,5 +1,7 @@
 racket-bin
 test
-profiling
+profiling/*
+!profiling/sol-header
+!profiling/gen-header
 *.pyc
 *.log

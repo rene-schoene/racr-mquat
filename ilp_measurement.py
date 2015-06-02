@@ -11,30 +11,29 @@ except ImportError:
 from constants import RACR_BIN, MQUAT_BIN
 
 class timed(object):
-
-	def __enter__(self, msg = ' done in %s sec'):
+	def __enter__(self, msg = ' done in {1:.3f}s'):
 		self.start = timeit.default_timer()
 		self.msg = msg
 		return self
 	def __exit__(self, ex_type, value, traceback):
 		self.stop = timeit.default_timer() - self.start
-		print self.msg % self.stop
+		print self.msg.format(self.stop)
 
 def checked_local(cmd, abort_on_error = True):
 	with quiet():
 		out = local(cmd, capture = True)
 	if out.failed:
-		print '"%s" not successful, stdout:\n%s\nstderr:\n%s' % (cmd, out.stdout, out.stderr)
+		print '"{0}" not successful, stdout:\n{1}\nstderr:\n{2}'.format(cmd, out.stdout, out.stderr)
 		if abort_on_error:
 			sys.exit(1)
 	return out
 
 def setup_profiling_dirs():
-	dirs = checked_local('racket -S %s -S %s ilp-measurement.scm dirs' % (RACR_BIN, MQUAT_BIN)).split()
+	dirs = checked_local('plt-r6rs ++path {0} ++path {1} ilp-measurement.scm dirs'.format(RACR_BIN, MQUAT_BIN)).split()
 	if not os.path.exists('profiling'):
 		os.mkdir('profiling')
 	for d in dirs:
-		name = 'profiling/%s' % d
+		name = 'profiling/{0}'.format(d)
 		if not os.path.exists(name):
 			os.mkdir(name)
 
@@ -50,7 +49,7 @@ def do_racket(number, dirs):
 	with timed():
 		setup_profiling_dirs()
 		for _ in xrange(int(number)):
-			local('racket -S %s -S %s ilp-measurement.scm %s' % (RACR_BIN, MQUAT_BIN, 'all' if dirs == () else ' '.join(dirs)))
+			local('plt-r6rs ++path {0} ++path {1} ilp-measurement.scm {2}'.format(RACR_BIN, MQUAT_BIN, 'all' if dirs == () else ' '.join(dirs)))
 			print '\n'
 			conflate_results(skip_sol = True)
 
@@ -75,15 +74,15 @@ def sol_n(solver, number, pathname = '*', skip_conflate = False):
 	do_sol(number, pathname, skip_conflate)
 
 params = { 'glpsol' : ['glpsol --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
-	   'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
+		   'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
 
 def do_sol(solver, number, pathname, skip_conflate):
 	old_cd = os.getcwd()
-	dirs = glob('profiling/%s/' % pathname)
+	dirs = glob('profiling/{0}/'.format(pathname))
 	dirs.sort()
 	for d in dirs:
 		if not os.path.isdir(d):
-			print red("Not a valid directory: %s" % d)
+			print red("Not a valid directory: {0}".format(d))
 			continue
 		with timed():
 			total_start = timeit.default_timer()
@@ -125,11 +124,11 @@ def do_sol(solver, number, pathname, skip_conflate):
 def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 	if not skip_gen:
 		old_cd = os.getcwd()
-		dirs = glob('profiling/%s/' % pathname)
+		dirs = glob('profiling/{0}/'.format(pathname))
 		sys.stdout.write('Conflating gen-results:')
 		for d in dirs:
 			if not os.path.isdir(d):
-			  print red("Not a valid directory: %s" % d)
+			  print red("Not a valid directory: {0}".format(d))
 			  continue
 			os.chdir(d)
 			sys.stdout.write('.')
@@ -156,13 +155,13 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
 			os.chdir(old_cd)
 		print ' done'
-		local('tail -qn +2 profiling/gen-header profiling/*/%s > profiling/all-gen-results.csv' % gen_results)
+		local('tail -qn +2 profiling/gen-header profiling/*/{0} > profiling/all-gen-results.csv'.format(gen_results))
 
 	local('tail -n +1 profiling/*/specs > profiling/all-specs')
 
 	if not skip_sol:
 		# sol-results
-		local('tail -qn +2 profiling/sol-header profiling/*/%s> profiling/all-sol-results.csv' % sol_results)
+		local('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/all-sol-results.csv'.format(sol_results))
 
 if __name__ == '__main__':
 	racket()

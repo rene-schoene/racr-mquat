@@ -10,11 +10,11 @@ import codecs
 
 @task
 def get_new_sol_file(test_nr):
-	return "test/%s-new.sol" % test_nr
+	return "test/{0}-new.sol".format(test_nr)
 
 @task
 def get_new_lp_file(test_nr):
-	return "test/%s-new.lp" % test_nr
+	return "test/{0}-new.lp".format(test_nr)
 
 @task
 def new_sol(test_nr):
@@ -35,5 +35,5 @@ def eval(test_nr):
 
 def make_subs(text, sol):
 	for key,value in sol.iteritems():
-		text = text.replace("%s " % key, u"\xb7%s " % value) #add a trailing space to only replace exact name matches
+		text = text.replace("{0} ".format(key), u"\xb7{0} ".format(value)) #add a trailing space to only replace exact name matches
 	return text

@@ -10,7 +10,17 @@ except ImportError:
 from constants import RACR_BIN, MQUAT_BIN
 
 run_racket = True
-NUM_PROCESSORS = 2
+NUM_PROCESSORS = 4
+
+def local_quiet(cmd):
+	""" Runs the command quietly, asserts successfull execution and returns stdout """
+	with quiet():
+		out = local(cmd, capture = True)
+		assertTrue(out.succeeded, '"{0}" not successful, stdout:\n{1}\nstderr:\n{2}'.format(cmd, out.stdout, out.stderr))
+		return out
+
+def call_racket(f, *args):
+	return local_quiet('plt-r6rs ++path {0} ++path {1} {2} {3}'.format(RACR_BIN, MQUAT_BIN, f, ' '.join(str(x) for x in args)))
 
 @task(default = True)
 def run(*given_ranges):
@@ -18,7 +28,7 @@ def run(*given_ranges):
 	ranges = parse_ranges(supported_ranges, given_ranges)
 #	print ranges
 	if not ranges:
-		print 'No test matches %s. Aborting.' % list(given_ranges)
+		print 'No test matches {0}. Aborting.'.format(list(given_ranges))
 		sys.exit(1)
 	test_ids = []
 	for lb,ub in ranges:
@@ -34,16 +44,16 @@ def run(*given_ranges):
 	for t in threads:
 		t.join()
 	stop = timeit.default_timer()
+	print '\n'
 	if progress.has_failures():
 		print '=' * 30
-		print 'FAILURE\n%s' % progress.failure_msg
+		print 'FAILURE\n{0}'.format(progress.failure_msg)
 	else:
 		print 'OK'
-	print '\nRan {0} tests in {1:.3f}s\n'.format(number_tests - len(test_ids), stop - start)
+	print '\nRan {0} tests in {1:.3f}s'.format(number_tests - len(test_ids), stop - start)
 
 def get_ranges():
-	with quiet():
-		intervals = local('racket -S %s -S %s ilp-test.scm ranges' % (RACR_BIN, MQUAT_BIN), capture=True)
+	intervals = call_racket('ilp-test.scm', 'ranges')
 	if intervals.failed:
 		print "Could not get intervals"
 		print intervals.stdout
@@ -114,7 +124,7 @@ def read_solution(fname):
 	with open(fname) as fd:
 		for line in fd:
 			line = line.strip()
-			#print "line = >%s<" % line
+			#print "line = >{0}<".format(line)
 			if status == 0:
 				m = obj_matcher.search(line)
 				if m:
@@ -132,16 +142,16 @@ def read_solution(fname):
 					name  = m.group(2)
 					value = m.group(3)
 					sol[name] = float(value)
-					#print "found combined value line for '%s' = '%s'" % (name, value)
+					#print "found combined value line for '{0}' = '{1}'".format(name, value)
 					# stay in same status
 				else:
 					name = name_matcher.match(line).group(2)
-					#print "found name line for '%s'" % name
+					#print "found name line for '{0}'".format(name)
 					status = 3
 			elif status == 3: #value line
 				value = value_matcher.match(line).group(1)
 				sol[name] = float(value)
-				#print "found value line for '%s' = '%s'" % (name, value)
+				#print "found value line for '{0}' = '{1}'".format(name, value)
 				status = 2
 	return (obj,sol)
 
@@ -149,17 +159,15 @@ def write_solution(sol, fname):
 	with open(fname, 'w') as fd:
 		fd.write('(\n')
 		for key,value in sol.iteritems():
-			fd.write('("%s" . %s)\n' % (key, value))
+			fd.write('("{0}" . {1})\n'.format(key, value))
 		fd.write(')\n')
 
 class TestProgress:
-	
 	def __init__(self, test_ids):
 		self.failure_msg = None
 		self.available = True
 		self.C = threading.Condition()
 		self.test_ids = test_ids
-	
 	def next_nr(self):
 		self.C.acquire()
 		while not self.available:
@@ -170,13 +178,11 @@ class TestProgress:
 			nr = None
 		self.C.release()
 		return nr
-	
 	def failure(self, test_id, msg):
 		self.C.acquire()
-		self.failure_msg = 'Test-Case %d FAILED\n%s' % (test_id, msg)
+		self.failure_msg = 'Test-Case {0} FAILED\n{1}'.format(test_id, msg)
 		self.C.notify()
 		self.C.release()
-	
 	def has_failures(self):
 		return self.failure_msg is not None
 
@@ -193,33 +199,26 @@ def loop(progress, thread_id):
 				working = False
 				progress.failure(nr, e.message)
 #		progress.notify()
-
 	
 def assertTrue(expr, msg):
 	if not expr:
 		raise AssertionError(msg)
 
 def tmp_lp(thread_nr):
-	return "test/tmp_%s.lp" % thread_nr
+	return "test/tmp_{0}.lp".format(thread_nr)
 
 def solution_file(test_nr):
-	return "test/%s.sol" % test_nr
+	return "test/{0}.sol".format(test_nr)
 
 def scheme_solution_file(test_nr):
-	return "test/%s.scsol" % test_nr
+	return "test/{0}.scsol".format(test_nr)
 
 def lp_file(test_nr):
-	return "test/%s.lp" % test_nr
-
-def local_quiet(cmd):
-	""" Runs the command quietly, asserts successfull execution and returns stdout """
-	with quiet():
-		out = local(cmd, capture = True)
-		assertTrue(out.succeeded, '"%s" not successful, stdout:\n%s\nstderr:\n%s' % (cmd, out.stdout, out.stderr))
-		return out
+	return "test/{0}.lp".format(test_nr)
 
 def run_case(test_nr, thread_id):
-	sys.stdout.write(str(test_nr))
+	s = '{0}.'.format(test_nr)
+	sys.stdout.write(s)
 	sys.stdout.flush()
 	## Run Racket to generate ILP
 	fname_sol = solution_file(test_nr)
@@ -231,12 +230,12 @@ def run_case(test_nr, thread_id):
 			os.remove(fname_lp_racket)
 		if os.path.exists(fname_sol):
 			os.remove(fname_sol)
-		out = local_quiet('racket -S %s -S %s ilp-test.scm run %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, fname_lp_racket))
-		assertTrue(os.path.exists(fname_lp_racket), "ILP was not generated\n%s" % out)
+		out = call_racket('ilp-test.scm', 'run', test_nr, fname_lp_racket)
+		assertTrue(os.path.exists(fname_lp_racket), "ILP was not generated\n{0}".format(out))
 		shutil.move(fname_lp_racket, fname_lp_python)
 	
 	## Solve the ILP with glpsol
-	out = local_quiet('glpsol --lp %s -o %s' % (fname_lp_python, fname_sol))
+	out = local_quiet('glpsol --lp {0} -o {1}'.format(fname_lp_python, fname_sol))
 	assertTrue(os.path.exists(fname_sol), "No solution file created")
 	obj,sol = read_solution(fname_sol)
 	
@@ -248,7 +247,7 @@ def run_case(test_nr, thread_id):
 		pass
 	
 	## Check solution with Racket
-	local_quiet('racket -S %s -S %s ilp-test.scm check %s %s %s' % (RACR_BIN, MQUAT_BIN, test_nr, obj, fname_scheme_sol))
+	call_racket('ilp-test.scm', 'check', test_nr, obj, fname_scheme_sol)
 
 if __name__ == '__main__':
 	print run(sys.argv[1:])
