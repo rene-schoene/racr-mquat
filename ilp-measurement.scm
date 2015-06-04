@@ -2,12 +2,12 @@
 
 (library
  (mquat ilp-measurement)
- (export)
+ (export measurement-cli-call)
  (import (rnrs) (racr core) (srfi :19)
          (mquat ast) (mquat basic-ag) (mquat utils) (mquat main) (mquat ilp) (mquat ast-generation) (mquat ui))
  
  (define (dirname id)
-   (let ([id-s (number->string id)])
+   (let ([id-s (if (number? id) (number->string id) id)])
      (string-append (make-string (- 3 (string-length id-s)) #\0) id-s)))
  
  (define params
@@ -53,7 +53,8 @@
    (let* ([name (string-append "profiling/" id-s "/" suffix ".lp")]
           [result (time-it (lambda _ (=to-ilp ast)))])
      (save-to-file name (car result))
-     (save-to-file (string-append name ".time") (list (time-second (cdr result)) (time-nanosecond (cdr result))))))
+     (save-to-file (string-append name ".time") (list (car (command-line)) (time-second (cdr result))
+                                                      (time-nanosecond (cdr result))))))
 
  (define (cst id-s specs) ; [c]reate-[s]ystem-[t]imed
    (let* ([name (string-append "profiling/" id-s "/specs")]
@@ -75,18 +76,13 @@
      (rw* rt 'load #f ast) (sit id-s "07-every-comp-rand" ast)
      (rw* rt 'load #f ast) (sit id-s "08-every-comp-rand" ast)))
 
- (cond
-   [(find (lambda (arg) (string=? "all" arg)) (command-line))
-    (let ([was-debugging? debugging?])
-      (set!debugging #f)
-      (for-each run-test (map car params) (map cdr params))
-      (set!debugging was-debugging?))]
-   [(find (lambda (arg) (string=? "dirs" arg)) (command-line))
-    (set!debugging #f)
-    (for-each (lambda (entry) (display (car entry)) (display " ")) params)]
-   [(> (length (command-line)) 1)
-    (let ([ids (map dirname (cdr command-line))]
-          [was-debugging? debugging?])
-      (set!debugging #f)
-      (for-each run-test (ids) (map (lambda (id) (assq id params)) ids))
-      (set!debugging was-debugging?))]))
+ (define (print-usage) (error "measurement-cli-call" "No valid arguments found, either use 'all', 'dirs' or a number of ids."))
+ 
+ (define (measurement-cli-call command-line)
+   (cond
+     [(= 0 (length command-line)) (print-usage)]
+     [(string=? "all" (car command-line)) (for-each run-test (map car params) (map cdr params))]
+     [(string=? "dirs" (car command-line)) (for-each (lambda (entry) (display (car entry)) (display " ")) params)]
+     [else (let ([ids (map dirname command-line)])
+             (for-each run-test ids (map (lambda (id) (cdr (assoc id params))) ids)))])))
+ 

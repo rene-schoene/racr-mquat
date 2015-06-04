@@ -2,7 +2,7 @@
 
 (library
  (mquat ilp-test)
- (export run-test)
+ (export run-test test-cli-call)
  (import (rnrs) (racr core) (racr testing)
          (mquat utils) (mquat ilp) (mquat main) (mquat basic-ag) (mquat ast)
          (mquat constants) (mquat ast-generation) (mquat ui))
@@ -1118,24 +1118,23 @@
  (define (display-ranges)
    (display "1 16 30 36 100 126 200 207 300 301 400 404 500 503 600 605 700 702 900 907"))
  
- (if (< (length (command-line)) 2)
-     (begin
-       (display "Usage: ilp-test.scm action cmds")
-       (display " action = ranges → no cmds, outputs valid inclusive intervals for test case ids")
-       (display " action = run → cmds = id tmp-file, outputs nothing")
-       (display " action = check → cmds id objective-value file-name, outputs error messages on failures\n"))
-     (begin
-       (when (string=? "ranges" (cadr (command-line))) ; expect just "ranges"
-         (display-ranges))
-       (when (string=? "run" (cadr (command-line))) ; expect "run" id tmp-file
-         (set!debugging #f)
-         (let* ([cmds (cddr (command-line))]
-                [id-s (car cmds)]
-                [tmp-file (cadr cmds)])
-           (set! tmp-lp tmp-file)
-           (run-test id-s)))
-       (when (string=? "check" (cadr (command-line))) ; expect "check" id obj fname
-         (set!debugging #t)
-         (let* ([cmds (cddr (command-line))]
-                [id-s (car cmds)] [obj (string->number (cadr cmds))] [fname (caddr cmds)])
-           (check-test id-s obj fname))))))
+ (define (test-cli-call command-line)
+   (if (< (length command-line) 2)
+       (begin
+         (display "Parameters: action rest")
+         (display " action = ranges → no rest. outputs valid inclusive intervals for test case ids")
+         (display " action = run → rest = id tmp-file. outputs nothing")
+         (display " action = check → rest = id objective-value file-name. outputs error messages on failures\n"))
+       (begin
+         (when (string=? "ranges" (cadr command-line)) ; expect just "ranges"
+           (display-ranges))
+         (when (string=? "run" (cadr command-line)) ; expect "run" id tmp-file
+           (let* ([cmds (cddr command-line)]
+                  [id-s (car cmds)]
+                  [tmp-file (cadr cmds)])
+             (set! tmp-lp tmp-file)
+             (run-test id-s)))
+         (when (string=? "check" (cadr command-line)) ; expect "check" id obj fname
+           (let* ([cmds (cddr command-line)]
+                  [id-s (car cmds)] [obj (string->number (cadr cmds))] [fname (caddr cmds)])
+             (check-test id-s obj fname)))))))

@@ -3,24 +3,13 @@
 
 import re, threading, os, shutil, sys, timeit
 try:
-	from fabric.api import local, quiet, task
-	from fabric.colors import red
+	from fabric.api import task
 except ImportError:
-	from fabric_workaround import local, quiet, red, task
-from constants import RACR_BIN, MQUAT_BIN
+	from fabric_workaround import task
+from utils import local_quiet, call_racket
 
 run_racket = True
 NUM_PROCESSORS = 4
-
-def local_quiet(cmd):
-	""" Runs the command quietly, asserts successfull execution and returns stdout """
-	with quiet():
-		out = local(cmd, capture = True)
-		assertTrue(out.succeeded, '"{0}" not successful, stdout:\n{1}\nstderr:\n{2}'.format(cmd, out.stdout, out.stderr))
-		return out
-
-def call_racket(f, *args):
-	return local_quiet('plt-r6rs ++path {0} ++path {1} {2} {3}'.format(RACR_BIN, MQUAT_BIN, f, ' '.join(str(x) for x in args)))
 
 @task(default = True)
 def run(*given_ranges):
@@ -200,10 +189,6 @@ def loop(progress, thread_id):
 				progress.failure(nr, e.message)
 #		progress.notify()
 	
-def assertTrue(expr, msg):
-	if not expr:
-		raise AssertionError(msg)
-
 def tmp_lp(thread_nr):
 	return "test/tmp_{0}.lp".format(thread_nr)
 

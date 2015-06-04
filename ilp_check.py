@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 
-from ilp_test import read_solution
+import json, codecs
 try:
-	from fabric.api import local, task
+	from fabric.api import task
 except ImportError:
-	from fabric_workaround import local, task
-import json
-import codecs
+	from fabric_workaround import task
+from ilp_test import read_solution
 
 @task
 def get_new_sol_file(test_nr):

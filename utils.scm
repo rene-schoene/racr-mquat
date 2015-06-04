@@ -4,7 +4,7 @@
  (mquat utils)
  (export add-to-al merge-al union intersect-b ;associate lists
          lonely? recur ;ast
-         debug save-to-file time-it set!debugging debugging?) ;misc
+         debug save-to-file time-it cli-debugging-arg=? debugging?) ;misc
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (mquat constants))
  
@@ -49,10 +49,9 @@
  
 
  ;; Debugging
- 
- (define debugging #t)
- (define (set!debugging b)
-   (set! debugging b))
+
+ (define (cli-debugging-arg=? arg) (or (string=? "-v" arg) (string=? "--verbose" arg)))
+ (define debugging (find cli-debugging-arg=? (command-line)))
  (define (debugging?) debugging)
  ; Displays the given arguments
  (define (debug0 . args)

@@ -22,7 +22,53 @@
  (define (=ilp-nego-hw n)               (att-value 'ilp-nego-hw n))
  (define (=req-hw-properties n)         (att-value 'required-hw-properties n))
  (define (=ilp-nego-hw0 n comp prop pe) (att-value 'ilp-nego-hw0 n comp prop pe))
-
+ 
+ (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
+ ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
+ (define subs (list (list #\- #\_) (list #\+ #\_)))
+ (define (ilp-conform-name name)
+   (list->string (map (lambda (c) (let ([entry (assq c subs)]) (if entry (cadr entry) c)))
+                      (string->list name))))
+ 
+ (define (make-constraints provs max-reqs min-reqs request?)
+   (fold-left ; fold over provisions
+    (lambda (constraints prov-entry)
+      (let ([max-req-entry (assq (car prov-entry) max-reqs)]
+            [min-req-entry (assq (car prov-entry) min-reqs)])
+        (cons-if (and max-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
+                                                     (cadr max-req-entry) comp-max-eq request?))
+                 (cons-if (and min-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
+                                                              (cadr min-req-entry) comp-min-eq request?))
+                          constraints)))) (list) provs))
+ 
+ (define (make-constraint prov prov-entry req-entry comp request?)
+   (if request?
+       (append
+        (list (string-append "request("(=ilp-name prov) "_" (comp->name comp) "): "))
+        (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
+        (cons* (comp->rev-string comp) (car req-entry)))
+       (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
+              [f-prov (if (eq? comp comp-max-eq)
+                          ; prov for max: (maximum - val)
+                          (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint))
+                          (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
+              [f-req (if (eq? comp comp-max-eq)
+                         ; req for max: - (maximum - val) = val - maximum
+                         (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
+                         (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
+         (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
+         (append
+          (list (string-append (=ilp-name prov) "_" (comp->name comp) ": "))
+          (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
+          (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
+          (list ">= 0")))))
+ 
+ (define (cons-if x y) (if x (cons x y) y))
+ 
+ 
+ (define (save-ilp path root) (save-to-file path (=to-ilp root)))
+ (define (make-ilp root) (save-ilp "gen/ilp.txt" root))    
+ 
  (define (add-ilp-ags mquat-spec)
    (with-specification
     mquat-spec
@@ -80,8 +126,6 @@
     
     (ag-rule request-target? (Comp (lambda (n) (eq? (->target (<=request n)) n))))
     
-    (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
-    
     (ag-rule
      ilp-objective
      (Root
@@ -124,42 +168,6 @@
                (=ilp-nego-reqc (->target n) 'ProvClause comp-eq) ;provs
                (=ilp-nego-reqc n comp-max-eq) ;max-reqs
                (=ilp-nego-reqc n comp-min-eq) #t))))) ;min-reqs,request?
-     
-    (define (make-constraints provs max-reqs min-reqs request?)
-      (fold-left ; fold over provisions
-       (lambda (constraints prov-entry)
-         (let ([max-req-entry (assq (car prov-entry) max-reqs)]
-               [min-req-entry (assq (car prov-entry) min-reqs)])
-           (cons-if (and max-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
-                                                        (cadr max-req-entry) comp-max-eq request?))
-                    (cons-if (and min-req-entry (make-constraint (car prov-entry) (cadr prov-entry)
-                                                                 (cadr min-req-entry) comp-min-eq request?))
-                             constraints)))) (list) provs))
-    
-    (define (make-constraint prov prov-entry req-entry comp request?)
-      (if request?
-          (append
-           (list (string-append "request("(=ilp-name prov) "_" (comp->name comp) "): "))
-           (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
-           (cons* (comp->rev-string comp) (car req-entry)))
-          (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
-                 [f-prov (if (eq? comp comp-max-eq)
-                             ; prov for max: (maximum - val)
-                             (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint))
-                             (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
-                 [f-req (if (eq? comp comp-max-eq)
-                            ; req for max: - (maximum - val) = val - maximum
-                            (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
-                            (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
-            (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
-            (append
-             (list (string-append (=ilp-name prov) "_" (comp->name comp) ": "))
-             (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
-             (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
-             (list ">= 0")))))
-    
-    (define (cons-if x y) (if x (cons x y) y))
-    
     (ag-rule
      ilp-nego-reqc
      (Comp ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode of each impl
@@ -252,12 +260,6 @@
                                                        (=every-pe n)) result))
                     (list) (=every-mode n))))))
     
-    ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
-    (define subs (list (list #\- #\_) (list #\+ #\_)))
-    (define (ilp-conform-name name)
-      (list->string (map (lambda (c) (let ([entry (assq c subs)]) (if entry (cadr entry) c)))
-                         (string->list name))))
-    
     (ag-rule
      ilp-name
      (Property (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
@@ -279,8 +281,5 @@
                (ilp-conform-name (string-append "b#" (symbol->string (->name (<=comp impl)))
                                                 "#"  (if (lonely? impl) "" (symbol->string (->name (<=impl n))))
                                                 "#"  (if (lonely? n) "" (symbol->string (->name n)))
-                                                "#"  (symbol->string (->name pe))))))))))
- 
- (define (save-ilp path root) (save-to-file path (=to-ilp root)))
- (define (make-ilp root) (save-ilp "gen/ilp.txt" root)))
+                                                "#"  (symbol->string (->name pe)))))))))))
  

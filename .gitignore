@@ -1,7 +1,12 @@
+# Binaries
 racket-bin
+larceny-bin
+compile-stale
+*.pyc
+
+# Test and measurment directories and files
 test
 profiling/*
 !profiling/sol-header
 !profiling/gen-header
-*.pyc
 *.log

@@ -4,14 +4,16 @@ import sys, re, os, csv, timeit
 from datetime import datetime
 from glob import glob
 try:
+	from fabric.api import task
 	from fabric.colors import red
-	from fabric.api import local, hide, quiet, task
 except ImportError:
-	from fabric_workaround import task, local, hide, quiet, red
-from constants import RACR_BIN, MQUAT_BIN
+	from fabric_workaround import task, red
+from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion
+
+assertTrue = assertTrueAssertion
 
 class timed(object):
-	def __enter__(self, msg = ' done in {1:.3f}s'):
+	def __enter__(self, msg = ' done in {0:.3f}s'):
 		self.start = timeit.default_timer()
 		self.msg = msg
 		return self
@@ -19,17 +21,8 @@ class timed(object):
 		self.stop = timeit.default_timer() - self.start
 		print self.msg.format(self.stop)
 
-def checked_local(cmd, abort_on_error = True):
-	with quiet():
-		out = local(cmd, capture = True)
-	if out.failed:
-		print '"{0}" not successful, stdout:\n{1}\nstderr:\n{2}'.format(cmd, out.stdout, out.stderr)
-		if abort_on_error:
-			sys.exit(1)
-	return out
-
-def setup_profiling_dirs():
-	dirs = checked_local('plt-r6rs ++path {0} ++path {1} ilp-measurement.scm dirs'.format(RACR_BIN, MQUAT_BIN)).split()
+def setup_profiling_dirs(call_impl):
+	dirs = call_impl('cli.scm', 'measure', 'dirs').split()
 	if not os.path.exists('profiling'):
 		os.mkdir('profiling')
 	for d in dirs:
@@ -39,22 +32,30 @@ def setup_profiling_dirs():
 
 @task(name = 'racket-n')
 def racket_n(number, *dirs):
-	do_racket(number,dirs)
+	do_gen(call_racket, number, dirs)
 
 @task
 def racket(*dirs):
-	do_racket(1,dirs)
+	do_gen(call_racket, 1, dirs)
 
-def do_racket(number, dirs):
+@task(name = 'racket-n')
+def larceny_n(number, *dirs):
+	do_gen(call_larceny, number, dirs)
+
+@task
+def larceny(*dirs):
+	do_gen(call_larceny, 1, dirs)
+
+def do_gen(call_impl, number, dirs):
 	with timed():
-		setup_profiling_dirs()
+		setup_profiling_dirs(call_impl)
 		for _ in xrange(int(number)):
-			local('plt-r6rs ++path {0} ++path {1} ilp-measurement.scm {2}'.format(RACR_BIN, MQUAT_BIN, 'all' if dirs == () else ' '.join(dirs)))
+			call_impl('cli.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
 			print '\n'
-			conflate_results(skip_sol = True)
+			conflate_results(impl = 'racket' if call_impl == call_racket else 'larceny', skip_sol = True)
 
 gen_results = 'gen.csv'
-gen_header  = ['timestamp', 'dir', 'step', 'ilp-gen'] # generation of ilp
+gen_header  = ['timestamp', 'impl', 'dir', 'step', 'ilp-gen'] # generation of ilp
 gen_old_dir = '.old'
 
 sol_results = 'sol.csv'
@@ -101,7 +102,7 @@ def do_sol(solver, number, pathname, skip_conflate):
 						if not ilp.endswith('.lp'):
 							continue
 						start = timeit.default_timer()
-						out = checked_local(params[solver][0].format(lp = ilp, sol = ilp.replace('lp','sol')))
+						out = local_quiet(params[solver][0].format(lp = ilp, sol = ilp.replace('lp','sol')))
 						stop = timeit.default_timer()
 						today = datetime.today()
 						if re.search(params[solver][1], out):
@@ -121,7 +122,7 @@ def do_sol(solver, number, pathname, skip_conflate):
 		conflate_results(pathname = pathname, skip_gen = True)
 
 @task(name = 'conflate-results')
-def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
+def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impl = None):
 	if not skip_gen:
 		old_cd = os.getcwd()
 		dirs = glob('profiling/{0}/'.format(pathname))
@@ -148,20 +149,22 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 				for f in files:
 					mod = datetime.fromtimestamp(os.path.getctime(f))
 					with open(f) as fd:
-						gen_time = '.'.join(fd.readline().split())
-					row = [mod.isoformat(),dirname(d), f.split('.')[0], gen_time]
+						tokens = fd.readline().split()
+						impl = tokens[0].split('/')[-1]
+						gen_time = '.'.join(tokens[1:3])
+					row = [mod.isoformat(), impl, dirname(d), f.split('.')[0], gen_time]
 					#print row
 					writer.writerow(row)
 					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
 			os.chdir(old_cd)
 		print ' done'
-		local('tail -qn +2 profiling/gen-header profiling/*/{0} > profiling/all-gen-results.csv'.format(gen_results))
+		local_quiet('tail -qn +2 profiling/gen-header profiling/*/{0} > profiling/all-gen-results.csv'.format(gen_results), capture = False)
 
-	local('tail -n +1 profiling/*/specs > profiling/all-specs')
+	local_quiet('tail -n +1 profiling/*/specs > profiling/all-specs', capture = False)
 
 	if not skip_sol:
 		# sol-results
-		local('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/all-sol-results.csv'.format(sol_results))
+		local_quiet('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/all-sol-results.csv'.format(sol_results), capture = False)
 
 if __name__ == '__main__':
 	racket()
