@@ -4,9 +4,13 @@ larceny-bin
 compile-stale
 *.pyc
 
-# Test and measurment directories and files
+# Test and measurment directories, files and output
 test
 profiling/*
 !profiling/sol-header
 !profiling/gen-header
 *.log
+gen.pdf
+gen.png
+sol.pdf
+sol.png

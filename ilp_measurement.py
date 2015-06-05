@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, re, os, csv, timeit
+import sys, re, os, csv, timeit, shutil
 from datetime import datetime
 from glob import glob
 try:
@@ -52,7 +52,7 @@ def do_gen(call_impl, number, dirs):
 		for _ in xrange(int(number)):
 			call_impl('cli.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
 			print '\n'
-			conflate_results(impl = 'racket' if call_impl == call_racket else 'larceny', skip_sol = True)
+			conflate_results(skip_sol = True)
 
 gen_results = 'gen.csv'
 gen_header  = ['timestamp', 'impl', 'dir', 'step', 'ilp-gen'] # generation of ilp
@@ -122,7 +122,7 @@ def do_sol(solver, number, pathname, skip_conflate):
 		conflate_results(pathname = pathname, skip_gen = True)
 
 @task(name = 'conflate-results')
-def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impl = None):
+def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 	if not skip_gen:
 		old_cd = os.getcwd()
 		dirs = glob('profiling/{0}/'.format(pathname))
@@ -158,13 +158,16 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impl = 
 					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
 			os.chdir(old_cd)
 		print ' done'
-		local_quiet('tail -qn +2 profiling/gen-header profiling/*/{0} > profiling/all-gen-results.csv'.format(gen_results), capture = False)
+		local_quiet('tail -qn +2 profiling/*/{0} > profiling/all-gen-results'.format(gen_results), capture = False)
+		for impl in ['plt-r6rs', 'larceny']:
+			shutil.copy('profiling/gen-header', 'profiling/gen-{0}-results.csv'.format(impl))
+			local_quiet('grep {0} profiling/all-gen-results | sed "s/{0},//" >> profiling/gen-{0}-results.csv'.format(impl))
 
 	local_quiet('tail -n +1 profiling/*/specs > profiling/all-specs', capture = False)
 
 	if not skip_sol:
 		# sol-results
-		local_quiet('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/all-sol-results.csv'.format(sol_results), capture = False)
+		local_quiet('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/sol-glpk-results.csv'.format(sol_results), capture = False)
 
 if __name__ == '__main__':
 	racket()
