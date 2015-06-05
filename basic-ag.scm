@@ -3,12 +3,13 @@
 (library
  (mquat basic-ag)
  (export add-basic-ags
-         =req-comp-map =req-comp-min =req-comp-all =real =objective-val =clauses-met?
+         =value-attr =req-comp-map =req-comp-min =req-comp-all =real =objective-val =clauses-met?
          =eval =eval-on =value-of =actual-value =provided-clause =mode-to-use =selected? =deployed? =hw?
          <=request <=impl <=comp =every-pe =every-mode =every-impl =search-prov-clause =search-req-clause)
  (import (rnrs) (racr core)
          (mquat constants) (mquat utils) (mquat ast))
 
+ (define (=value-attr n)       (att-value 'value-attr n))
  (define (=req-comp-map n)     (att-value 'req-comp-map n))
  (define (=req-comp-min n)     (att-value 'req-comp-min n))
  (define (=req-comp-all n)     (att-value 'req-comp-all n))
@@ -44,6 +45,7 @@
     mquat-spec
     
     ;; Basic AG rules
+    (ag-rule value-attr (ProvClause (lambda (n) ((->value n)))))
 
     ; Returns a associate list, mapping required components to a list of implementations requiring that component
     (ag-rule
@@ -97,7 +99,7 @@
      (Comp       (lambda (n) (=clauses-met? (->selected-impl n))))
      (Impl       (lambda (n) (=clauses-met? (=mode-to-use n))))
      (Mode       (lambda (n) (for-all =clauses-met? (->* (->Clause* n)))))
-     (ReqClause  (lambda (n) ((->comparator n) (=eval n) (=actual-value n))))
+     (ReqClause  (lambda (n) ((comp->f (->comparator n)) (=eval n) (=actual-value n))))
      (ProvClause (lambda (n) #t)) ; Provision clauses are always fulfilled
      (Request    (lambda (n) (for-all =clauses-met? (->* (->Constraints n))))))
     

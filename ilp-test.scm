@@ -1112,7 +1112,7 @@
        [(202 203) (test-obj 50 obj id)] ;15+35
        [(206)     (test-obj 55 obj id)] ;15+40
        [(204 205) (test-obj 70 obj id)] ;25+45
-       [(402 501 503 600 900 901 902 903 904 905 906 907) (test-assert "Objective not zero." (eq? 0.0 obj))]
+       [(402 501 503 600 900 901 902 903 904 905 906 907) (test-assert "Objective not zero." (= 0.0 obj))]
        [else (error #f "Unknown test case id for objectives" id)])))
  
  (define (display-ranges)

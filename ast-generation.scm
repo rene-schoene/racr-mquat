@@ -20,8 +20,9 @@
  
  (define (call-n-times proc n) (letrec ([cnt (lambda (n) (if (>= 0 n) (list) (cons (proc n) (cnt (- n 1)))))]) (cnt n)))
  (define (random n) (random-integer n))
- (define (rand maxVal digits offset) (let ([factor (expt 10 digits)])
-                                    (lambda _ (+ offset (inexact (/ (random (* factor maxVal)) factor))))))
+ (define (rand maxVal digits offset) (let* ([factor (expt 10 digits)]
+                                            [val (+ offset (inexact (/ (random (* factor maxVal)) factor)))])
+                                       (lambda _ val)))
  
  (define (something v) v)
  (define (make-prov property comparator value) (:ProvClause mquat-spec property comparator value))

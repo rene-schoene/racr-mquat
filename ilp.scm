@@ -30,6 +30,7 @@
    (list->string (map (lambda (c) (let ([entry (assq c subs)]) (if entry (cadr entry) c)))
                       (string->list name))))
  
+ (define (comp-name comp) (ilp-conform-name (comp->name comp)))
  (define (make-constraints provs max-reqs min-reqs request?)
    (fold-left ; fold over provisions
     (lambda (constraints prov-entry)
@@ -44,7 +45,7 @@
  (define (make-constraint prov prov-entry req-entry comp request?)
    (if request?
        (append
-        (list (string-append "request("(=ilp-name prov) "_" (comp->name comp) "): "))
+        (list (string-append "request(" (=ilp-name prov) "_" (comp-name comp) "): "))
         (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
         (cons* (comp->rev-string comp) (car req-entry)))
        (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
@@ -58,16 +59,14 @@
                          (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
          (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
          (append
-          (list (string-append (=ilp-name prov) "_" (comp->name comp) ": "))
+          (list (string-append (=ilp-name prov) "_" (comp-name comp) ": "))
           (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
           (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
           (list ">= 0")))))
  
  (define (cons-if x y) (if x (cons x y) y))
- 
- 
  (define (save-ilp path root) (save-to-file path (=to-ilp root)))
- (define (make-ilp root) (save-ilp "gen/ilp.txt" root))    
+ (define (make-ilp root) (save-ilp "gen/ilp.txt" root))
  
  (define (add-ilp-ags mquat-spec)
    (with-specification
@@ -223,7 +222,7 @@
                       (lambda (val) (prepend-sign (- maximum val))) ; for max: (maximum - val)
                       (lambda (val) (prepend-sign val)))]) ; for other: val
           (append (list (string-append (=ilp-name n) "_" (=ilp-name prop) "_"
-                                       (=ilp-name pe) "_" (comp->name comp) ": "))
+                                       (=ilp-name pe) "_" (comp-name comp) ": "))
                   (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
                   (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
                                                             (->type pe)) pe)))))))

@@ -36,7 +36,22 @@
               (list 21 90 0 70 2 2)
               (list 22 90 0 80 2 2)
               (list 23 90 0 90 2 2))))
-   
+ 
+ (define (valf val) (lambda _ val))
+ 
+ (define (check-value-is-static ast)
+   (let* ([first-res (car (->* (->SubResources (->HWRoot ast))))]
+          [val-0 ((->value (car (->* (->ProvClause* first-res)))))]
+          [val-1 ((->value (car (->* (->ProvClause* first-res)))))])
+     (when (not (= val-0 val-1)) (error "check-value-is-static" "Value is not static" val-0 val-1))))
+
+ (define (check-attribut-is-flushed-to val ast res-name restype prop-name)
+   (let ([attr-val (=value-attr (=provided-clause (find (lambda (pe) (eq? (->name pe) res-name))
+                                                              (=every-pe ast)) prop-name restype))])
+     (when (not (= val attr-val))
+       (error "check-attribut-is-flushed-to" "Value is not equal" val attr-val))))
+
+ 
  (define (rw comp-name restype prop-name new-value ast)
 ;   (debug comp-name prop-name new-value ast)
    (rewrite-terminal 'value (=provided-clause (find (lambda (pe) (eq? (->name pe) comp-name))
@@ -45,8 +60,9 @@
  
  (define (rw* restype prop-name new-value? ast)
    (for-each
-    (lambda (pe) (rewrite-terminal 'value (=provided-clause pe prop-name restype)
-                                   (if new-value? (lambda _ new-value?) (rand 1 3 0))))
+    (lambda (pe)
+      (let ([f (if new-value? (valf new-value?) (rand 1 3 0))])
+       (rewrite-terminal 'value (=provided-clause pe prop-name restype) f)))
     (=every-pe ast)))
  
  (define (sit id-s suffix ast) ; [s]ave-[i]lp-[t]imed
@@ -68,10 +84,14 @@
      (display id-s) (display " ") (flush-output-port (current-output-port))
      (sit id-s "01-init" ast)
      (rw 'res-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast)
+     (check-attribut-is-flushed-to 0.1 ast 'res-1 rt 'load) ;<-larceny bug tracking
      (rw 'res-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast)
+     (check-attribut-is-flushed-to 0.5 ast 'res-1 rt 'load) ;<-larceny bug tracking
      (rw 'res-1 rt 'load 0.8 ast) (rw 'res-2 rt 'load 0.8 ast) (rw 'res-3 rt 'load 0.8 ast)
      (sit id-s "04-three-comps" ast)
+     (check-attribut-is-flushed-to 0.8 ast 'res-1 rt 'load) ;<-larceny bug tracking
      (rw* rt 'load 0.1 ast) (sit id-s "05-every-comp" ast)
+     (check-value-is-static ast) ;<-larceny bug tracking
      (rw* rt 'load #f ast) (sit id-s "06-every-comp-rand" ast)
      (rw* rt 'load #f ast) (sit id-s "07-every-comp-rand" ast)
      (rw* rt 'load #f ast) (sit id-s "08-every-comp-rand" ast)))
