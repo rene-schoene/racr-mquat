@@ -67,11 +67,11 @@ def dirname(d):
 	return os.path.split(os.path.dirname(d))[-1]
 
 @task
-def sol(solver, pathname = '*', skip_conflate = False):
+def sol(solver = 'glpsol', pathname = '*', skip_conflate = False):
 	do_sol(solver, 1, pathname, skip_conflate)
 
-@task(name = 'glpsol-n')
-def sol_n(solver, number, pathname = '*', skip_conflate = False):
+@task(name = 'sol-n')
+def sol_n(number, solver = 'glpsol', pathname = '*', skip_conflate = False):
 	do_sol(number, pathname, skip_conflate)
 
 params = { 'glpsol' : ['glpsol --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
