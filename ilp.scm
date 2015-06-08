@@ -197,6 +197,7 @@
     (ag-rule combined-reqs (Mode (lambda (n) (append (->* (->Clause* n))
                                                      (->* (->Constraints (<=request n)))))))
     
+    ; TODO "extract" pe from here and put into ilp-nego-hw0, thus removing one parameter from the latter
     (ag-rule
      ilp-nego-hw
      (Comp

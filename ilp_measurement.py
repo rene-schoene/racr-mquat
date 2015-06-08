@@ -51,8 +51,9 @@ def do_gen(call_impl, number, dirs):
 		setup_profiling_dirs(call_impl)
 		for _ in xrange(int(number)):
 			call_impl('cli.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
+#			call_impl('larceny_profiling.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
 			print '\n'
-			conflate_results(skip_sol = True)
+#			conflate_results(skip_sol = True)
 
 gen_results = 'gen.csv'
 gen_header  = ['timestamp', 'impl', 'dir', 'step', 'ilp-gen'] # generation of ilp
@@ -122,7 +123,7 @@ def do_sol(solver, number, pathname, skip_conflate):
 		conflate_results(pathname = pathname, skip_gen = True)
 
 @task(name = 'conflate-results')
-def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
+def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs'):
 	if not skip_gen:
 		old_cd = os.getcwd()
 		dirs = glob('profiling/{0}/'.format(pathname))
@@ -159,7 +160,7 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False):
 			os.chdir(old_cd)
 		print ' done'
 		local_quiet('tail -qn +2 profiling/*/{0} > profiling/all-gen-results'.format(gen_results), capture = False)
-		for impl in ['plt-r6rs', 'larceny']:
+		for impl in impls.split(':'):
 			shutil.copy('profiling/gen-header', 'profiling/gen-{0}-results.csv'.format(impl))
 			local_quiet('grep {0} profiling/all-gen-results | sed "s/{0},//" >> profiling/gen-{0}-results.csv'.format(impl))
 

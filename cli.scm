@@ -8,6 +8,6 @@
 
 (cond
   [(= 0 (length cmds)) (print-usage)]
-  [(string=? "test" (car cmds)) (test-cli-call (cdr (command-line)))]
+  [(string=? "test" (car cmds)) (test-cli-call (cdr cmds))]
   [(string=? "measure" (car cmds)) (measurement-cli-call (cdr cmds))]
   [else (print-usage)])
