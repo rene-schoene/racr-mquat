@@ -21,7 +21,11 @@
                 ((n clausetype comp)    (att-value 'ilp-nego-reqc n clausetype comp))))
  (define (=ilp-nego-hw n)               (att-value 'ilp-nego-hw n))
  (define (=req-hw-properties n)         (att-value 'required-hw-properties n))
- (define (=ilp-nego-hw0 n comp prop pe) (att-value 'ilp-nego-hw0 n comp prop pe))
+ (define (=req-hw-clauses n)            (att-value 'required-hw-clauses n))
+ (define (=every-clause n)              (att-value 'every-clause n))
+ (define =ilp-nego-hw0
+   (case-lambda ((n comp prop)          (att-value 'ilp-nego-hw0 n comp prop))
+                ((n comp prop pe)       (att-value 'ilp-nego-hw0 n comp prop pe))))
  
  (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
  ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
@@ -57,7 +61,7 @@
                          ; req for max: - (maximum - val) = val - maximum
                          (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
                          (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
-         (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
+;         (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
          (append
           (list (string-append (=ilp-name prov) "_" (comp-name comp) ": "))
           (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
@@ -67,6 +71,16 @@
  (define (cons-if x y) (if x (cons x y) y))
  (define (save-ilp path root) (save-to-file path (=to-ilp root)))
  (define (make-ilp root) (save-ilp "gen/ilp.txt" root))
+ 
+ (define (eq-pair? p1 p2) (and (eq? (car p1) (car p2)) (eq? (cdr p1) (cdr p2))))
+ (define (add-to-al-paired al key val op)
+   (if (null? al) (list (list key (op val (list)))) ; make new entry
+       (let ([entry (car al)])
+         (if (eq-pair? (car entry) key)
+             (cons (list key (op val (cadr entry))) (cdr al)) ; add to entry and return
+             (cons entry (add-to-al-paired (cdr al) key val op)))))) ; recur
+ (define (merge-paired-al al1 al2)
+   (fold-left (lambda (big-al entry) (add-to-al-paired big-al (car entry) (cadr entry) append)) al1 al2))
  
  (define (add-ilp-ags mquat-spec)
    (with-specification
@@ -100,6 +114,7 @@
      (Comp
       (lambda (n)
         (debug "Comp:" (->name n))
+;        (display (=req-hw-clauses n))
         (cons
          (fold-left
           (lambda (result entry)
@@ -197,47 +212,55 @@
     (ag-rule combined-reqs (Mode (lambda (n) (append (->* (->Clause* n))
                                                      (->* (->Constraints (<=request n)))))))
     
-    ; TODO "extract" pe from here and put into ilp-nego-hw0, thus removing one parameter from the latter
     (ag-rule
      ilp-nego-hw
      (Comp
       (lambda (n)
         (fold-left
-         (lambda (result cp) ;[c]omparator+[p]roperty
+         (lambda (result entry) ; entry = {(comparator . property) { clauses }}
            (append
             (fold-left
-             (lambda (inner pe) (cons (=ilp-nego-hw0 n (car cp) (cadr cp) pe) inner))
+             (lambda (inner pe) (cons (=ilp-nego-hw0 n (caar entry) (cdar entry) pe) inner))
              (list) (=every-pe n))
             result))
-         (list) (=req-hw-properties n)))))
+         (list) (=req-hw-clauses n)))))
     
     (ag-rule
      ilp-nego-hw0
      (Comp
       (lambda (n comp prop pe)
-        (let* ([lop (fold-left ;here we have a [l]ist [o]f [p]airs (evaled-prop mode-on-pe-name)
-                     (lambda (result impl) (append (=ilp-nego-hw0 impl comp prop pe) result))
-                     (list) (->* (->Impl* n)))]
-               [maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 lop))]
-               [f (if (eq? comp comp-max-eq)
-                      (lambda (val) (prepend-sign (- maximum val))) ; for max: (maximum - val)
-                      (lambda (val) (prepend-sign val)))]) ; for other: val
-          (append (list (string-append (=ilp-name n) "_" (=ilp-name prop) "_"
-                                       (=ilp-name pe) "_" (comp-name comp) ": "))
-                  (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
-                  (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
-                                                            (->type pe)) pe)))))))
-     (Impl (lambda (n comp prop pe) (recur n append =ilp-nego-hw0 ->Mode* comp prop pe)))
-     (Mode (lambda (n comp prop pe) (recur n append =ilp-nego-hw0 ->Clause* comp prop pe)))
+        (debug "hw0-comp" (->name n) comp (->name prop) (->name pe))
+            (let* ([cp (cons comp prop)]
+                   [__ (begin (debug (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))
+                              (debug (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))))]
+                   [lop (fold-left ;here we have a [l]ist [o]f [p]airs (evaled-prop mode-on-pe-name)
+                         (lambda (result cl) (append (=ilp-nego-hw0 cl comp prop pe) result))
+                         (list) (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n))))]
+                   [maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 lop))]
+                   [f (if (eq? comp comp-max-eq)
+                          (lambda (val) (prepend-sign (- maximum val))) ; for max: (maximum - val)
+                          (lambda (val) (prepend-sign val)))]) ; for other: val
+              (append (list (string-append (=ilp-name n) "_" (=ilp-name prop) "_"
+                                           (=ilp-name pe) "_" (comp-name comp) ": "))
+                      (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
+                      (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
+                                                                (->type pe)) pe)))))))
      (Clause
       (lambda (n comp prop pe)
         (let ([real-return-type (=real (->return-type n))])
-          (if (and (eq? prop real-return-type)
-                   (eq? comp (->comparator n))
+          (debug "hw0-clause" (->name real-return-type) comp (->name prop) (->name pe))
+          (if ;(and (eq? prop real-return-type)
+              ;     (eq? comp (->comparator n))
                    (or (eq? (->type pe) (<<- real-return-type))
-                       (ast-subtype? (<<- real-return-type) 'HWRoot)))
-              (list (list (=eval-on n pe) (=ilp-binvar-deployed (<<- n) pe)))
+                       (ast-subtype? (<<- real-return-type) 'HWRoot));)
+              (list (list (=eval-on n (->type pe)) (=ilp-binvar-deployed (<<- n) pe)))
               (list)))))) ;empty pair if not a suitable clause
+    
+    (ag-rule
+     every-clause
+     (Comp (lambda (n) (recur n union =every-clause ->Impl*)))
+     (Impl (lambda (n) (recur n union =every-clause ->Mode*)))
+     (Mode (lambda (n) (->* (->Clause* n)))))
     
     (ag-rule
      required-hw-properties
@@ -249,6 +272,17 @@
         (let ([prop (=real (->return-type n))])
           (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
               (list (list (->comparator n) prop)) (list))))))
+    
+    (ag-rule
+     required-hw-clauses ; computes {(comp . prop) {clause1 .. clauseN} ... } for each comp and prop + clauseI has comp and prop
+     (Comp (lambda (n) (recur n merge-paired-al =req-hw-clauses ->Impl*)))
+     (Impl (lambda (n) (recur n merge-paired-al =req-hw-clauses ->Mode*)))
+     (Mode (lambda (n) (recur n merge-paired-al =req-hw-clauses ->Clause*)))
+     (Clause
+      (lambda (n)
+        (let ([prop (=real (->return-type n))])
+          (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
+              (list (list (cons (->comparator n) prop) (list n))) (list))))))
     
     (ag-rule
      ilp-binary-vars
