@@ -6,7 +6,7 @@
          lonely? recur ;ast
          debug save-to-file time-it cli-debugging-arg=? debugging?) ;misc
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
-         (mquat constants))
+         (mquat constants) (mquat properties))
  
  ; Either cons val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
  (define (add-to-al al key val) (add-to-al0 al key val cons))
@@ -49,10 +49,11 @@
  
 
  ;; Debugging
-
+ 
  (define (cli-debugging-arg=? arg) (or (string=? "-v" arg) (string=? "--verbose" arg)))
- (define debugging (find cli-debugging-arg=? (command-line)))
+ (define debugging verbose?)
  (define (debugging?) debugging)
+
  ; Displays the given arguments
  (define (debug0 . args)
   (letrec

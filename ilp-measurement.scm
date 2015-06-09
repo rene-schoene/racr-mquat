@@ -4,7 +4,8 @@
  (mquat ilp-measurement)
  (export measurement-cli-call)
  (import (rnrs) (racr core) (srfi :19)
-         (mquat ast) (mquat basic-ag) (mquat utils) (mquat main) (mquat ilp) (mquat ast-generation) (mquat ui))
+         (mquat ast) (mquat basic-ag) (mquat utils) (mquat main) (mquat ilp)
+         (mquat ast-generation) (mquat properties))
  
  (define (dirname id)
    (let ([id-s (if (number? id) (number->string id) id)])
@@ -66,9 +67,10 @@
     (=every-pe ast)))
  
  (define (sit id-s suffix ast) ; [s]ave-[i]lp-[t]imed
+   (debug "sit:" suffix)
    (let* ([name (string-append "profiling/" id-s "/" suffix ".lp")]
           [result (time-it (lambda _ (=to-ilp ast)))])
-     (save-to-file name (car result))
+     (when write-ilp? (save-to-file name (car result)))
      (save-to-file (string-append name ".time") (list (car (command-line)) (time-second (cdr result))
                                                       (time-nanosecond (cdr result))))))
 
@@ -78,23 +80,25 @@
      (save-to-file name (cons* (time-second (cdr result)) (time-nanosecond (cdr result)) specs))
      (car result)))
  
+ (define (display+flush s) (display s) (flush-output-port (current-output-port)))
+ 
  (define (run-test id-s specs)
    (let* ([ast (cst id-s specs)]
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))])
-     (display id-s) (display " ") (flush-output-port (current-output-port))
+     (display id-s) (display+flush " ")
      (sit id-s "01-init" ast)
-     (rw 'res-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast)
-     (check-attribut-is-flushed-to 0.1 ast 'res-1 rt 'load) ;<-larceny bug tracking
-     (rw 'res-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast)
-     (check-attribut-is-flushed-to 0.5 ast 'res-1 rt 'load) ;<-larceny bug tracking
+     (rw 'res-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.1 ast 'res-1 rt 'load) ;<-larceny bug tracking
+     (rw 'res-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.5 ast 'res-1 rt 'load) ;<-larceny bug tracking
      (rw 'res-1 rt 'load 0.8 ast) (rw 'res-2 rt 'load 0.8 ast) (rw 'res-3 rt 'load 0.8 ast)
-     (sit id-s "04-three-comps" ast)
-     (check-attribut-is-flushed-to 0.8 ast 'res-1 rt 'load) ;<-larceny bug tracking
-     (rw* rt 'load 0.1 ast) (sit id-s "05-every-comp" ast)
-     (check-value-is-static ast) ;<-larceny bug tracking
-     (rw* rt 'load #f ast) (sit id-s "06-every-comp-rand" ast)
-     (rw* rt 'load #f ast) (sit id-s "07-every-comp-rand" ast)
-     (rw* rt 'load #f ast) (sit id-s "08-every-comp-rand" ast)))
+     (sit id-s "04-three-comps" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.8 ast 'res-1 rt 'load) ;<-larceny bug tracking
+     (rw* rt 'load 0.1 ast) (sit id-s "05-every-comp" ast) (display+flush ".")
+;     (check-value-is-static ast) ;<-larceny bug tracking
+     (rw* rt 'load #f ast) (sit id-s "06-every-comp-rand" ast) (display+flush ".")
+     (rw* rt 'load #f ast) (sit id-s "07-every-comp-rand" ast) (display+flush ".")
+     (rw* rt 'load #f ast) (sit id-s "08-every-comp-rand" ast) (display+flush ".")))
 
  (define (print-usage) (error "measurement-cli-call" "No valid arguments found, either use 'all', 'dirs' or a number of ids."))
  
