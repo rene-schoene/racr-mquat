@@ -37,9 +37,8 @@
                   (list) ;other-reqs
                   energy-c2
                   (lambda (lomp target) ;dynamic value for energy
-                    (let ([mp-size (=value-of lomp 'size)]
-                          [deployed-kind (->type target)])
-                      (if (eq? deployed-kind Cubieboard)
+                    (let ([mp-size (=value-of lomp 'size)])
+                      (if (eq? target Cubieboard)
                           (* 3 (log mp-size))
                           (* 1.5 mp-size))))
                   rt-C2 (lambda _ 0.5) ;response-time
@@ -69,9 +68,8 @@
               (list)
               energy-c1
               (lambda (lomp target) ;energy
-                (let ([mp-size (=value-of lomp 'size)]
-                      [deployed-kind (->type target)])
-                  (if (eq? deployed-kind Cubieboard)
+                (let ([mp-size (=value-of lomp 'size)])
+                  (if (eq? target Cubieboard)
                       (* 10 (log mp-size))
                       (* 2 mp-size))))
               rt-C1 (lambda _ 0.4) ;response-time

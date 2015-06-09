@@ -68,7 +68,7 @@
     (ast-rule 'Comp->name-Impl*-selectedimpl-Property*)
     (ast-rule 'Impl->name-Mode*-reqcomps-deployedon-selectedmode)
     (ast-rule 'Mode->name-Clause*)
-    ;value is a lambda expecting two values, an AST-List-Node with MetaParameters and the target resource, returning the value
+    ;value is a function, expecting an AST-List-Node with MetaParameters and the target resource type, returning the value
     ;comp is a lambda expecting two values, required and actual, returning #t or #f
     (ast-rule 'Clause->returntype-comp-value)
     ; target is either a Comp or a ResourceType

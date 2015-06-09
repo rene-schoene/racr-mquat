@@ -592,7 +592,7 @@
    ; dynamical value functions within modes (type-0:res-2 → max load 0.7, type-1:res-1,res-3 → max load 0.3)
    ; Normally only deployable on resource of type-0 (which is only res-2)
    (let* ([hw-types (lambda (res-name) (if (or (eq? res-name 'res-1) (eq? res-name 'res-3)) 1 #f))]
-          [load-f (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 0.3 0.7))]
+          [load-f (lambda (lomp target) (if (eq? (->name target) 'type-1) 0.3 0.7))]
           [sw-clauses (lambda _ (lambda (p comp-nr) (if (eq? load-name p) (list make-req comp-max-eq load-f)
                                                         ((no-freq-sw-clauses) p comp-nr))))]
           [ast (create-system 3 0 1 2 2 (list #f sw-clauses no-freq-hw-clauses hw-types))])
@@ -612,11 +612,11 @@
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
        [(402) ; Dynamic provision value for requested property, on type-1 it's 7, on type-0 it's 3
         ; Expected outcome: No solution, since provision only met on type-1, but all modes only deployable on type-0-resources
-        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 7 3)))
+        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name target) 'type-1) 7 3)))
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
        [(403) ; Dynamic provision value for requested property only for first three modes
         ; Expected outcome: mode-1-2-2 on res-2
-        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name (->type target)) 'type-1) 7 3))
+        (change-sw-prov ast 'prop-1 (lambda (lomp target) (if (eq? (->name target) 'type-1) 7 3))
                         'mode-1-1-1 'mode-1-1-2 'mode-1-2-1)
         (change-sw-prov ast 'prop-1 (lambda (lomp target) 7) 'mode-1-2-2)
         (change-req-constraint ast 'prop-1 comp-min-eq 5)]
@@ -756,7 +756,8 @@
    ; General description: Tree hardware structure with different hardware types on each level
    ; Top level has 3 PEs and type-0, second level has 9 PEs and type-1, third level has 18 PEs and type-2
    (let* ([type-nr (lambda (res-name) (/ (- (string-length (symbol->string res-name)) 5) 2))]
-          [load-f (lambda (lomp target) (case (type-nr (->name target)) [(0) 0.2] [(1) 0.4] [(2) 0.7]))]
+          [name->type-nr (lambda (type-name) (string->number (substring (symbol->string type-name) 5)))]
+          [load-f (lambda (lomp target) (case (name->type-nr (->name target)) [(0) 0.2] [(1) 0.4] [(2) 0.7]))]
           [sw-clauses (lambda _ (lambda (p comp-nr) (if (eq? load-name p) (list make-req comp-max-eq load-f)
                                                         ((no-freq-sw-clauses) p comp-nr))))]
           [ast (create-system 30 3 1 1 2 (list #f sw-clauses no-freq-hw-clauses type-nr))])
@@ -1118,23 +1119,24 @@
  (define (display-ranges)
    (display "1 16 30 36 100 126 200 207 300 301 400 404 500 503 600 605 700 702 900 907"))
  
+ (define (print-testing-usage)
+   (display "Parameters: action rest")
+   (display " action = ranges → no rest. outputs valid inclusive intervals for test case ids")
+   (display " action = run → rest = id tmp-file. outputs nothing")
+   (display " action = check → rest = id objective-value file-name. outputs error messages on failures\n"))
+ 
  (define (test-cli-call command-line)
-   (if (< (length command-line) 2)
-       (begin
-         (display "Parameters: action rest")
-         (display " action = ranges → no rest. outputs valid inclusive intervals for test case ids")
-         (display " action = run → rest = id tmp-file. outputs nothing")
-         (display " action = check → rest = id objective-value file-name. outputs error messages on failures\n"))
-       (begin
-         (when (string=? "ranges" (cadr command-line)) ; expect just "ranges"
-           (display-ranges))
-         (when (string=? "run" (cadr command-line)) ; expect "run" id tmp-file
-           (let* ([cmds (cddr command-line)]
-                  [id-s (car cmds)]
-                  [tmp-file (cadr cmds)])
-             (set! tmp-lp tmp-file)
-             (run-test id-s)))
-         (when (string=? "check" (cadr command-line)) ; expect "check" id obj fname
-           (let* ([cmds (cddr command-line)]
-                  [id-s (car cmds)] [obj (string->number (cadr cmds))] [fname (caddr cmds)])
-             (check-test id-s obj fname)))))))
+   (cond
+     [(= 0 (length command-line)) (error "test-cli-call" "No valid arguments found, try 'help'")]
+     [(string=? "ranges" (car command-line)) (display-ranges)] ; expect just "ranges"
+     [(string=? "run" (car command-line)) ; expect "run" id tmp-file
+      (let* ([cmds (cdr command-line)]
+             [id-s (car cmds)]
+             [tmp-file (cadr cmds)])
+        (set! tmp-lp tmp-file)
+        (run-test id-s))]
+     [(string=? "check" (car command-line)) ; expect "check" id obj fname
+      (let* ([cmds (cdr command-line)]
+             [id-s (car cmds)] [obj (string->number (cadr cmds))] [fname (caddr cmds)])
+        (check-test id-s obj fname))]
+     [else (print-testing-usage)])))
