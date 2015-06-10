@@ -5,7 +5,7 @@ try:
 	from fabric.api import task
 except ImportError:
 	from fabric_workaround import task
-from ilp_test import read_solution
+from ilp_test import read_solution, _lp_file, _solution_file
 
 @task
 def get_new_sol_file(test_nr):
@@ -17,7 +17,7 @@ def get_new_lp_file(test_nr):
 
 @task
 def new_sol(test_nr):
-	_, sol = read_solution(ILPTest.solution_file(test_nr))
+	_, sol = read_solution(_solution_file(test_nr))
 	with open(get_new_sol_file(test_nr), 'w') as fd:
 		json.dump(sol, fd, indent=0)
 
@@ -25,7 +25,7 @@ def new_sol(test_nr):
 def eval(test_nr):
 	with open(get_new_sol_file(test_nr)) as fd:
 		sol = json.load(fd)
-	with open(ILPTest.lp_file(test_nr)) as fd:
+	with open(_lp_file(test_nr)) as fd:
 		out = make_subs(fd.read(), sol)
 	with codecs.open(get_new_lp_file(test_nr), 'w', encoding = "utf-8") as fd:
 		for line in out:

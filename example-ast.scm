@@ -4,7 +4,7 @@
  (mquat example-ast)
  (export example-ast comp1 comp2 impl1a impl1b impl1c cb1 cb2)
  (import (rnrs) (racr core)
-         (mquat ast) (mquat basic-ag) (mquat constants) (mquat main) (mquat ui))
+         (mquat ast) (mquat basic-ag) (mquat constants) (mquat main) (mquat ui) (mquat utils))
  
  (define example-ast
    (let* ([make-simple-prop ; kind=runtime, direction=decreasing
@@ -89,8 +89,8 @@
             (list comp2) #f #f)]
           [comp1 (:Comp mquat-spec 'Example-Component (list c1-impl1a c1-impl1b c1-impl1c) c1-impl1a (list rt-C1 energy-c1))])
      (:Root mquat-spec
-            (:HWRoot mquat-spec (list Cubieboard) (list cubie1 cubie2))
-            (:SWRoot mquat-spec (list comp1 comp2))
+            (:HWRoot mquat-spec (list Cubieboard) (list cubie1 cubie2) (list))
+            (:SWRoot mquat-spec (list comp1 comp2) (list energy))
             (:Request mquat-spec (list (make-mp-size 50)) comp1
                       (list (:ReqClause mquat-spec rt-C1 comp-max-eq (lambda _ 0.3))) #f))))
  
