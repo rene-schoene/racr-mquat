@@ -3,8 +3,8 @@
 (library
  (mquat ilp)
  (export add-ilp-ags save-ilp make-ilp =to-ilp)
- (import (rnrs) (racr core) (racr testing)
-         (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
+ (import (rnrs) (racr core) (srfi :19)
+         (mquat properties) (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
  
  (define (=to-ilp n)                    (att-value 'to-ilp n))
  (define (=ilp-name n)                  (att-value 'ilp-name n))
@@ -52,14 +52,13 @@
         (list (string-append "request(" (=ilp-name prov) "_" (comp-name comp) "): "))
         (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
         (cons* (comp->rev-string comp) (car req-entry)))
-       (let* ([maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 (append prov-entry req-entry)))]
-              [f-prov (if (eq? comp comp-max-eq)
+       (let* ([f-prov (if (eq? comp comp-max-eq)
                           ; prov for max: (maximum - val)
-                          (lambda (constraint val name) (cons* (prepend-sign (- maximum val)) name constraint))
+                          (lambda (constraint val name) (cons* (prepend-sign (- (=maximum prov) val)) name constraint))
                           (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
               [f-req (if (eq? comp comp-max-eq)
                          ; req for max: - (maximum - val) = val - maximum
-                         (lambda (constraint val name) (cons* (prepend-sign (- val maximum)) name constraint))
+                         (lambda (constraint val name) (cons* (prepend-sign (- val (=maximum prov))) name constraint))
                          (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
 ;         (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
          (append
@@ -81,6 +80,16 @@
              (cons entry (add-to-al-paired (cdr al) key val op)))))) ; recur
  (define (merge-paired-al al1 al2)
    (fold-left (lambda (big-al entry) (add-to-al-paired big-al (car entry) (cadr entry) append)) al1 al2))
+
+ (define (maybe-names l) (map (lambda (x) (if (and (ast-node? x) (ast-has-child? 'name x)) (->name x) x)) l))
+ (define times (list))
+ (define (ctf att-name f . args) ; [c]ons [t]imed [f]unction
+   (if timing? (let ([result (time-it (lambda _ (apply f args)))])
+                 (set! times (cons (list (current-date-formatted) att-name (time-second (cdr result))
+                                                 (time-nanosecond (cdr result)) (maybe-names args)) times))
+                 (car result))
+       (apply f args)))
+ (define (write-result-list prefix ext) (when timing? (save-to-file (date-file-name prefix ext) times)))
  
  (define (add-ilp-ags mquat-spec)
    (with-specification
@@ -89,28 +98,33 @@
     ;;; ILP-Creation rules
     
     ; Return a list of 1 objective, some constraints, some bounds and some generals, everything
-    ; packed inside a list, e.g. one constraint is also a list.
+    ; packed inside a list, e.g. one constraint is also a list. ;(write-result-list "profiling/nego-hw" "time" nego-hw-times)
     (ag-rule
      to-ilp
      (Root
       (lambda (n)
-        (let ([binary-vars (=ilp-binary-vars n)])
-          (list
-           (list "Minimize")
-           (=ilp-objective n)
-           (list "Subject To")
-           (append
-            (=to-ilp (<=request n)) ; request-constraints
-            (=to-ilp (->SWRoot n)) ; archtitecture-constraints
-            (=ilp-nego n)) ; NFP-negotiation
-           (list "Bounds")
-           (append
-            (map (lambda (var) (list 0 "<=" var "<=" 1)) binary-vars))
-           (list "Generals")
-           binary-vars
-           (list "End")))))
+        (let* ([binary-vars (=ilp-binary-vars n)]
+               [result
+                (list
+                 (list "Minimize")
+                 (=ilp-objective n)
+                 (list "Subject To")
+                 (append
+                  (=to-ilp (<=request n)) ; request-constraints
+                  (=to-ilp (->SWRoot n)) ; archtitecture-constraints
+                  (=ilp-nego n)) ; NFP-negotiation
+                 (list "Bounds")
+                 (append
+                  (map (lambda (var) (list 0 "<=" var "<=" 1)) binary-vars))
+                 (list "Generals")
+                 binary-vars
+                 (list "End"))])
+               (write-result-list "profiling/att-measure" "time")
+               result)))
      (Request (lambda (n) (=ilp-nego-sw n)))
-     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))
+;     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))
+     (SWRoot (lambda (n) (fold-left (lambda (result c) (append (=to-ilp c) result))
+                                    (list) (=every-comp n))))
      (Comp
       (lambda (n)
         (debug "Comp:" (->name n))
@@ -158,7 +172,9 @@
     (ag-rule
      ilp-nego
      (Root (lambda (n) (remove (list) (=ilp-nego (->SWRoot n))))) ; remove empty constraints
-     (SWRoot (lambda (n) (recur n append =ilp-nego ->Comp*)))
+;     (SWRoot (lambda (n) (recur n append =ilp-nego ->Comp*)))
+     (SWRoot (lambda (n) (fold-left (lambda (result c) (append (=ilp-nego c) result))
+                                    (list) (=every-comp n))))
      (Comp (lambda (n) (append (=ilp-nego-sw n)
                                (=ilp-nego-hw n)))))
     
@@ -220,7 +236,7 @@
          (lambda (result entry) ; entry = {(comparator . property) { clauses }}
            (append
             (fold-left
-             (lambda (inner pe) (cons (=ilp-nego-hw0 n (caar entry) (cdar entry) pe) inner))
+             (lambda (inner pe) (cons (ctf "ilp-nego-hw0" =ilp-nego-hw0 n (caar entry) (cdar entry) pe) inner))
              (list) (=every-pe n))
             result))
          (list) (=req-hw-clauses n)))))
@@ -231,14 +247,13 @@
       (lambda (n comp prop pe)
         (debug "hw0-comp" (->name n) comp (->name prop) (->name pe))
             (let* ([cp (cons comp prop)]
-                   [__ (begin (debug (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))
-                              (debug (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))))]
+;                   [__ (begin (debug (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))
+;                              (debug (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))))]
                    [lop (fold-left ;here we have a [l]ist [o]f [p]airs (evaled-prop mode-on-pe-name)
                          (lambda (result cl) (append (=ilp-nego-hw0 cl comp prop pe) result))
                          (list) (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n))))]
-                   [maximum (+ 1 (fold-left (lambda (max-val pair) (max (car pair) max-val)) 0 lop))]
                    [f (if (eq? comp comp-max-eq)
-                          (lambda (val) (prepend-sign (- maximum val))) ; for max: (maximum - val)
+                          (lambda (val) (prepend-sign (- (=maximum prop) val))) ; for max: (maximum - val)
                           (lambda (val) (prepend-sign val)))]) ; for other: val
               (append (list (string-append (=ilp-name n) "_" (=ilp-name prop) "_"
                                            (=ilp-name pe) "_" (comp-name comp) ": "))
@@ -255,12 +270,6 @@
                        (ast-subtype? (<<- real-return-type) 'HWRoot));)
               (list (list (=eval-on n (->type pe)) (=ilp-binvar-deployed (<<- n) pe)))
               (list)))))) ;empty pair if not a suitable clause
-    
-    (ag-rule
-     every-clause
-     (Comp (lambda (n) (recur n union =every-clause ->Impl*)))
-     (Impl (lambda (n) (recur n union =every-clause ->Mode*)))
-     (Mode (lambda (n) (->* (->Clause* n)))))
     
     (ag-rule
      required-hw-properties

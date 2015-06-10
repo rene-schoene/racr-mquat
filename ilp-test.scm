@@ -909,7 +909,7 @@
      (for-each (lambda (key) (debug key ":" (hashtable-ref table key #f))) (vector->list (hashtable-keys table)))
      ; impl deployment
      (case id
-       [(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 500 502 601 700 701 702)
+       [(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 500 502 601 605 700 701 702)
                               (check-impl 1 (1 *))]
        [(30 100 101 105 108 109 110 111 112 116 119 120 121 122 129 400 404)
                               (check-impl 1 (1 (1)))
@@ -931,8 +931,6 @@
        [(402 902 903)         (check-impl 0 (1 (1 2)))]
        [(501 503 600 900 901) (check-impl 0 (1 *))]
        [(603 604)             (check-impl 1 (1 2 *))]
-       [(605)                 (check-impl 1 (1 *))
-                              (check-impl 0 (2 *))]
        [(904 905)             (check-impl 0 (1 2 (1 2)))]
        [(906 907)             (check-impl 0 (1 2 3 (1 2)))]
        [else (error #f "Unknown test case id for impls" id)])
@@ -1076,8 +1074,7 @@
                       (check-mode 1 (2 (* (* (2)))))
                       (check-mode 0 (2 (* (* (1)))))]
        [(605)         (check-mode 1 (1 (* (1 (1 2)))))
-                      (check-mode 0 (1 (* (2 (1 2)))))
-                      (check-mode 0 (2 (* (* (1 2)))))]
+                      (check-mode 0 (1 (* (2 (1 2)))))]
        [(700)         (check-mode 1 (1 (* (1 ((mrl3 (list 1 2 3) (list 1 2 3) (list 1 2)))))))
                       (check-mode 0 (1 (* (1 ((append (mrl2 (list 1 2 3) (list 1 2 3)) (list 1 2 3)))))))
                       (check-mode 0 (1 (* (2 ((append (mrl3 (list 1 2 3) (list 1 2 3) (list 1 2))

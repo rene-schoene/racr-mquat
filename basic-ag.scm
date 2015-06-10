@@ -5,7 +5,8 @@
  (export add-basic-ags
          =value-attr =req-comp-map =req-comp-min =req-comp-all =real =objective-val =clauses-met?
          =eval =eval-on =value-of =actual-value =provided-clause =mode-to-use =selected? =deployed? =hw?
-         <=request <=impl <=comp =every-pe =every-mode =every-impl =search-prov-clause =search-req-clause)
+         <=request <=impl <=comp =search-prov-clause =search-req-clause =maximum
+         =every-pe =every-comp =every-impl =every-mode =every-sw-clause =every-hw-clause)
  (import (rnrs) (racr core)
          (mquat constants) (mquat utils) (mquat ast))
 
@@ -31,14 +32,24 @@
  (define (=deployed? n)        (att-value 'deployed? n))
  (define (=hw? n)              (att-value 'hw? n))
  (define (=every-pe n)         (att-value 'every-pe n))
- (define (=every-mode n)       (att-value 'every-mode n))
+ (define (=every-res-type n)   (att-value 'every-res-type n))
+ (define (=resources-of n)     (att-value 'resources-of n))
+ (define (=every-comp n)       (att-value 'every-comp n))
  (define (=every-impl n)       (att-value 'every-impl n))
+ (define (=every-mode n)       (att-value 'every-mode n))
+ (define (=every-req-clause n comp)
+                               (att-value 'every-req-clause n comp))
+ (define (=every-prov-clause n comp)
+                               (att-value 'every-prov-clause n comp))
+ (define (=every-sw-clause n)  (att-value 'every-sw-clause n))
+ (define (=every-hw-clause n)  (att-value 'every-hw-clause n))
  (define (=search-prov-clause n name) (att-value 'search-clause n name 'ProvClause))
  (define (=search-req-clause n name)  (att-value 'search-clause n name 'ReqClause))
+ (define (=lookup-clause n prop)      (att-value 'lookup-clause n prop))
+ (define (=maximum n)          (att-value 'maximum n))
+ (define (=max-help n arg0)    (att-value 'max-help n arg0))
 
- ;; only used internally
- (define (=res* n)      (att-value 'res* n))
- (define (=sw* n what)  (att-value 'sw* n what))
+ (define (if? val def)         (if val val def))
 
  (define (add-basic-ags mquat-spec)
    (with-specification
@@ -144,6 +155,13 @@
      ; Search through Clauses to find a ProvClause with matching name
      (Mode (lambda (n name) (=search-prov-clause n name))))
     
+    (ag-rule
+     lookup-clause
+     (Resource
+      (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->return-type cl)))) (->ProvClause* n))))
+     (Mode
+      (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->return-type cl)))) (->Clause* n)))))
+    
     ; Returns a clause, both for a property with the given name and having the given subtype (ReqClause or ProvClause)
     (ag-rule
      search-clause
@@ -191,28 +209,68 @@
     ; Return either the selected-mode or the first mode
     (ag-rule mode-to-use (Impl (lambda (n) (or (->selected-mode n) (ast-child 1 (->Mode* n))))))
     
+    ; Return every requirement clauses referencing this property and using the given comparator
+    (ag-rule
+     every-req-clause
+     (Property
+      (lambda (n comparator)
+        (fold-left (lambda (result cl) (if (and (eq? comparator (->comparator cl)) (ast-subtype? n 'ReqClause)
+                                                (eq? n (=real (->return-type cl)))) (cons cl result) result))
+                   (list) (=every-sw-clause n)))))
+    
+    ; Return every provision clauses referencing this property and using the given comparator
+    (ag-rule
+     every-prov-clause
+     (Property
+      (lambda (n comparator)
+        (fold-left (lambda (result cl) (if (and (eq? comparator (->comparator cl)) (ast-subtype? n 'ProvClause)
+                                                (eq? n (=real (->return-type cl)))) (cons cl result) result))
+                   (list) (append (=every-sw-clause n) (=every-hw-clause n))))))
+    
     ; Returns #t, if the property belongs to a ResourceType or to the HWRoot (i.e. a general hardware property)
     (ag-rule hw? (Property (lambda (n) (let ([parent (<<- (=real n))])
                                          (or (ast-subtype? parent 'ResourceType) (ast-subtype? parent 'HWRoot))))))
 
-    ; Returns a list containing every resource
-    (ag-rule every-pe (Root (lambda (n) (=res* (->HWRoot n)))))
-    
-    (ag-rule ; Search through AST and find resources recursively
-     res*
-     (HWRoot    (lambda (n) (fold-left (lambda (result res) (append (=res* res) result)) (list) (->* (->SubResources n)))))
-     (Resource  (lambda (n) (fold-left (lambda (result res) (append (=res* res) result)) (list n) (->* (->SubResources n))))))
-    
-    ; Returns a list containing every mode
-    (ag-rule every-mode (Root (lambda (n) (=sw* (->SWRoot n) 0))))
-    
-    ; Returns a list containing every implementation
-    (ag-rule every-impl (Root (lambda (n) (=sw* (->SWRoot n) 1))))
-    
-    (ag-rule ; Search through AST and find either Impls (what = 0) or Modes (what = 1)
-     sw*
-     (SWRoot (lambda (n what) (fold-left (lambda (result comp) (append (=sw* comp what) result)) (list) (->* (->Comp* n)))))
-     (Comp   (lambda (n what) (fold-left (lambda (result impl) (append (=sw* impl what) result)) (list) (->* (->Impl* n)))))
-     (Impl   (lambda (n what) (case what
-                                [(0) (->* (->Mode* n))]
-                                [(1) (list n)])))))))
+    (ag-rule ; Returns a list containing every resource
+     every-pe
+     (Root     (lambda (n) (recur n append =every-pe (lambda (m) (->SubResources (->HWRoot m))))))
+     (Resource (lambda (n) (cons n (recur n append =every-pe ->SubResources)))))
+
+    ; Returns a list containing every resource type
+    (ag-rule every-res-type (Root (lambda (n) (->* (->ResourceType* (->HWRoot n))))))
+
+    ; Returns all resources of the type
+    (ag-rule resources-of (ResourceType (lambda (n) (filter (lambda (pe) (eq? n (->type pe))) (=every-pe n)))))
+
+    (ag-rule ; Returns a list containing every component, that may be needed for the request
+     every-comp
+     (Root (lambda (n) (=every-comp (->target (<=request n)))))
+     (Comp (lambda (n) (cons n (fold-left (lambda (result c) (append (=every-comp c) result))
+                                          (list) (=req-comp-all n))))))
+
+    (ag-rule ; Returns a list containing every implementation, that may be needed for the request
+     every-impl
+     (Root (lambda (n) (=every-impl (->target (<=request n)))))
+     (Comp (lambda (n) (append (->* (->Impl* n)) (fold-left (lambda (result c) (append (=every-impl c) result))
+                                                            (list) (=req-comp-all n))))))
+
+    ; Returns a list containing every mode, that may be needed for the request
+    (ag-rule every-mode (Root (lambda (n) (fold-left (lambda (result impl) (append (->* (->Mode* impl)) result))
+                                                     (list) (=every-impl n)))))
+
+    (ag-rule ; Returns a list containing every SW clause
+     every-sw-clause
+     (Root (lambda (n) (fold-left (lambda (result mode) (append (->* (->Clause* mode)) result)) (list) (=every-mode n)))))
+
+    (ag-rule ; Returns a list containing every HW clause
+     every-hw-clause
+     (Root (lambda (n) (fold-left (lambda (result pe) (append (->* (->ProvClause* pe)) result)) (list) (=every-pe n)))))
+
+    (ag-rule ; Returns the maximum value for this property for clauses with comp-max-eq as comparator
+     maximum (Property (lambda (n) (+ 1 (apply max (map (lambda (type) (att-value 'max-help n type)) (=every-res-type n)))))))
+
+    (ag-rule ; Helper-Attribute for maximum
+     max-help
+     (Property (lambda (n type) (apply max (map (lambda (cl) (if cl (=eval-on cl type) 0))
+                                                (append (=max-help type n) (=every-req-clause n comp-max-eq))))))
+     (ResourceType (lambda (n prop) (map (lambda (pe) (=lookup-clause pe prop)) (=resources-of n))))))))
