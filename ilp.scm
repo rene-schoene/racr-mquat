@@ -23,9 +23,8 @@
  (define (=req-hw-properties n)         (att-value 'required-hw-properties n))
  (define (=req-hw-clauses n)            (att-value 'required-hw-clauses n))
  (define (=every-clause n)              (att-value 'every-clause n))
- (define =ilp-nego-hw0
-   (case-lambda ((n comp prop)          (att-value 'ilp-nego-hw0 n comp prop))
-                ((n comp prop pe)       (att-value 'ilp-nego-hw0 n comp prop pe))))
+ (define (=ilp-nego-hw0 n comp prop pe) (att-value 'ilp-nego-hw0 n comp prop pe))
+ (define (=ilp-nego-hw1 n pe)           (att-value 'ilp-nego-hw1 n pe))
  
  (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
  ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
@@ -250,7 +249,7 @@
 ;                   [__ (begin (debug (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))
 ;                              (debug (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))))]
                    [lop (fold-left ;here we have a [l]ist [o]f [p]airs (evaled-prop mode-on-pe-name)
-                         (lambda (result cl) (append (=ilp-nego-hw0 cl comp prop pe) result))
+                         (lambda (result cl) (append (=ilp-nego-hw1 cl pe) result))
                          (list) (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n))))]
                    [f (if (eq? comp comp-max-eq)
                           (lambda (val) (prepend-sign (- (=maximum prop) val))) ; for max: (maximum - val)
@@ -259,15 +258,15 @@
                                            (=ilp-name pe) "_" (comp-name comp) ": "))
                       (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
                       (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
-                                                                (->type pe)) pe)))))))
+                                                                (->type pe)) pe))))))))
+    (ag-rule
+     ilp-nego-hw1
      (Clause
-      (lambda (n comp prop pe)
+      (lambda (n pe)
         (let ([real-return-type (=real (->return-type n))])
-          (debug "hw0-clause" (->name real-return-type) comp (->name prop) (->name pe))
-          (if ;(and (eq? prop real-return-type)
-              ;     (eq? comp (->comparator n))
-                   (or (eq? (->type pe) (<<- real-return-type))
-                       (ast-subtype? (<<- real-return-type) 'HWRoot));)
+          (debug "hw0-clause" (->name real-return-type) (->name pe))
+          (if (or (eq? (->type pe) (<<- real-return-type))
+                  (ast-subtype? (<<- real-return-type) 'HWRoot))
               (list (list (=eval-on n (->type pe)) (=ilp-binvar-deployed (<<- n) pe)))
               (list)))))) ;empty pair if not a suitable clause
     
