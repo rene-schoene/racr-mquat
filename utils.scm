@@ -2,9 +2,10 @@
 
 (library
  (mquat utils)
- (export add-to-al merge-al union intersect-b ;associate lists
-         lonely? recur ;ast
-         debug save-to-file time-it cli-debugging-arg=? debugging?) ;misc
+ (export add-to-al merge-al union intersect-b ; associate lists
+         lonely? recur ; ast
+         save-to-file time-it current-date-formatted date-file-name ; measurement
+         debug cli-debugging-arg=? debugging?) ; debug
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (mquat constants) (mquat properties))
  
@@ -114,4 +115,16 @@
  (define (time-it proc)
   (let ([before (current-time)])
     (let ([result (proc)])
-      (cons result (time-difference (current-time) before))))))
+      (cons result (time-difference (current-time) before)))))
+ 
+ (define (current-date-formatted)
+   (let ([now (current-date)])
+     (string-append (number->string (date-year now)) "_"
+                    (number->string (date-month now)) "_"
+                    (number->string (date-day now)) "T"
+                    (number->string (date-hour now)) "_"
+                    (number->string (date-minute now)) "_"
+                    (number->string (date-second now)) "_"
+                    (number->string (date-nanosecond now)))))
+ 
+ (define (date-file-name prefix ext) (string-append prefix (current-date-formatted) "." ext)))

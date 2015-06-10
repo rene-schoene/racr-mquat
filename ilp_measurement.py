@@ -170,6 +170,10 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 		# sol-results
 		local_quiet('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/sol-glpk-results.csv'.format(sol_results), capture = False)
 
+@task(name = 'clean-att-measures')
+def clean_att_measures():
+	local_quiet('rm profiling/att-measure*.time')
+
 if __name__ == '__main__':
 	racket()
 	glpsol()
