@@ -67,7 +67,7 @@
                             id (type (if type-nr? type-nr? 0)) (make-subs id total subs)
                             (filter something (list (create-hw-clause ud-clauses id load)
                                                     (create-hw-clause ud-clauses id freq))))))])
-     (let ([subs (make-subs 'res num-pe (if (= 0 num-subs) num-pe num-subs))])
+     (let ([subs (make-subs 'r num-pe (if (= 0 num-subs) num-pe num-subs))])
        (:HWRoot mquat-spec (map cdr types-al) subs (list load freq)))))
  
  ; udfs: function (mode-name → function (property → clause))
@@ -109,7 +109,7 @@
                          (if (eq? args #t) (set! args (default-sw-clause-gen (->name real-property) comp-nr)))
                          (if args ((car args) real-property (cadr args) (caddr args)) #f)) #f)))]
             [ps (prop comp)]
-            [name (node-name 'mode (cons mode impl-lon))]
+            [name (node-name 'm (cons mode impl-lon))]
             [cls (filter something (list (create-sw-clause ud-clauses name comp load)
                                          (create-sw-clause ud-clauses name comp freq)
                                          (create-sw-clause ud-clauses name comp (car ps))
@@ -118,12 +118,12 @@
        (:Mode mquat-spec name (if req-cl? (cons req-cl? cls) cls))))
    (define (make-impl comp impl)
      (let* ([lon (list impl comp)]
-            [name (node-name 'impl lon)]
+            [name (node-name 'i lon)]
             [does-req? (and last-comp-nr (reqc name))])
        (:Impl mquat-spec name
               (call-n-times (lambda (mode) (make-mode comp lon mode does-req? (= 1 impl))) mode-per-impl) ; Mode*
               (if does-req? (list last-comp) (list)) #f #f))) ; reqcomps selected-mode deployed-on
-   (define (make-comp comp) (:Comp mquat-spec (node-name 'comp (list comp))
+   (define (make-comp comp) (:Comp mquat-spec (node-name 'c (list comp))
                                    (call-n-times (lambda (impl) (make-impl comp impl)) impl-per-comp) #f
                                    (prop comp)))
    (let ([sw-root (:SWRoot
