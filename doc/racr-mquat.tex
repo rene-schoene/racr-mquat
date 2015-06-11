@@ -4,27 +4,80 @@
 \title{RACR - MQuAT}
 \subtitle{The journey has just begun}
 \author{René Schöne}
-\institute{Fakultät Informattik. Institut für Software- und Multimediatechnik. Lehrstuhl Softwaretechnologie}
+\faculty{Fakultät Informatik}
+\institute{Institut für Software- und Multimediatechnik}
+\chair{Lehrstuhl Softwaretechnologie}
 \date{\today}
 
 % more preamble...
 \usepackage[T1]{fontenc}
 \usepackage{babel}
 \usepackage{selinput}
-
+\usepackage{luacode}
 \usepackage{longtable}
 \usepackage{booktabs}
+\bibliographystyle{alpha}
+
+\begin{luacode*}
+	newline = function()
+		return "\n";
+	end
+	tab = function()
+		return "\t";
+	end
+\end{luacode*}
+
+
+\newcommand{\oppcomment}[1]{\directlua{
+
+	if (notestring == nil) then
+		notestring = "<notes>" .. newline();
+		init = 1;
+	end
+	notestring = notestring
+		.. tab() .. "<note number ='\insertpagenumber'>" .. newline()
+		.. "SLIDE" .. tab() .. " \insertframenumber"  .. newline();
+%	if ("\secname" == "") then
+%	notestring = notestring .. newline()
+%	else
+%		notestring = notestring	.. "SECTION" .. tab() .. " \thesection " .. " - \secname " .. newline()
+%	end
+%	if ("\subsecname" == "") then
+%	notestring = notestring .. newline()
+%	else
+%	notestring = notestring	.. "SUBSEC" .. tab() .. " \thesubsection " .. " - \subsecname " .. newline()
+%	end
+
+	notestring = notestring	.. "SEC" .. tab() .. " \thesection "  .. newline()
+	notestring = notestring	.. "SUBSEC" .. tab() .. " \thesubsection " .. newline()
+
+	local content = "#1";
+	notestring = notestring
+		.. newline()
+		.. "==================================================" .. newline() .. newline()
+	    .. content:gsub("<br/>", newline()) .. newline()
+	    .. tab() .. "</note>" .. newline();
+}}
+
+%
+
+\newcommand{\oppend}{\directlua{
+	if notestring == nil
+	then
+	else
+	assert(io.open("notes.xml", 'w')):write(notestring  .. " </notes> ");
+	end
+}}
 
 \begin{document}
-%\begin{frame}
-\maketitle
-%\end{frame}
 
-\begin{frame}
-\frametitle{Outline}
-\tableofcontents[subsectionstyle=show,subsubsectionstyle=hide]
-\end{frame}
+\maketitle
 
 \input{"presentation.tex"}
+
+\begin{frame}
+\frametitle{References}
+\bibliography{refs}
+\end{frame}
 
 \end{document}

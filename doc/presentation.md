@@ -14,32 +14,41 @@ comment:
 # Start and Problems
 ## Where we started
 
+- MQuAT concept
+	- Self-adaptive system optimizing for multiple qualities
+	- Component-based design for both hardware and software
+	- Quality contracts capturing requirements and guarantees of components
 - THEATRE as a Java-based implementation of MQuAT
 	- Knowledge represented with EMF-Models
 	- Optimization problem solved by transformation to ILP
-	- capable of distributed operation (see HAECubie) using Master-Slave-Pattern [ref?]
+	- Designed for distributed operation (see HAECubie) using Master-Slave-Pattern \cite{sahni1996scheduling}
 
 ## What was the problem
 
 - ILP-Solution branded "unuseable" for bigger systems
-	- current measurements disprove this, see next slide
-	- generation however still started from skretch for each request
-		- measurements on Cubieboards still todo for new approach
+	- current measurements disprove this, see next slides
+	- ILP still generated from skretch for each request
+	- measurements on Cubieboards still to be done for new approach
 - EMF-Model (element)s somewhat ambiguous or superfluous
 	- component requirement possible both, on component- and on mode-level
 	- structure and variant model contain similar information
 	- general approach of structural model not easy to use (especially for ILP-Generation)
 
+\oppcomment{%
+- similar information: subcomponents/subresources <br/>%
+- general approach not easy to use: assumptions (mostly implicit) made for structural model (e.g. for ILP-Generation: containers are servers with one level of subresources) <br/>%
+}
+
 ## What was the problem (2)
 
-- Quick measurement
-	- context: Java-based System Generator to generate ILP, solved by lp\_solve and glpk
-	- format of ILP needed to be adopted for glpk ← Python script
+- Measurement on solving times
+	- Context: Java-based System Generator to generate ILP for increasing size of systems, solved by lp\_solve and glpk
+	- Format of ILP adopted for glpk via own Python script
 - Result
-	- bad solver (lp\_solve): 14/23 timed out at 2 minutes, others solved took 0.003–80s
-	- good solver (glpk): all solved within 3 seconds
+	- lpsolve: 14/23 timed out at 2 minutes, others solved took 0.003 to 80s
+	- glpk: all solved within 3 seconds
 - Further investigation needed
-	- both solvers did not compute the same solution
+	- Both solvers do not compute the same solution
 
 ## What was the problem (3)
 
@@ -105,21 +114,8 @@ SUM:                             25            287            293           2694
 	- Describe multiple systems and their interaction
 	- Include behaviour model
 
----
+\oppcomment{%
+- vision slides <br/>%
+}
 
-# Notes
-
-## Where we started
-
-## What was the problem
-
-- similar information: subcomponents/subresources
-- general approach not easy to use: assumptions (mostly implicit) made for structural model (e.g. for ILP-Generation: containers are servers with one level of subresources)
-
-## What was the idea to solve the problem
-
-## How that this improved the existing work
-
-## Where we should go next
-
-- vision slides
+\oppend
