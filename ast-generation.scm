@@ -5,7 +5,7 @@
  (export create-hw create-sw create-system rand
          freq-name load-name mp-name node-name make-prov make-req)
  (import (rnrs) (racr core) (srfi :27)
-         (mquat constants) (mquat ast) (mquat basic-ag) (mquat main) (mquat utils))
+         (mquat constants) (mquat ast) (mquat basic-ag) (mquat join) (mquat utils))
  
  ;;; Reusable nodes and names
  (define load-name 'load)

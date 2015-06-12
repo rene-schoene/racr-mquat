@@ -4,7 +4,7 @@
  (mquat ilp-measurement)
  (export measurement-cli-call)
  (import (rnrs) (racr core) (srfi :19)
-         (mquat ast) (mquat basic-ag) (mquat utils) (mquat main) (mquat ilp)
+         (mquat ast) (mquat basic-ag) (mquat utils) (mquat join) (mquat ilp)
          (mquat ast-generation) (mquat properties))
  
  (define (dirname id)
@@ -87,13 +87,13 @@
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))])
      (display id-s) (display+flush " ")
      (sit id-s "01-init" ast)
-     (rw 'res-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
-;     (check-attribut-is-flushed-to 0.1 ast 'res-1 rt 'load) ;<-larceny bug tracking
-     (rw 'res-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast) (display+flush ".")
-;     (check-attribut-is-flushed-to 0.5 ast 'res-1 rt 'load) ;<-larceny bug tracking
-     (rw 'res-1 rt 'load 0.8 ast) (rw 'res-2 rt 'load 0.8 ast) (rw 'res-3 rt 'load 0.8 ast)
+     (rw 'r-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.1 ast 'r-1 rt 'load) ;<-larceny bug tracking
+     (rw 'r-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.5 ast 'r-1 rt 'load) ;<-larceny bug tracking
+     (rw 'r-1 rt 'load 0.8 ast) (rw 'r-2 rt 'load 0.8 ast) (rw 'r-3 rt 'load 0.8 ast)
      (sit id-s "04-three-comps" ast) (display+flush ".")
-;     (check-attribut-is-flushed-to 0.8 ast 'res-1 rt 'load) ;<-larceny bug tracking
+;     (check-attribut-is-flushed-to 0.8 ast 'r-1 rt 'load) ;<-larceny bug tracking
      (rw* rt 'load 0.1 ast) (sit id-s "05-every-comp" ast) (display+flush ".")
 ;     (check-value-is-static ast) ;<-larceny bug tracking
      (rw* rt 'load #f ast) (sit id-s "06-every-comp-rand" ast) (display+flush ".")

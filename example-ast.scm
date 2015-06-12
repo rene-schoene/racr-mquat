@@ -4,7 +4,7 @@
  (mquat example-ast)
  (export example-ast comp1 comp2 impl1a impl1b impl1c cb1 cb2)
  (import (rnrs) (racr core)
-         (mquat ast) (mquat basic-ag) (mquat constants) (mquat main) (mquat ui) (mquat utils))
+         (mquat ast) (mquat basic-ag) (mquat constants) (mquat join) (mquat ui) (mquat utils))
  
  (define example-ast
    (let* ([make-simple-prop ; kind=runtime, direction=decreasing

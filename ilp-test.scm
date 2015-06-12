@@ -4,7 +4,7 @@
  (mquat ilp-test)
  (export run-test test-cli-call)
  (import (rnrs) (racr core) (racr testing)
-         (mquat utils) (mquat ilp) (mquat main) (mquat basic-ag) (mquat ast)
+         (mquat utils) (mquat ilp) (mquat join) (mquat basic-ag) (mquat ast)
          (mquat constants) (mquat ast-generation) (mquat ui))
  ;; Testing generated ILP, whether correct results are computed for small models
  
@@ -756,7 +756,8 @@
    ; General description: Tree hardware structure with different hardware types on each level
    ; Top level has 3 PEs and type-0, second level has 9 PEs and type-1, third level has 18 PEs and type-2
    (let* ([type-nr (lambda (res-name) (/ (- (string-length (symbol->string res-name)) 3) 2))]
-          [name->type-nr (lambda (type-name) (string->number (substring (symbol->string type-name) 5)))]
+          [name->type-nr (lambda (type-name) (let ([tns (symbol->string type-name)])
+                                               (string->number (substring tns 5 (string-length tns)))))]
           [load-f (lambda (lomp target) (case (name->type-nr (->name target)) [(0) 0.2] [(1) 0.4] [(2) 0.7]
                                           [else (error "load-f" "wrong type" (->name target))]))]
           [sw-clauses (lambda _ (lambda (p comp-nr) (if (eq? load-name p) (list make-req comp-max-eq load-f)
@@ -912,10 +913,10 @@
      (case id
        [(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 500 502 601 605 700 701 702)
                               (check-impl 1 (1 *))]
-       [(30 100 101 105 108 109 110 111 112 116 119 120 121 122 129 400 404)
+       [(30 100 101 105 108 109 110 111 112 116 119 120 121 122 127 128 400 404)
                               (check-impl 1 (1 (1)))
                               (check-impl 0 (1 (2)))]
-       [(31 32 33 34 35 36 102 103 104 106 107 113 114 115 117 118 123 124 125 126 127 128 401 403 602)
+       [(31 32 33 34 35 36 102 103 104 106 107 113 114 115 117 118 123 124 125 126 129 401 403 602)
                               (check-impl 0 (1 (1)))
                               (check-impl 1 (1 (2)))]
        [(200 202 203 207 301) (check-impl 1 (1 2 (1)))

@@ -5,8 +5,9 @@ ast
 basic-ag
 ilp
 ui
+join
 ast-generation
-main
 example-ast
 ilp-measurement
 ilp-test
+ag-test

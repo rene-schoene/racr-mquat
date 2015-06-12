@@ -1,7 +1,7 @@
 #!r6rs
 
 (library
- (mquat main)
+ (mquat join)
  (export mquat-spec)
  (import (rnrs) (racr core)
          (mquat ast) (mquat basic-ag) (mquat ilp))
