@@ -6,7 +6,7 @@
          =value-attr =req-comp-map =req-comp-min =req-comp-all =real =objective-val =clauses-met?
          =eval =eval-on =value-of =actual-value =provided-clause =mode-to-use =selected? =deployed? =hw?
          <=request <=impl <=comp =search-prov-clause =search-req-clause =maximum
-         =every-pe =every-comp =every-impl =every-mode =every-sw-clause =every-hw-clause)
+         =every-pe =every-comp =every-impl =every-mode =every-req-clause =every-prov-clause =every-sw-clause =every-hw-clause)
  (import (rnrs) (racr core)
          (mquat constants) (mquat utils) (mquat ast))
 
@@ -48,8 +48,6 @@
  (define (=lookup-clause n prop)      (att-value 'lookup-clause n prop))
  (define (=maximum n)          (att-value 'maximum n))
  (define (=max-help n arg0)    (att-value 'max-help n arg0))
-
- (define (if? val def)         (if val val def))
 
  (define (add-basic-ags mquat-spec)
    (with-specification

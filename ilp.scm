@@ -2,20 +2,21 @@
 
 (library
  (mquat ilp)
- (export add-ilp-ags save-ilp make-ilp =to-ilp)
+ (export add-ilp-ags save-ilp make-ilp =to-ilp =ilp-eval-binvar)
  (import (rnrs) (racr core) (srfi :19)
          (mquat properties) (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
  
  (define (=to-ilp n)                    (att-value 'to-ilp n))
  (define (=ilp-name n)                  (att-value 'ilp-name n))
  (define (=ilp-binvar n)                (att-value 'ilp-binvar n))
- (define (=ilp-binvar-deployed n pe)    (att-value 'ilp-binvar-deployed n pe))
+ (define (=ilp-binvar-deployed n pe)    (debug "ibd" n pe) (att-value 'ilp-binvar-deployed n pe))
  (define (=ilp-binary-vars n)           (att-value 'ilp-binary-vars n))
  (define =ilp-objective
    (case-lambda ((n)                    (att-value 'ilp-objective n))
                 ((n pe)                 (att-value 'ilp-objective n pe))))
  (define (=ilp-nego n)                  (att-value 'ilp-nego n))
  (define (=ilp-nego-sw n)               (att-value 'ilp-nego-sw n))
+ (define (=every-clause-of n)           (att-value 'every-clause-of n))
  (define =ilp-nego-reqc
    (case-lambda ((n comp)               (att-value 'ilp-nego-reqc n comp))
                 ((n clausetype comp)    (att-value 'ilp-nego-reqc n clausetype comp))))
@@ -24,7 +25,7 @@
  (define (=req-hw-clauses n)            (att-value 'required-hw-clauses n))
  (define (=every-clause n)              (att-value 'every-clause n))
  (define (=ilp-nego-hw0 n comp prop pe) (att-value 'ilp-nego-hw0 n comp prop pe))
- (define (=ilp-nego-hw1 n pe)           (att-value 'ilp-nego-hw1 n pe))
+ (define (=ilp-eval-binvar n pe)        (att-value 'ilp-eval-binvar n pe))
  
  (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
  ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
@@ -51,14 +52,14 @@
         (list (string-append "request(" (=ilp-name prov) "_" (comp-name comp) "): "))
         (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
         (cons* (comp->rev-string comp) (car req-entry)))
-       (let* ([f-prov (if (eq? comp comp-max-eq)
-                          ; prov for max: (maximum - val)
-                          (lambda (constraint val name) (cons* (prepend-sign (- (=maximum prov) val)) name constraint))
-                          (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
-              [f-req (if (eq? comp comp-max-eq)
-                         ; req for max: - (maximum - val) = val - maximum
-                         (lambda (constraint val name) (cons* (prepend-sign (- val (=maximum prov))) name constraint))
-                         (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
+       (let ([f-prov (if (eq? comp comp-max-eq)
+                         ; prov for max: (maximum - val)
+                         (lambda (constraint val name) (cons* (prepend-sign (- (=maximum prov) val)) name constraint))
+                         (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
+             [f-req (if (eq? comp comp-max-eq)
+                        ; req for max: - (maximum - val) = val - maximum
+                        (lambda (constraint val name) (cons* (prepend-sign (- val (=maximum prov))) name constraint))
+                        (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
 ;         (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
          (append
           (list (string-append (=ilp-name prov) "_" (comp-name comp) ": "))
@@ -67,6 +68,10 @@
           (list ">= 0")))))
  
  (define (cons-if x y) (if x (cons x y) y))
+ (define (f-val-signed comp prop)
+   (if (eq? comp comp-max-eq)
+       (lambda (val) (prepend-sign (- (=maximum prop) val))) ; for max: (maximum - val)
+       (lambda (val) (prepend-sign val))))
  (define (save-ilp path root) (save-to-file path (=to-ilp root)))
  (define (make-ilp root) (save-ilp "gen/ilp.txt" root))
  
@@ -109,8 +114,11 @@
                  (=ilp-objective n)
                  (list "Subject To")
                  (append
+                  ;(debug "request")
                   (=to-ilp (<=request n)) ; request-constraints
+                  ;(debug "arch-c")
                   (=to-ilp (->SWRoot n)) ; archtitecture-constraints
+                  ;(debug "nfp-nego")
                   (=ilp-nego n)) ; NFP-negotiation
                  (list "Bounds")
                  (append
@@ -160,12 +168,14 @@
         (fold-left
          (lambda (result mode)
            (cons*
-            (fold-left (lambda (inner pe) (cons* (prepend-sign (=ilp-objective mode pe))
-                                                 (=ilp-binvar-deployed mode pe) inner))
+            (fold-left (lambda (inner pe) (append (=ilp-objective pe mode) inner))
                        (list) (=every-pe n))
             result))
          (list) (=every-mode n))))
-     (Mode (lambda (n pe) (=eval-on (=provided-clause n pn-energy) pe))))
+;     (Mode (lambda (n pe) (=eval-on (=provided-clause n pn-energy) pe)))
+     (Resource (lambda (n mode) (debug n mode) (list (prepend-sign (=eval-on (=provided-clause mode pn-energy) n))
+                                      (=ilp-binvar-deployed mode n)))))
+    ; ^→ change to (Resource (lambda (n mode)
     
     ; Creates a list of NFP-negotiation constraints
     (ag-rule
@@ -176,7 +186,7 @@
                                     (list) (=every-comp n))))
      (Comp (lambda (n) (append (=ilp-nego-sw n)
                                (=ilp-nego-hw n)))))
-    
+
     (ag-rule
      ilp-nego-sw
      (Comp
@@ -201,6 +211,20 @@
      ilp-nego-reqc
      (Comp ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode of each impl
       (lambda (n clausetype comparator) (recur n merge-al =ilp-nego-reqc ->Impl* clausetype comparator)))
+;      (lambda (n clausetype comparator)
+;        (fold-left 
+;         (lambda (result clause)
+;           (if (and (ast-subtype? clause clausetype) (eq? (->comparator clause) comparator))
+;               (fold-left ; fold over pe
+;                (lambda (inner pe)
+;                  (add-to-al inner (=real (->return-type clause))
+;                             (list (=eval-on clause pe) (=ilp-binvar-deployed (<<- clause) pe))))
+;;                             (=ilp-eval-binvar clause pe)))
+;                result (=every-pe n))
+;               result))
+;;         (list) (append (=every-clause-of n) (->* (->Constraints (<=request n)))))))
+;         (list) (=every-clause-of n))))
+                   
      (Impl ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode
       (lambda (n clausetype comparator) (recur n merge-al =ilp-nego-reqc ->Mode* clausetype comparator)))
      (Mode ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type
@@ -214,7 +238,8 @@
                              (list (=eval-on clause pe) (=ilp-binvar-deployed n pe))))
                 result (=every-pe n))
                result))
-         (list) (att-value 'combined-reqs n))))
+;         (list) (att-value 'combined-reqs n))))
+         (list) (->* (->Clause* n)))))
      (Request
       (lambda (n comparator)
         (fold-left
@@ -223,7 +248,33 @@
                (add-to-al result (=real (->return-type clause)) (list (=eval-on clause #f) "")) ;use arbitrary target #f
                result))
          (list) (->* (->Constraints n))))))
-    
+
+    (ag-rule
+     every-clause-of
+     (Comp
+      (lambda (n) (fold-left (lambda (result mode) (append (->* (->Clause* mode)) result)) (list) (=every-mode n)))))
+
+;    (ag-rule
+;     ilp-nego-rc-req
+;     (Comp
+;      (lambda (n) ; → all properties required in here. ([prop (clause ... )] ... )
+;        (fold-left
+;;         (lambda (result clause) (let ([prop (=real (->return-type clause))])
+;;                                   (if (member prop result) result (cons prop result))))
+;         (lambda (result clause) (add-to-al result (=real (->return-type clause)) clause))
+;         (list) (=every-clause-of n)))))
+;
+;    (ag-rule
+;     ilp-nego-sw-v2
+;     (Comp
+;      (lambda (n)
+;        (fold-left (lambda (result pc) (make-constraints2 (cdr pc) (=every-prov-clause (car pc) comp-max-eq)
+;                                                          (=every-prov-clause (car pc) comp-min-eq)))
+;                   (list) (=ilp-nego-rc-req n)))))
+;
+;    (define (make-constraints2 prov-clauses req-clauses) #f)
+;    (define (=ilp-nego-rc-req n) (att-value '=ilp-nego-rc-req n))
+
     (ag-rule combined-reqs (Mode (lambda (n) (append (->* (->Clause* n))
                                                      (->* (->Constraints (<=request n)))))))
     
@@ -235,7 +286,12 @@
          (lambda (result entry) ; entry = {(comparator . property) { clauses }}
            (append
             (fold-left
-             (lambda (inner pe) (cons (ctf "ilp-nego-hw0" =ilp-nego-hw0 n (caar entry) (cdar entry) pe) inner))
+             (lambda (inner pe) (cons (append
+                                       (ctf "ilp-nego-hw0" =ilp-nego-hw0 n (caar entry) (cdar entry) pe)
+                                       (list "<=" ((f-val-signed (caar entry) (cdar entry))
+                                                   (=eval-on (=provided-clause pe (->name (cdar entry))
+                                                                               (->type pe)) pe))))
+                                       inner))
              (list) (=every-pe n))
             result))
          (list) (=req-hw-clauses n)))))
@@ -249,26 +305,26 @@
 ;                   [__ (begin (debug (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))
 ;                              (debug (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))))]
                    [lop (fold-left ;here we have a [l]ist [o]f [p]airs (evaled-prop mode-on-pe-name)
-                         (lambda (result cl) (append (=ilp-nego-hw1 cl pe) result))
+                         (lambda (result cl) (cons (=ilp-eval-binvar cl pe) result))
                          (list) (cadr (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n))))]
-                   [f (if (eq? comp comp-max-eq)
-                          (lambda (val) (prepend-sign (- (=maximum prop) val))) ; for max: (maximum - val)
-                          (lambda (val) (prepend-sign val)))]) ; for other: val
+                   [f (f-val-signed comp prop)]) ; for other: val
               (append (list (string-append (=ilp-name n) "_" (=ilp-name prop) "_"
                                            (=ilp-name pe) "_" (comp-name comp) ": "))
-                      (fold-left (lambda (result p) (cons* (f (car p)) (cadr p) result)) (list) lop)
-                      (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
-                                                                (->type pe)) pe))))))))
+                      (fold-left (lambda (result p) #|(debug p)|# (cons* (f (car p)) (cadr p) result)) (list) lop)
+;                      (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
+;                                                                (->type pe)) pe)))
+                      )))))
     (ag-rule
-     ilp-nego-hw1
+     ilp-eval-binvar
      (Clause
       (lambda (n pe)
-        (let ([real-return-type (=real (->return-type n))])
-          (debug "hw0-clause" (->name real-return-type) (->name pe))
-          (if (or (eq? (->type pe) (<<- real-return-type))
-                  (ast-subtype? (<<- real-return-type) 'HWRoot))
-              (list (list (=eval-on n (->type pe)) (=ilp-binvar-deployed (<<- n) pe)))
-              (list)))))) ;empty pair if not a suitable clause
+;        (let ([real-return-type (=real (->return-type n))])
+        (debug "ilp-eval-binvar" n (->name pe))
+;          (if (or (eq? (->type pe) (<<- real-return-type))
+;                  (ast-subtype? (<<- real-return-type) 'HWRoot))
+        (list (=eval-on n (->type pe)) (=ilp-binvar-deployed (<<- n) pe))
+;              (begin (debug "not suitable" real-return-type pe) (list))))
+        ))) ;empty pair if not a suitable clause
     
     (ag-rule
      required-hw-properties
