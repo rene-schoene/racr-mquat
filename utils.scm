@@ -72,7 +72,8 @@
                ((number? s) (number->string s))
                ((list? s) (string-append "(" (D s) ")"))
                ((procedure? s) "<proc>")
-               ((ast-node? s) (if (ast-has-child? 'name s) (P (ast-child 'name s)) "<node>"))
+               ((ast-node? s) (if (ast-has-child? 'name s) (P (ast-child 'name s))
+                                  (string-append "<node " (symbol->string (ast-node-type s)) ">")))
                (else "?")))])
     (display (D args)) (display "\n") (when (not (null? args)) (car args))))
  

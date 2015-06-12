@@ -7,7 +7,7 @@ try:
 except ImportError:
 	from fabric_workaround import task
 import utils
-from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion
+from utils import local_quiet, assertTrue, assertTrueAssertion
 
 NUM_PROCESSORS = 4
 
@@ -15,11 +15,11 @@ utils.assertTrue = assertTrueAssertion
 
 @task(name = 'racket')
 def run_racket(*given_ranges):
-	do_run(call_racket, given_ranges)
+	do_run(utils.call_racket, given_ranges)
 
 @task(name = 'larceny')
 def run_larceny(*given_ranges):
-	do_run(call_larceny, given_ranges)
+	do_run(utils.call_larceny, given_ranges)
 
 def do_run(call_impl, given_ranges):
 	supported_ranges = get_ranges(call_impl)

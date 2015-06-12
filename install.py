@@ -3,7 +3,7 @@ try:
 	from fabric.api import lcd, task
 except ImportError:
 	from fabric_workaround import lcd, task
-from constants import racketBin, larcenyBin
+from constants import racketBin, larcenyBin, racketExec, larcenyExec
 from utils import local_quiet
 
 def parse(names = None):
@@ -23,7 +23,7 @@ def compile_racket(*names):
 		output = 'racket-bin/mquat/{0}'.format('main_.ss' if name == 'main.scm' else (name[:-2] + 's'))
 		if os.path.exists(output):
 			os.remove(output)
-		local_quiet('plt-r6rs ++path {0} --install --collections racket-bin {1}'.format(racketBin.racr_bin, name), capture = False)
+		local_quiet('{0} ++path {1} --install --collections racket-bin {2}'.format(racketExec, racketBin.racr_bin, name), capture = False)
 
 compile_stale_text = """#!r6rs
 (import (rnrs) (larceny compiler))
@@ -42,4 +42,4 @@ def compile_larceny():
 	for name in parse():
 		shutil.copy2(name, os.path.join(larceny_dir, os.path.splitext(name)[0] + '.sls'))
 	with lcd(larceny_dir):
-		local_quiet('larceny --r6rs --path ..:{0} --program {1}'.format(larcenyBin.racr_bin, compile_stale), capture = False)
+		local_quiet('{0} --r6rs --path ..:{1} --program {2}'.format(larcenyExec, larcenyBin.racr_bin, compile_stale), capture = False)
