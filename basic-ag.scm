@@ -143,7 +143,7 @@
           (if (eq? (->type n) type) ; if n has correct type ...
               (let ([found-clause
                      (ast-find-child ; (1) ... then try to find a child in n ...
-                      (lambda (index clause) (eq? (->name (=real (->return-type clause))) name))
+                      (lambda (index clause) (string=? (->name (=real (->return-type clause))) name))
                       (->ProvClause* n))])
                 (if found-clause ; (1.q) if a child was found ...
                     found-clause ; (1.1) ... return it
@@ -168,7 +168,7 @@
         (debug "search" name "in" (->name n))
         (ast-find-child
          (lambda (index clause)
-           (and (ast-subtype? clause subtype) (eq? (->name (=real (->return-type clause))) name)))
+           (and (ast-subtype? clause subtype) (string=? (->name (=real (->return-type clause))) name)))
          (->Clause* n)))))
     
     ; Get request from every node
@@ -195,7 +195,7 @@
     
     ; Given a metaparameter name, return the value of the according metaparameter
     (ag-rule value-of (Request (lambda (n name)
-                                 (ast-find-child* (lambda (i child) (and (eq? (->name child) name) (->value child)))
+                                 (ast-find-child* (lambda (i child) (and (string=? (->name child) name) (->value child)))
                                                   (->MetaParameter* n)))))
     
     ; Returns #t, if the Implementation is selected by its component

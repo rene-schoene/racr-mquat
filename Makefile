@@ -16,7 +16,7 @@ larceny: $(LSRC)
 	@cp compile-stale $(LARCENY_BUILD_DIR)/mquat
 	@cd $(LARCENY_BUILD_DIR)/mquat && larceny --r6rs --path ..:$(RACR_LARCENY_BIN) --program compile-stale
 	
-$RACKET_BUILD_DIR/mquat/%.ss: %.scm Makefile
+$(RACKET_BUILD_DIR)/mquat/%.ss: %.scm Makefile
 	@mkdir -p $(RACKET_BUILD_DIR)
 	@rm -f $@
 	plt-r6rs ++path $(RACR_RACKET_BIN) --install --collections $(RACKET_BUILD_DIR) $<

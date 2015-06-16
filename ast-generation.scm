@@ -8,15 +8,13 @@
          (mquat constants) (mquat ast) (mquat basic-ag) (mquat join) (mquat utils))
  
  ;;; Reusable nodes and names
- (define load-name 'load)
- (define freq-name 'frequency)
- (define load #f) (define freq #f)
+ (define load-name "load")
+ (define freq-name "frequency")
  
- (define mp-name 'size)
+ (define mp-name "size")
  
  ;;; Utility definitions
- (define (node-name ident lon) (string->symbol (fold-right (lambda (n s) (string-append s "-" (number->string n)))
-                                                           (symbol->string ident) lon)))
+ (define (node-name ident lon) (fold-right (lambda (n s) (string-append s "-" (number->string n))) ident lon))
  
  (define (call-n-times proc n) (letrec ([cnt (lambda (n) (if (>= 0 n) (list) (cons (proc n) (cnt (- n 1)))))]) (cnt n)))
  (define (random n) (random-integer n))
@@ -40,7 +38,7 @@
  ; Returns the HWRoot
  (define (create-hw load freq num-pe num-subs ud-clauses ud-types)
    (define types-al (list))
-   (define (make-type nr) (:ResourceType mquat-spec (node-name 'type (list nr))
+   (define (make-type nr) (:ResourceType mquat-spec (node-name "type" (list nr))
                                          (list (:PropertyRef mquat-spec load) (:PropertyRef mquat-spec freq))))
    (define (type nr)
      (let ([entry (assq nr types-al)])
@@ -53,9 +51,9 @@
            #f)))
    (define (default-hw-clause-gen property-name)
      (cond
-       ((eq? property-name load-name) (list make-prov comp-eq (rand 50 2 0))) ; provided load = [0.01, 50.00]
-       ((eq? property-name freq-name) (list make-prov comp-eq (rand 1000 2 500))) ; provided freq = [500.01 - 1000.00]
-       (else (error "default-hw-clause-gen" "Wrong property" property-name))))
+       [(string=? property-name load-name) (list make-prov comp-eq (rand 50 2 0))] ; provided load = [0.01, 50.00]
+       [(string=? property-name freq-name) (list make-prov comp-eq (rand 1000 2 500))] ; provided freq = [500.01 - 1000.00]
+       [else (error "default-hw-clause-gen" "Wrong property" property-name)]))
    (letrec ([make-subs (lambda (outer-id total subs)
                          (call-n-times (lambda (sub-n)
                                          (make-res (node-name outer-id (list sub-n))
@@ -67,7 +65,7 @@
                             id (type (if type-nr? type-nr? 0)) (make-subs id total subs)
                             (filter something (list (create-hw-clause ud-clauses id load)
                                                     (create-hw-clause ud-clauses id freq))))))])
-     (let ([subs (make-subs 'r num-pe (if (= 0 num-subs) num-pe num-subs))])
+     (let ([subs (make-subs "r" num-pe (if (= 0 num-subs) num-pe num-subs))])
        (:HWRoot mquat-spec (map cdr types-al) subs (list load freq)))))
  
  ; udfs: function (mode-name → function (property → clause))
@@ -75,9 +73,9 @@
  (define (create-sw load freq num-comp impl-per-comp mode-per-impl ud-clauses reqc)
    (define last-comp-nr #f) (define last-comp #f)
    (define (new-comp comp comp-nr) (set! last-comp-nr comp-nr) (set! last-comp comp))
-   (define energy (:RealProperty mquat-spec pn-energy 'J 'runtime 'decreasing 'sum))
+   (define energy (:RealProperty mquat-spec pn-energy "J" 'runtime 'decreasing agg-sum))
    (define prop-al (list))
-   (define (make-sw-prop n) (list (:RealProperty mquat-spec (node-name 'prop (list n)) 'u 'runtime 'increasing 'max)
+   (define (make-sw-prop n) (list (:RealProperty mquat-spec (node-name "p" (list n)) "unit" 'runtime 'increasing agg-max)
                                   (:PropertyRef mquat-spec energy)))
    (define (prop n)
      (let ([entry (assq n prop-al)])
@@ -90,17 +88,17 @@
                       [comp-nr+1 (+ comp-nr 1)])
                   (cond
                     ; required load max [50.01, 100.00] if valid!?, [0.01 - 100.00] otherwise
-                    ((eq? property-name load-name) (list make-req comp-max-eq (if valid!? (rand 100 2 50) (rand 100 2 0))))
+                    [(string=? property-name load-name) (list make-req comp-max-eq (if valid!? (rand 100 2 50) (rand 100 2 0)))]
                     ; required freq min [0.01, 500.00]
-                    ((eq? property-name freq-name) (list make-req comp-min-eq (rand 500 2 0)))
+                    [(string=? property-name freq-name) (list make-req comp-min-eq (rand 500 2 0))]
                     ; provided prop-n = [5.01 - 10.00] if valid!?, [0.01 - 10.00] otherwise
-                    ((eq? property-name (->name (car ps))) (list make-prov comp-eq (if valid!? (rand 10 2 5) (rand 10 2 0))))
+                    [(string=? property-name (->name (car ps))) (list make-prov comp-eq (if valid!? (rand 10 2 5) (rand 10 2 0)))]
                     ; provided energy = [0.001 - 100.000]
-                    ((eq? property-name pn-energy) (list make-prov comp-eq (rand 100 3 0)))
+                    [(string=? property-name pn-energy) (list make-prov comp-eq (rand 100 3 0))]
                     ; required prop-m max [10.01, 20.00]
-                    ((eq? property-name (->name (car (prop comp-nr+1)))) (list make-req comp-max-eq (rand 20 2 10)))
-                    (else (error "default-sw-clause-gen" "no suitable property"
-                                 property-name (->name (car (prop comp-nr+1))) comp-nr)))))]
+                    [(string=? property-name (->name (car (prop comp-nr+1)))) (list make-req comp-max-eq (rand 20 2 10))]
+                    [else (error 'default-sw-clause-gen "no suitable property"
+                                 property-name (->name (car (prop comp-nr+1))) comp-nr)])))]
             [create-sw-clause
              (lambda (udfs name comp-nr property)
                (let ([f (create-clause udfs default-sw-clause-gen name)]
@@ -109,7 +107,7 @@
                          (if (eq? args #t) (set! args (default-sw-clause-gen (->name real-property) comp-nr)))
                          (if args ((car args) real-property (cadr args) (caddr args)) #f)) #f)))]
             [ps (prop comp)]
-            [name (node-name 'm (cons mode impl-lon))]
+            [name (node-name "m" (cons mode impl-lon))]
             [cls (filter something (list (create-sw-clause ud-clauses name comp load)
                                          (create-sw-clause ud-clauses name comp freq)
                                          (create-sw-clause ud-clauses name comp (car ps))
@@ -118,12 +116,12 @@
        (:Mode mquat-spec name (if req-cl? (cons req-cl? cls) cls))))
    (define (make-impl comp impl)
      (let* ([lon (list impl comp)]
-            [name (node-name 'i lon)]
+            [name (node-name "i" lon)]
             [does-req? (and last-comp-nr (reqc name))])
        (:Impl mquat-spec name
               (call-n-times (lambda (mode) (make-mode comp lon mode does-req? (= 1 impl))) mode-per-impl) ; Mode*
               (if does-req? (list last-comp) (list)) #f #f))) ; reqcomps selected-mode deployed-on
-   (define (make-comp comp) (:Comp mquat-spec (node-name 'c (list comp))
+   (define (make-comp comp) (:Comp mquat-spec (node-name "c" (list comp))
                                    (call-n-times (lambda (impl) (make-impl comp impl)) impl-per-comp) #f
                                    (prop comp)))
    (let ([sw-root (:SWRoot
@@ -168,8 +166,8 @@
  (define (create-system1 num-pe num-pe-subs num-comp impl-per-comp mode-per-impl sw-reqc ud-sw-clauses ud-hw-clauses ud-types)
    (let* ([types-al (list)]
           [prop-al (list)]
-          [load (:RealProperty mquat-spec load-name '% 'runtime 'decreasing agg-sum)]
-          [freq (:RealProperty mquat-spec freq-name 'MHz 'runtime 'increasing agg-max)]
+          [load (:RealProperty mquat-spec load-name "%" 'runtime 'decreasing agg-sum)]
+          [freq (:RealProperty mquat-spec freq-name "MHz" 'runtime 'increasing agg-max)]
           [sw-result (create-sw load freq num-comp impl-per-comp mode-per-impl ud-sw-clauses sw-reqc)]
           [sw-root (car sw-result)]
           [target-property (cdr sw-result)])

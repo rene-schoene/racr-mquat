@@ -2,7 +2,7 @@
 
 (import (rnrs) (mquat ilp-measurement) (mquat ilp-test) (mquat ag-test) (mquat utils))
 
-(define (print-usage) (error "cli" "No valid arguments found, either use 'test' or 'measure' as first parameter."))
+(define (print-usage) (error 'cli "No valid arguments found, either use 'test' or 'measure' as first parameter."))
 
 (define cmds (cdr (filter (lambda (arg) (not (cli-debugging-arg=? arg))) (command-line))))
 

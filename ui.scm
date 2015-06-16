@@ -33,7 +33,7 @@
                    (cons
                     (list
                      (map (lambda (c) (->name c)) (ast-child 'reqcomps impl))
-                     (if (=selected? impl) (string-append "*" (symbol->string name)) name)
+                     (if (=selected? impl) (string-append "*" name) name)
                      (if (=deployed? impl) (->name (->deployed-on impl)) #f)
                      (if (=selected? impl) (M (=mode-to-use impl)) #f))
                     (I (cdr loi))))))])

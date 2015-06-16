@@ -55,8 +55,8 @@
  
  (define (rw comp-name restype prop-name new-value ast)
 ;   (debug comp-name prop-name new-value ast)
-   (rewrite-terminal 'value (=provided-clause (find (lambda (pe) (eq? (->name pe) comp-name))
-                                                              (=every-pe ast)) prop-name restype)
+   (rewrite-terminal 'value (=provided-clause (find (lambda (pe) (string=? (->name pe) comp-name))
+                                                    (=every-pe ast)) prop-name restype)
                      (lambda _ new-value)))
  
  (define (rw* restype prop-name new-value? ast)
@@ -87,11 +87,11 @@
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))])
      (display id-s) (display+flush " ")
      (sit id-s "01-init" ast)
-     (rw 'r-1 rt 'load 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
+     (rw "r-1" rt 'load 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
 ;     (check-attribut-is-flushed-to 0.1 ast 'r-1 rt 'load) ;<-larceny bug tracking
-     (rw 'r-1 rt 'load 0.5 ast) (sit id-s "03-comp1" ast) (display+flush ".")
+     (rw "r-1" rt 'load 0.5 ast) (sit id-s "03-comp1" ast) (display+flush ".")
 ;     (check-attribut-is-flushed-to 0.5 ast 'r-1 rt 'load) ;<-larceny bug tracking
-     (rw 'r-1 rt 'load 0.8 ast) (rw 'r-2 rt 'load 0.8 ast) (rw 'r-3 rt 'load 0.8 ast)
+     (rw "r-1" rt 'load 0.8 ast) (rw "r-2" rt 'load 0.8 ast) (rw "r-3" rt 'load 0.8 ast)
      (sit id-s "04-three-comps" ast) (display+flush ".")
 ;     (check-attribut-is-flushed-to 0.8 ast 'r-1 rt 'load) ;<-larceny bug tracking
      (rw* rt 'load 0.1 ast) (sit id-s "05-every-comp" ast) (display+flush ".")

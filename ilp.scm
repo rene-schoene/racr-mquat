@@ -3,7 +3,7 @@
 (library
  (mquat ilp)
  (export add-ilp-ags save-ilp make-ilp =to-ilp =ilp-eval-binvar)
- (import (rnrs) (racr core) (srfi :19)
+ (import (rnrs) (racr core) (srfi :19) (prefix (only (srfi :13) string-map) srfi:)
          (mquat properties) (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
  
  (define (=to-ilp n)                    (att-value 'to-ilp n))
@@ -30,9 +30,7 @@
  (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
  ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
  (define subs (list (list #\- #\_) (list #\+ #\_)))
- (define (ilp-conform-name name)
-   (list->string (map (lambda (c) (let ([entry (assq c subs)]) (if entry (cadr entry) c)))
-                      (string->list name))))
+ (define (ilp-conform-name name) (srfi:string-map (lambda (c) (let ([entry (assq c subs)]) (if entry (cadr entry) c))) name))
  
  (define (comp-name comp) (ilp-conform-name (comp->name comp)))
  (define (make-constraints provs max-reqs min-reqs request?)
@@ -172,16 +170,13 @@
                        (list) (=every-pe n))
             result))
          (list) (=every-mode n))))
-;     (Mode (lambda (n pe) (=eval-on (=provided-clause n pn-energy) pe)))
      (Resource (lambda (n mode) (debug n mode) (list (prepend-sign (=eval-on (=provided-clause mode pn-energy) n))
                                       (=ilp-binvar-deployed mode n)))))
-    ; ^→ change to (Resource (lambda (n mode)
     
     ; Creates a list of NFP-negotiation constraints
     (ag-rule
      ilp-nego
      (Root (lambda (n) (remove (list) (=ilp-nego (->SWRoot n))))) ; remove empty constraints
-;     (SWRoot (lambda (n) (recur n append =ilp-nego ->Comp*)))
      (SWRoot (lambda (n) (fold-left (lambda (result c) (append (=ilp-nego c) result))
                                     (list) (=every-comp n))))
      (Comp (lambda (n) (append (=ilp-nego-sw n)
@@ -360,24 +355,21 @@
     
     (ag-rule
      ilp-name
-     (Property (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
-     (Comp (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
-     (Impl (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
-     (Mode (lambda (n) (ilp-conform-name (symbol->string (->name n)))))
-     (Resource (lambda (n) (ilp-conform-name (symbol->string (->name n))))))
+     (Property (lambda (n) (ilp-conform-name (->name n))))
+     (Comp (lambda (n) (ilp-conform-name (->name n))))
+     (Impl (lambda (n) (ilp-conform-name (->name n))))
+     (Mode (lambda (n) (ilp-conform-name (->name n))))
+     (Resource (lambda (n) (ilp-conform-name (->name n)))))
     
     (ag-rule
      ilp-binvar
-     (Impl (lambda (n) (ilp-conform-name (string-append "b#" (symbol->string (->name (<=comp n)))
-                                                        "#"  (if (lonely? n) "" (symbol->string (->name n)))))))
+     (Impl (lambda (n) (ilp-conform-name (string-append "b#" (->name (<=comp n)) "#" (if (lonely? n) "" (->name n))))))
      (Mode (lambda (n) (error "Should not be called for Modes"))))
     
     (ag-rule
      ilp-binvar-deployed
      (Mode (lambda (n pe)
              (let ([impl (<=impl n)])
-               (ilp-conform-name (string-append "b#" (symbol->string (->name (<=comp impl)))
-                                                "#"  (if (lonely? impl) "" (symbol->string (->name (<=impl n))))
-                                                "#"  (if (lonely? n) "" (symbol->string (->name n)))
-                                                "#"  (symbol->string (->name pe)))))))))))
+               (ilp-conform-name (string-append "b#" (->name (<=comp impl)) "#"  (if (lonely? impl) "" (->name (<=impl n)))
+                                                "#"  (if (lonely? n) "" (->name n)) "#"  (->name pe))))))))))
  

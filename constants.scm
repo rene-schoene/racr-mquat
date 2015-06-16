@@ -7,7 +7,7 @@
          comp->f comp->string comp->rev-string comp->name)
  (import (rnrs base) (rnrs lists))
  
- (define pn-energy 'energy-consumption) ; Name of the property energy-consumption and as default objective function property name
+ (define pn-energy "energy-consumption") ; Name of the property energy-consumption and as default objective function property name
  (define agg-max 1) (define agg-sum 2)  ; Used in agg of property to describe how to aggregate the property
  (define comp-min-eq 'min-eq)
  (define comp-max-eq 'max-eq)
@@ -23,7 +23,7 @@
                            (list comp-max-eq (lambda (req act) (>= req act)) '>= '<=)))
 
  (define comp->X (lambda (comp picker default) (let ([entry (assq comp comparators)]) (if entry (picker entry) default))))
- (define comp->f (lambda (comp) (comp->X comp cadr (lambda _ (error "")))))
+ (define comp->f (lambda (comp) (comp->X comp cadr (lambda _ (error 'comparators "No function found" comp)))))
  (define comp->string (lambda (comp) (comp->X comp caddr '?~)))
  (define comp->rev-string (lambda (comp) (comp->X comp cadddr '~?)))
  (define comp->name (lambda (comp) (symbol->string comp))))
