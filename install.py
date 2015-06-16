@@ -9,7 +9,9 @@ from utils import local_quiet
 def parse(names = None):
 	if not names:
 		with open('dependencies.txt') as fd:
-			return map(lambda name: name + '.scm', fd.read().splitlines())
+			deps = fd.read().splitlines()
+		deps = filter(lambda x : not x.startswith('#'), deps[deps.index('@sources:')+1:])
+		return map(lambda name: name + '.scm', deps)
 	return names
 
 @task(name = 'all', default = True)
@@ -23,7 +25,9 @@ def compile_racket(*names):
 		output = 'racket-bin/mquat/{0}'.format('main_.ss' if name == 'main.scm' else (name[:-2] + 's'))
 		if os.path.exists(output):
 			os.remove(output)
-		local_quiet('{0} ++path {1} --install --collections racket-bin {2}'.format(racketExec, racketBin.racr_bin, name), capture = False)
+		local_quiet('{0} ++path {1} --install --collections racket-bin {2}'.
+			format(racketExec, racketBin.racr_bin, name),
+			capture = False)
 
 compile_stale_text = """#!r6rs
 (import (rnrs) (larceny compiler))
@@ -42,4 +46,6 @@ def compile_larceny():
 	for name in parse():
 		shutil.copy2(name, os.path.join(larceny_dir, os.path.splitext(name)[0] + '.sls'))
 	with lcd(larceny_dir):
-		local_quiet('{0} --r6rs --path ..:{1} --program {2}'.format(larcenyExec, larcenyBin.racr_bin, compile_stale), capture = False)
+		local_quiet('{0} --r6rs --path ..:{1} --program {2}'.
+			format(larcenyExec, larcenyBin.racr_bin, compile_stale),
+			capture = False)

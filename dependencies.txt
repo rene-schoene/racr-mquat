@@ -1,3 +1,11 @@
+@libraries:
+rnrs/eval-6
+racr/core
+racr/testing
+srfi/19
+srfi/27
+srfi/42
+@sources:
 constants
 properties
 utils
