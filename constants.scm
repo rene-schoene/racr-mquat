@@ -2,13 +2,15 @@
 
 (library
  (mquat constants)
- (export pn-energy agg-max agg-sum
+ (export pn-energy agg-max agg-sum offline online booting halting error-state
          comp-min-eq comp-max-eq comp-eq f-comp-max-diff-eq
          comp->f comp->string comp->rev-string comp->name)
  (import (rnrs base) (rnrs lists))
  
  (define pn-energy "energy-consumption") ; Name of the property energy-consumption and as default objective function property name
  (define agg-max 1) (define agg-sum 2)  ; Used in agg of property to describe how to aggregate the property
+ ; Status of resources
+ (define offline 'offline) (define online 'online) (define booting 'booting) (define halting 'halting) (define error-state 'error)
  (define comp-min-eq 'min-eq)
  (define comp-max-eq 'max-eq)
  (define comp-eq 'eq)

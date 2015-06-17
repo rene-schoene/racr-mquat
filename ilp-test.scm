@@ -591,7 +591,7 @@
    ; General description: 1 comp, 2 impls with 2 modes each. Two different resources types and, thus,
    ; dynamical value functions within modes (type-0:res-2 → max load 0.7, type-1:res-1,res-3 → max load 0.3)
    ; Normally only deployable on resource of type-0 (which is only res-2)
-   (let* ([hw-types (lambda (res-name) (if (or (string=? res-name "r-1") (string=? res-name "r-3")) 1 #f))]
+   (let* ([hw-types (lambda (res-name) (if (or (string=? res-name "r-1") (string=? res-name "r-3")) (cons 1 #t) #f))]
           [load-f (lambda (lomp target) (if (string=? (->name target) "type-1") 0.3 0.7))]
           [sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? load-name p) (list make-req comp-max-eq load-f)
                                                         ((no-freq-sw-clauses) p comp-nr))))]
@@ -629,38 +629,42 @@
      (save-ilp tmp-lp ast)))
 
  (define (new-resources id)
-   (define (add-resource name prototype parent)
+   (define (add-resource name status prototype parent)
      (let* ([type (->type prototype)]
             [cs (->* (->ProvClause* prototype))]
             [new-cs (map (lambda (c) (:ProvClause mquat-spec (->return-type c) (->comparator c) (->value c))) cs)])
-       (rewrite-add (->SubResources parent) (:Resource mquat-spec name type (list) new-cs))))
+       (rewrite-add (->SubResources parent) (:Resource mquat-spec name type status (list) new-cs))))
    ; General description: New resources entering the system, enabling new configurations
    (let ([ast (create-system 2 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) "m-1-1-1")
      (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) "m-1-1-2")
      (change-sw-req ast "load" comp-max-eq 0.8)
+     (remove-req-constraints ast)
      (case id
        [(500) ; No further constraints
         ; Expected outcome: mode-1-1-1 on either res-1 or res-2
-        (remove-req-constraints ast)]
+        #t]
        [(501) ; High load
         ; Expected outcome: No solution
-        (change-hw-prov ast "load" 0.9)
-        (remove-req-constraints ast)]
+        (change-hw-prov ast "load" 0.9)]
        [(502) ; High load, but a fresh resource available
         ; Expected outcome: mode-1-1-1 on (new) res-3
         (change-hw-prov ast "load" 0.9)
-        (save-ilp tmp-lp ast)
-        (add-resource "r-3" (car (->* (->SubResources (->HWRoot ast)))) (->HWRoot ast))
-        (change-hw-prov ast "load" 0.5 "r-3")
-        (remove-req-constraints ast)]
+        (save-ilp tmp-lp ast) ; just emporary
+        (add-resource "r-3" online (car (->* (->SubResources (->HWRoot ast)))) (->HWRoot ast))
+        (change-hw-prov ast "load" 0.5 "r-3")]
        [(503) ; High load, new resource available, but still no viable solution
         ; Expected outcome: No solution
         (change-hw-prov ast "load" 0.9)
-        (save-ilp tmp-lp ast)
-        (add-resource "r-3" (car (->* (->SubResources (->HWRoot ast)))) (->HWRoot ast))
-        (change-hw-prov ast "load" 0.9 "r-3")
-        (remove-req-constraints ast)]
+        (save-ilp tmp-lp ast) ; just emporary
+        (add-resource "r-3" online (car (->* (->SubResources (->HWRoot ast)))) (->HWRoot ast))
+        (change-hw-prov ast "load" 0.9 "r-3")]
+       [(504) ; High load, new offline resource added with no load
+        ; Expected outcome: No solution (offline resource should not be used)
+        (change-hw-prov ast "load" 0.9)
+        (save-ilp tmp-lp ast) ; just emporary
+        (add-resource "r-3" offline (car (->* (->SubResources (->HWRoot ast)))) (->HWRoot ast))
+        (change-hw-prov ast "load" 0.0 "r-3")]
 
        [else (wrong-id new-resources id)])
      (save-ilp tmp-lp ast)))
@@ -755,13 +759,13 @@
  (define (tree-res id)
    ; General description: Tree hardware structure with different hardware types on each level
    ; Top level has 3 PEs and type-0, second level has 9 PEs and type-1, third level has 18 PEs and type-2
-   (let* ([type-nr (lambda (res-name) (/ (- (string-length res-name) 3) 2))]
+   (let* ([hw-types (lambda (res-name) (cons (/ (- (string-length res-name) 3) 2) #t))]
           [name->type-nr (lambda (type-name) (string->number (substring type-name 5 (string-length type-name))))]
           [load-f (lambda (lomp target) (case (name->type-nr (->name target)) [(0) 0.2] [(1) 0.4] [(2) 0.7]
                                           [else (error "load-f" "wrong type" (->name target))]))]
           [sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? load-name p) (list make-req comp-max-eq load-f)
                                                         ((no-freq-sw-clauses) p comp-nr))))]
-          [ast (create-system 30 3 1 1 2 (list #f sw-clauses no-freq-hw-clauses type-nr))])
+          [ast (create-system 30 3 1 1 2 (list #f sw-clauses no-freq-hw-clauses hw-types))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) "m-1-1-1")
      (change-sw-prov ast pn-energy (+ 15 (/ id 1e3)) "m-1-1-2")
      (case id

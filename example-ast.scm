@@ -4,7 +4,7 @@
  (mquat example-ast)
  (export example-ast comp1 comp2 impl1a impl1b impl1c cb1 cb2)
  (import (rnrs) (racr core)
-         (mquat ast) (mquat basic-ag) (mquat constants) (mquat join) (mquat ui) (mquat utils))
+         (mquat ast) (mquat basic-ag) (mquat constants) (mquat join) (mquat ui) (mquat utils) (mquat properties))
  
  (define example-ast
    (let* ([make-simple-prop ; kind=runtime, direction=decreasing
@@ -12,12 +12,12 @@
           [load (make-simple-prop "server-load" "%" agg-sum)]
           [freq (make-simple-prop "cpu-frequency" "Mhz" agg-max)] ; TODO add some clauses referencing this
           [energy (make-simple-prop pn-energy "Joule" agg-sum)]
-          [Cubieboard (:ResourceType mquat-spec "Cubieboard" (list load freq))]
+          [Cubieboard (:ResourceType mquat-spec "Cubieboard" #t (list load freq))]
           [make-cubie
-           (lambda (name f-load)
-             (:Resource mquat-spec name Cubieboard (list) (list (:ProvClause mquat-spec load comp-eq f-load))))]
-          [cubie1 (make-cubie "Cubie1" (lambda _ 0.7))]
-          [cubie2 (make-cubie "Cubie2" (lambda _ 0.4))]
+           (lambda (name status f-load)
+             (:Resource mquat-spec name Cubieboard status (list) (list (:ProvClause mquat-spec load comp-eq f-load))))]
+          [cubie1 (make-cubie "Cubie1" online (lambda _ 0.7))]
+          [cubie2 (make-cubie "Cubie2" online (lambda _ 0.4))]
           [size "size"]
           [make-mp-size (lambda (value) (:MetaParameter mquat-spec size value))]
           [make-simple-mode
@@ -53,8 +53,7 @@
                [(mode1a (make-simple-mode
                          (lambda _ 0.5) ;prop-load
                          (list (:ReqClause mquat-spec rt-C2 comp-max-eq (lambda (lomp target) (=value-of lomp size))))
-                         energy-c1
-                         (lambda _ 20) ;energy
+                         energy-c1 (lambda _ 20) ;energy
                          rt-C1 (lambda _ 0.2) ;response-time
                          "static-mode-1a"))] ;name of Mode
              (:Impl mquat-spec "Sample-Impl1a" (list mode1a) (list comp2) cubie1 mode1a))]

@@ -3,13 +3,22 @@
 (library
  (mquat ast)
  (export specify&compile-ast
-         ->HWRoot ->SWRoot ->Comp* ->RealProperty* ->name ->Impl* ->selected-impl ->Property* ->deployed-on ->selected-mode
-         ->Mode* ->Clause*
-         ->ResourceType* ->SubResources ->type ->ProvClause* ->MetaParameter* ->target ->Constraints ->objective
-         ->return-type ->comparator ->value ->unit ->kind ->direction ->agg
-         ->* <- <<-
-         :Root :SWRoot :Comp :Impl :Mode :ReqClause :ProvClause :HWRoot :ResourceType :Resource :Request :MetaParameter
-         :RealProperty :PropertyRef)
+         ->name ->Property* ->* <- <<- ->SubResources ->value ; common
+         ->HWRoot ->SWRoot ; Root
+         ->Comp* ->RealProperty* ; SWRoot
+         ->Impl* ->selected-impl ; Comp
+         ->Mode* ->deployed-on ->selected-mode ; Impl
+         ->Clause* ; Mode
+         ->return-type ->comparator ; Clause
+         ->ResourceType* ; HWRoot
+         ->container? ; ResourceType
+         ->type ->status ->ProvClause* ; Resource
+         ->MetaParameter* ->target ->Constraints ->objective ; Request
+         ->unit ->kind ->direction ->agg ; Property
+         :Root :RealProperty :PropertyRef
+         :SWRoot :Comp :Impl :Mode :ReqClause :ProvClause
+         :HWRoot :ResourceType :Resource
+         :Request :MetaParameter)
  (import (rnrs) (racr core))
  
  (define (->HWRoot n)         (ast-child 'HWRoot n))
@@ -27,6 +36,8 @@
  (define (->ResourceType* n)  (ast-child 'ResourceType* n))
  (define (->SubResources n)   (ast-child 'SubResources n))
  (define (->type n)           (ast-child 'type n))
+ (define (->status n)         (ast-child 'status n))
+ (define (->container? n)     (ast-child 'container n))
  (define (->ProvClause* n)    (ast-child 'ProvClause* n))
  (define (->MetaParameter* n) (ast-child 'MetaParameter* n))
  (define (->target n)         (ast-child 'target n))
@@ -51,8 +62,8 @@
  (define (:ReqClause spec r c v)    (create-ast spec 'ReqClause (list r c v)))
  (define (:ProvClause spec r c v)   (create-ast spec 'ProvClause (list r c v)))
  (define (:HWRoot spec t r p)       (create-ast spec 'HWRoot (list (create-ast-list t) (create-ast-list r) (create-ast-list p))))
- (define (:ResourceType spec n p)   (create-ast spec 'ResourceType (list n (create-ast-list p))))
- (define (:Resource spec n t s p)   (create-ast spec 'Resource (list n t (create-ast-list s) (create-ast-list p))))
+ (define (:ResourceType spec n c p) (create-ast spec 'ResourceType (list n c (create-ast-list p))))
+ (define (:Resource spec n t s subs p) (create-ast spec 'Resource (list n t s (create-ast-list subs) (create-ast-list p))))
  (define (:Request spec m t c o)    (create-ast spec 'Request (list (create-ast-list m) t (create-ast-list c) o)))
  (define (:MetaParameter spec n v)  (create-ast spec 'MetaParameter (list n v)))
  (define (:RealProperty spec n u k d a) (create-ast spec 'RealProperty (list n u k d a)))
@@ -61,8 +72,7 @@
  (define (specify&compile-ast mquat-spec)
    (with-specification
     mquat-spec
-    
-    ;; AST rules
+
     (ast-rule 'Root->HWRoot-SWRoot-Request)
     (ast-rule 'SWRoot->Comp*-RealProperty*)
     (ast-rule 'Comp->name-Impl*-selectedimpl-Property*)
@@ -75,9 +85,9 @@
     (ast-rule 'ReqClause:Clause->)
     (ast-rule 'ProvClause:Clause->)
     (ast-rule 'HWRoot->ResourceType*-Resource*<SubResources-RealProperty*)
-    (ast-rule 'ResourceType->name-Property*)
+    (ast-rule 'ResourceType->name-container-Property*)
     ; type is a ResourceType
-    (ast-rule 'Resource->name-type-Resource*<SubResources-ProvClause*)
+    (ast-rule 'Resource->name-type-status-Resource*<SubResources-ProvClause*)
     (ast-rule 'Request->MetaParameter*-target-ReqClause*<Constraints-objective)
     (ast-rule 'MetaParameter->name-value)
     (ast-rule 'Property->)

@@ -34,15 +34,15 @@
        ((not udf?) #f) ; marked as remove
        (else udf?)))) ; apply user-defined function
  
- ; udfs: function (res-name → function (property → clause)). ud-types: function (res-name → nr of res-type).
+ ; udfs: function (res-name → function (property → clause)). ud-types: function (res-name → (nr-of-res-type . container?)).
  ; Returns the HWRoot
  (define (create-hw load freq num-pe num-subs ud-clauses ud-types)
    (define types-al (list))
-   (define (make-type nr) (:ResourceType mquat-spec (node-name "type" (list nr))
-                                         (list (:PropertyRef mquat-spec load) (:PropertyRef mquat-spec freq))))
-   (define (type nr)
+   (define (make-type nr container?) (:ResourceType mquat-spec (node-name "type" (list nr)) container?
+                                                    (list (:PropertyRef mquat-spec load) (:PropertyRef mquat-spec freq))))
+   (define (type nr container?)
      (let ([entry (assq nr types-al)])
-       (if entry (cdr entry) (let ([new (make-type nr)]) (set! types-al (cons (cons nr new) types-al)) new))))
+       (if entry (cdr entry) (let ([new (make-type nr container?)]) (set! types-al (cons (cons nr new) types-al)) new))))
    (define (create-hw-clause udfs name property)
      (let ([f (create-clause udfs default-hw-clause-gen name)])
        (if f (let ([args (f (->name property))])
@@ -60,9 +60,9 @@
                                                    (floor (/ (- total 1) subs)) subs)) (min total subs)))]
             [make-res
              (lambda (id total subs)
-               (let ([type-nr? (ud-types id)])
+               (let ([type? (ud-types id)])
                  (:Resource mquat-spec
-                            id (type (if type-nr? type-nr? 0)) (make-subs id total subs)
+                            id (type (if type? (car type?) 0) (if type? (cdr type?) #t)) online (make-subs id total subs)
                             (filter something (list (create-hw-clause ud-clauses id load)
                                                     (create-hw-clause ud-clauses id freq))))))])
      (let ([subs (make-subs "r" num-pe (if (= 0 num-subs) num-pe num-subs))])

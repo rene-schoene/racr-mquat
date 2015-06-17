@@ -3,9 +3,12 @@
 (library
  (mquat basic-ag)
  (export add-basic-ags
-         =value-attr =req-comp-map =req-comp-min =req-comp-all =real =objective-val =clauses-met?
-         =eval =eval-on =value-of =actual-value =provided-clause =mode-to-use =selected? =deployed? =hw?
-         <=request <=impl <=comp =search-prov-clause =search-req-clause =maximum
+         =objective-val =clauses-met?
+         =mode-to-use =selected? =deployed? =hw?
+         =req-comp-map =req-comp-min =req-comp-all =real
+         =eval =eval-on =value-of =actual-value =value-attr =maximum
+         <=request <=impl <=comp
+         =search-prov-clause =search-req-clause =search-pe =provided-clause
          =every-pe =every-comp =every-impl =every-mode =every-req-clause =every-prov-clause =every-sw-clause =every-hw-clause)
  (import (rnrs) (racr core)
          (mquat constants) (mquat utils) (mquat ast))
@@ -48,6 +51,7 @@
  (define (=lookup-clause n prop)      (att-value 'lookup-clause n prop))
  (define (=maximum n)          (att-value 'maximum n))
  (define (=max-help n arg0)    (att-value 'max-help n arg0))
+ (define (=search-pe n name)   (att-value 'search-pe n name))
 
  (define (add-basic-ags mquat-spec)
    (with-specification
@@ -170,6 +174,13 @@
          (lambda (index clause)
            (and (ast-subtype? clause subtype) (string=? (->name (=real (->return-type clause))) name)))
          (->Clause* n)))))
+
+    ; Search for a resource with the given name
+    (ag-rule
+     search-pe
+     (Root (lambda (n name) (ast-find-child (lambda (i pe) (=search-pe pe name)) (->SubResources (->HWRoot n)))))
+     (Resource (lambda (n name) (or (string=? (->name n) name) (ast-find-child (lambda (i pe) (=search-pe pe name))
+                                                                               (->SubResources n))))))
     
     ; Get request from every node
     (ag-rule get-request (Root (lambda (n) (ast-child 'Request n))))
