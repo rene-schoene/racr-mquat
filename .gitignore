@@ -14,9 +14,3 @@ gen.pdf
 gen.png
 sol.pdf
 sol.png
-
-# Documentation
-doc/*.pdf
-doc/presentation.tex
-doc/tmp
-doc/notes.xml

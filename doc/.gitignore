@@ -1,0 +1,13 @@
+# Documentation
+*.pdf
+!racr-mquat.pdf
+presentation.tex
+tmp
+notes.xml
+*.aux
+*.bbl
+*.blg
+*.nav
+*.out
+*.snm
+*.toc

@@ -14,11 +14,11 @@ comment:
 # Start and Problems
 ## Where we started
 
-- MQuAT concept
+- MQuAT concept \cite{gotz2014models}
 	- Self-adaptive system optimizing for multiple qualities
 	- Component-based design for both hardware and software
 	- Quality contracts capturing requirements and guarantees of components
-- THEATRE as a Java-based implementation of MQuAT
+- THEATRE \cite{gotz2010theatre} as a Java-based implementation of MQuAT
 	- Knowledge represented with EMF-Models
 	- Optimization problem solved by transformation to ILP
 	- Designed for distributed operation (see HAECubie) using Master-Slave-Pattern \cite{sahni1996scheduling}
@@ -54,14 +54,15 @@ comment:
 
 - Even better performance using Gurobi (commercial solver)
 
-\centerline{\includegraphics[width=1.2\linewidth]{../sol.pdf}}
+\centerline{\includegraphics[width=\linewidth]{../sol.pdf}}
 
 # Ideas and Current State
-## What was the idea to solve the problem
+## What is the idea to solve the problem
 
-- Use RACR
+- Use RACR \cite{burger2012racr}
+	- **R**eference **A**ttribute Grammer **C**ontrolled **R**ewriting
 	- specify knowledge as an ASG\footnote{Abstract Syntax Graph, i.e. an Abstract Syntax Tree with references}
-	  whose structure is defined by an RAG\footnote{Reference Attribute Grammer}
+	  whose structure is defined by a RAG\footnote{Reference Attribute Grammer}
 	- RAG is a combination of structural and variant model, avoiding duplicate information
 	- analyses run on ASG now inherently incremental
 
@@ -69,17 +70,19 @@ comment:
 
 - Hm, not quite there yet:
 
-\centerline{\includegraphics[width=1.2\linewidth]{../gen.pdf}}
+\centerline{\includegraphics[width=\linewidth]{../gen.pdf}}
 
 ## Some Facts
 
 - repository: <https://bitbucket.org/rschoene/racr-mquat>
-- IPython [Notebook](http://nbviewer.ipython.org/urls/bitbucket.org/rschoene/racr-mquat/raw/master/ilp-measurement.ipynb) used for measurement plots
+- IPython Notebook\footnote{http://nbviewer.ipython.org/urls/bitbucket.org/rschoene/racr-mquat/raw/master/ilp-measurement.ipynb} used for measurement plots
 - Main language: Scheme
-	- implementations used: [Racket](http://racket-lang.org/), [Larceny](http://www.larcenists.org/)
+	- implementations used: Racket\footnote{http://racket-lang.org/}, Larceny\footnote{http://www.larcenists.org/}
 - Measurement and test scripts: Python
 
 ## Code Facts
+
+Using cloc\footnote{http://cloc.sourceforge.net/}
 
 --------------------------------------------------------------------------------
 Language                      files          blank        comment           code
@@ -108,14 +111,14 @@ SUM:                             22            267            292           2615
 - Do not transform to ILP
 	- Implement an heuristic similar to HAEC demo of Daniel and Johannes
 - Apply static analysis where appropriate, e.g.
+	- Abstract Interpretation \cite{Cousot1977,Rosendahl1990} to estimate energy consumption \cite{Jayaseelan2006,Rusu2003}
+	- Describe decisions \cite{Danylenko2015}
 	- Find configurations, which can never be used
 	- Unify constraints (in contracts) of modes
 - Extend AG
-	- Describe multiple systems and their interaction
+	- Describe multiple systems and their interaction \cite{WSG+2013}
 	- Include behaviour model
 
 \oppcomment{%
 - vision slides <br/>%
 }
-
-\oppend

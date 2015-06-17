@@ -11,12 +11,16 @@
 
 % more preamble...
 \usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \usepackage{babel}
 \usepackage{selinput}
 \usepackage{luacode}
 \usepackage{longtable}
 \usepackage{booktabs}
 \bibliographystyle{alpha}
+
+\setbeamersize{text margin right=15pt}
+%\DeclareTextCommandDefault{\textbullet}{\ensuremath{\bullet}}
 
 \begin{luacode*}
 	newline = function()
@@ -69,15 +73,18 @@
 	end
 }}
 
+
 \begin{document}
 
 \maketitle
 
 \input{"presentation.tex"}
+\oppend
 
-\begin{frame}
+\begin{frame}[allowframebreaks]
 \frametitle{References}
-\bibliography{refs}
+\nocite{*}
+\small\bibliography{refs}
 \end{frame}
 
 \end{document}

@@ -1,11 +1,21 @@
-all: presentation.tex racr-mquat.pdf
+MAIN = racr-mquat.tex
+BIB  = refs.bib
+PDF  = racr-mquat.pdf
+
+.PHONY: all clean
+
+all: $(PDF) Makefile
 
 presentation.tex: presentation.md
 	pandoc --latex-engine=xelatex -t beamer presentation.md -o presentation.tex
 
-racr-mquat.pdf: presentation.tex racr-mquat.tex presentation.md
-	lualatex --output-directory=./tmp racr-mquat.tex
-	bibtex tmp/racr-mquat.aux
-	lualatex --output-directory=./tmp racr-mquat.tex
-	lualatex --output-directory=./tmp racr-mquat.tex
-	mv tmp/racr-mquat.pdf .
+$(PDF): presentation.tex $(MAIN) $(BIB)
+	lualatex $(MAIN)
+	bibtex racr-mquat
+	lualatex $(MAIN)
+	lualatex $(MAIN)
+
+clean:
+	rm -f *~
+	rm -f *.{aux,log,bbl,blg}
+	rm -f $(PDF)
