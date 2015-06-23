@@ -27,18 +27,18 @@ comment:
 
 Mapping *n* components on *m* resources
 
-\centerline{\includegraphics[width=\linewidth]{opt_problem.pdf}}
+\centerline{\includegraphics[width=\linewidth]{images/opt_problem.pdf}}
 
 ## The optimization problem solved
 
 Mapping *n* components on *m* resources
 
-\centerline{\includegraphics[width=\linewidth]{opt_problem_sol.pdf}}
+\centerline{\includegraphics[width=\linewidth]{images/opt_problem_sol.pdf}}
 
 ## What was the problem
 
 - Usage of ILP thought *unusable* for bigger systems
-	- Current measurements disprove this, see slides 10 and 11
+	- Current measurements disprove this, see slides 11 – 13
 - EMF-Model (element)s somewhat ambiguous or superfluous
 	- Component requirement possible on both, component- and mode-level
 	- Structure and variant model contain similar information
@@ -61,31 +61,24 @@ Mapping *n* components on *m* resources
 	- RAG is a combination of structural and variant model, avoiding duplicate information
 	- Analyses run on ASG now run inherently **incremental** and are defined **declarative**
 
-## Current state, compared to existing work
+## Test setup
 
-- Not quite there yet:
+\centerline{\includegraphics[width=\linewidth]{images/gen_sol_arch.pdf}}
 
-\centerline{\includegraphics[width=\linewidth]{../gen.pdf}}
+\(a) Initial creation, (b) HW changes
 
-\oppcomment{%
-- Generation with <br/>%
-	- Left = Java <br/>%
-	- Middle = Racket <br/>%
-	- Right = Larceny <br/>%
-- 8 seconds maximum <br/>%
-- steps during synthetic scenario, increasing amount of changes
-}
+## Measurements
 
-
-## Measurement on solving times
-
-- Measurement on solving times
-	- Context: System Generator to generate ILP for increasing size of systems
-	- 23 different sizes of systems, 40sec timeout
-	- Format of ILP adopted for glpk via own Python script
-- Result for Java-based solution
+- Setup
+	- System Generator to generate ILP for increasing size of systems
+	- 23 different sizes of systems
+	- ILP-Solving with 40sec timeout
+	- Two new aspects
+		- technology used: Java vs. RACR
+		- ILP format: old vs. enhanced
+- ILP-Solving using existing Java-based ILP format
 	- Timeouts: glpk 10/23, lpsolve 8/23
-- Result for RACR-based solution (enhanced ILP)
+- ILP-Solving using RACR-based enhanced ILP format
 	- All but one systems solved within 5sec (outlier 12sec)
 
 \oppcomment{%
@@ -97,11 +90,35 @@ Mapping *n* components on *m* resources
 	- side result
 }
 
+## Measurement on generation times
+
+- Not quite there yet:
+
+\centerline{\includegraphics[height=0.6\textheight]{images/gen.pdf}}
+
+\oppcomment{%
+- Generation with <br/>%
+	- Left = Java <br/>%
+	- Middle = Racket <br/>%
+	- Right = Larceny <br/>%
+- 8 seconds maximum <br/>%
+- steps during synthetic scenario, increasing amount of changes
+}
+
 ## Measurement on solving times (2)
 
-- Even better performance using Gurobi (commercial solver)
+- Promising results
 
-\centerline{\includegraphics[width=\linewidth]{../sol.pdf}}
+<!--\centerline{\includegraphics[width=\linewidth]{images/sol.pdf}}-->
+\centerline{\includegraphics[height=0.6\textheight]{images/sol.pdf}}
+
+
+## Measurement on solving times (3)
+
+\centerline{\includegraphics[height=0.5\textheight]{images/comp_sol.pdf}}
+
+- solid = GLPK, old format, dashed = GLPK, enhanced format
+- dotted = Gurobi, enhanced format ($\leq$ 1sec)
 
 ## Current pitfalls
 
@@ -116,25 +133,17 @@ Mapping *n* components on *m* resources
 ## General Facts
 
 - <https://bitbucket.org/rschoene/racr-mquat>
-- IPython Notebook\footnote{http://nbviewer.ipython.org/urls/bitbucket.org/rschoene/racr-mquat/raw/master/ilp-measurement.ipynb} used for measurement plots
 - Main language: Scheme
 	- Implementations used: Racket\footnote{http://racket-lang.org/}, Larceny\footnote{http://www.larcenists.org/}
-- Measurement and test scripts: Python
-
-## Code Facts
-
-Using cloc\footnote{http://cloc.sourceforge.net/}
 
 --------------------------------------------------------------------------------
 Language                      files          blank        comment           code
 -------------------------   -------   ------------   ------------   ------------
-Scheme                           15            224            316           2287
+Scheme                          14            203            300           2207
 
-Python                            8             81             44            509
+Python                           7             75             43            477
 
-Bourne Again Shell                1              0              0              2
-
-SUM:                             24            305            360           2798
+SUM:                            21            278            343           2684
 --------------------------------------------------------------------------------
 
 # The future
@@ -156,21 +165,16 @@ SUM:                             24            305            360           2798
 - heuristic different from RACRtune
 }
 
-# Presentation TODOs
+## An example application of static analysis
 
-## todo
+WCET squeezing \cite{knoop2013wcet}
 
-arch. picture slide 7
-slide 8
-	-> 2 folien
-	-> overlay glpk(java) + glpk(scheme) + glpk/gurobi)
-future -> wcet squeezing
-	- slides on website of j.knoop?
+- Combines ILP solving with symbolic execution \cite{King1976} (SE)
+- Iterative, alternating, automatic approach
+- SE either tighten found bound	– or proves it precise
 
-## done
+Application to HAEC use case
 
-where we started
-	-> Phase I
-different impls slide 5
-slide 4 captialize
-other wording slide 6
+- Do WCEC squeezing
+	- worst case energy consumption
+	- based on energy contracts

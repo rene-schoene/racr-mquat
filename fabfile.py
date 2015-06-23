@@ -15,4 +15,4 @@ def call_larceny(f, *args):
 
 @task
 def cloc():
-	local('cloc . --exclude-dir=doc,gen,profiling,test,racket-bin,larceny-bin --not-match-f="tricks|larceny|Makefile"')
+	local('cloc . --exclude-dir=doc,gen,profiling,test,racket-bin,larceny-bin --not-match-f="tricks|larceny|Makefile|ls"')
