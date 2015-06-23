@@ -17,6 +17,8 @@
 \usepackage{luacode}
 \usepackage{longtable}
 \usepackage{booktabs}
+\usepackage{multicol}
+
 \bibliographystyle{alpha}
 
 \setbeamersize{text margin right=15pt}
@@ -53,7 +55,7 @@
 %	end
 
 	notestring = notestring	.. "SEC" .. tab() .. " \thesection "  .. newline()
-	notestring = notestring	.. "SUBSEC" .. tab() .. " \thesubsection " .. newline()
+%	notestring = notestring	.. "SUBSEC" .. tab() .. " \thesubsection " .. newline()
 
 	local content = "#1";
 	notestring = notestring
@@ -81,10 +83,14 @@
 \input{"presentation.tex"}
 \oppend
 
-\begin{frame}[allowframebreaks]
+%allowframebreaks,
+\begin{frame}[allowframebreaks]%[shrink=5]
+%\begin{multicols}{2}[\frametitle{\insertsection} \usebeamertemplate{frametitle}]
 \frametitle{References}
-\nocite{*}
-\small\bibliography{refs}
+\footnotesize
+%\nocite{*}
+\bibliography{refs}
+%\end{multicols}
 \end{frame}
 
 \end{document}

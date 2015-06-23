@@ -75,7 +75,7 @@ def sol(solver = 'glpsol', pathname = '*', skip_conflate = False):
 def sol_n(number, solver = 'glpsol', pathname = '*', skip_conflate = False):
 	do_sol(number, pathname, skip_conflate)
 
-params = { 'glpsol' : ['glpsol --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
+params = { 'glpsol' : ['glpsol --tmlim 40 --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
 		   'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
 
 def do_sol(solver, number, pathname, skip_conflate):
