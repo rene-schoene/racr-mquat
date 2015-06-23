@@ -39,7 +39,7 @@ Mapping *n* components on *m* resources
 
 - Usage of ILP thought *unusable* for bigger systems
 	- Current measurements disprove this, see slides 11 – 13
-- EMF-Model (element)s somewhat ambiguous or superfluous
+- EMF-Models and some of their elements ambiguous or redudant
 	- Component requirement possible on both, component- and mode-level
 	- Structure and variant model contain similar information
 	- General approach of structural model not easy to use (especially for ILP-Generation)
