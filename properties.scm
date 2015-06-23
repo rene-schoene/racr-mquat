@@ -2,7 +2,7 @@
 
 (library
  (mquat properties)
- (export timing? verbose? write-ilp?)
+ (export timing? log.debug? log.info? log.warn? write-ilp?)
  (import (rnrs) (only (srfi :13) string-tokenize string-index string-trim-both) (srfi :14))
 
  (define (file->char_list path)
@@ -37,5 +37,7 @@
                                     (if entry (cdr entry) default)))
  
  (define timing? (get-value "timing" #f))
- (define verbose? (get-value "verbose" #f))
+ (define log.debug? (get-value "log.debug" #f))
+ (define log.info? (get-value "log.info" #t))
+ (define log.warn? (get-value "log.warn" #t))
  (define write-ilp? (get-value "write-ilp" #f)))

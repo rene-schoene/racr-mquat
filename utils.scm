@@ -6,7 +6,7 @@
          lonely? recur ; ast
          save-to-file ; files
          time-it current-date-formatted date-file-name ; measurement
-         debug cli-debugging-arg=? debugging?) ; debug
+         debug info warn log0) ; logging
  (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (mquat constants) (mquat properties))
  
@@ -53,34 +53,19 @@
  ;; Debugging
  
  (define (cli-debugging-arg=? arg) (or (string=? "-v" arg) (string=? "--verbose" arg)))
- (define debugging verbose?)
- (define (debugging?) debugging)
 
  ; Displays the given arguments
- (define (debug0 . args)
-  (letrec
-      ([D (lambda (loa) ; [l]ist [o]f [a]rgs
-            (cond
-              ((= (length loa) 0) "") ;no arguments given
-              ((null? (car loa)) "") ;end of recursion
-              (else ;recure with cdr
-               (string-append (P (car loa)) " " (D (cdr loa))))))]
-       [P (lambda (s)
-             (cond
-               ((string? s) s)
-               ((boolean? s) (if s "#t" "#f"))
-               ((symbol? s) (symbol->string s))
-               ((number? s) (number->string s))
-               ((list? s) (string-append "(" (D s) ")"))
-               ((procedure? s) "<proc>")
-               ((ast-node? s) (if (ast-has-child? 'name s) (P (ast-child 'name s))
-                                  (string-append "<node " (symbol->string (ast-node-type s)) ">")))
-               (else "?")))])
-    (display (D args)) (display "\n") (when (not (null? args)) (car args))))
+ (define (log0 . args)
+   (map (lambda (x) (display (if (ast-node? x)
+                                 (if (ast-has-child? 'name x) (ast-child 'name x)
+                                     (string-append "<node " (cond [(ast-list-node? x)   "#List"]
+                                                                   [(ast-bud-node? x)    "#Bud"]
+                                                                   [else (symbol->string (ast-node-type x))]) ">")) x))
+          (display " ")) args) (newline) (when (not (null? args)) (car args)))
  
- (define-syntax debug
-   (syntax-rules ()
-     [(_ args ...) (and debugging (debug0 args ...))]))
+ (define-syntax debug (syntax-rules () [(_ args ...) (and log.debug? (log0 args ...))]))
+ (define-syntax info (syntax-rules () [(_ args ...) (and log.info? (log0 args ...))]))
+ (define-syntax warn (syntax-rules () [(_ args ...) (and log.warn? (log0 args ...))]))
 
  ;; Text save
  
