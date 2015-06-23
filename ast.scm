@@ -27,7 +27,7 @@
  (define (->RealProperty* n)  (ast-child 'RealProperty* n))
  (define (->name n)           (ast-child 'name n))
  (define (->Impl* n)          (ast-child 'Impl* n))
- (define (->selected-impl n)  (ast-child 'selectedImpl n))
+ (define (->selected-impl n)  (ast-child 'selectedimpl n))
  (define (->Property* n)      (ast-child 'Property* n))
  (define (->deployed-on n)    (ast-child 'deployedon n))
  (define (->selected-mode n)  (ast-child 'selectedmode n))

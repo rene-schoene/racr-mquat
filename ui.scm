@@ -7,15 +7,17 @@
  (import (rnrs) (racr core) (racr testing)
          (mquat constants) (mquat ast) (mquat basic-ag))
 
+ (define (name-or-type n) (if (ast-has-child? 'name n) (->name n) (ast-node-type n)))
+ 
  (define (clauses-to-list loc)
    (fold-left
     (lambda (result clause)
-      (let ([returnType (->name (->return-type clause))]
+      (let ([returnType (->name (=real (->return-type clause)))]
             [evalValue (=eval clause)]
             [compName (comp->rev-string (->comparator clause))])
         (cons
          (if (ast-subtype? clause 'ProvClause) (list returnType compName evalValue)
-             (list returnType 'on (->name (<<- (->return-type clause)))
+             (list returnType 'on (name-or-type (<<- (=real (->return-type clause))))
                    compName evalValue 'currently: (=actual-value clause)))
          result)))
     (list) loc))
@@ -81,10 +83,9 @@
  
  ; Given a component (or an impl) and a resource, change deployed-on of the selected impl
  ; of the given component (or the given impl) to the given resource, returning the old resource
- (define (deploy-on x new-pe ast)
-   (rewrite-terminal 'deployedon (if (ast-subtype? x 'Comp) (->selected-impl x) x) new-pe))
+ (define (deploy-on x new-pe) (rewrite-terminal 'deployedon (if (ast-subtype? x 'Comp) (->selected-impl x) x) new-pe))
  
- (define (use-next-impl comp ast)
+ (define (use-next-impl comp)
    (let* ([former-impl (->selected-impl comp)]
           [former-index (ast-child-index former-impl)]
           [num-impls (ast-num-children (->Impl* comp))]
