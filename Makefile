@@ -1,5 +1,5 @@
-RACR_RACKET_BIN   = $$HOME/git/racr/racr/racket-bin
-RACR_LARCENY_BIN  = $$HOME/git/racr/racr/larceny-bin
+RACR_RACKET_BIN   = $$HOME/git/2bt/racr/racr/racket-bin
+RACR_LARCENY_BIN  = $$HOME/git/2bt/racr/racr/larceny-bin
 RACKET_BUILD_DIR  = racket-bin
 LARCENY_BUILD_DIR = larceny-bin
 RDEPS := $(shell sed -e '1,/@sources:/d' dependencies.txt | while read l; do echo $(RACKET_BUILD_DIR)/mquat/$$l.ss; done)
