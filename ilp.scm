@@ -6,6 +6,7 @@
  (import (rnrs) (racr core) (srfi :19) (prefix (only (srfi :13) string-map) srfi:)
          (mquat properties) (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
  
+ (define (=check-model n)               (att-value 'check-model n))
  (define (=to-ilp n)                    (att-value 'to-ilp n))
  (define (=ilp-name n)                  (att-value 'ilp-name n))
  (define (=ilp-binvar n)                (att-value 'ilp-binvar n))
@@ -96,7 +97,17 @@
  (define (add-ilp-ags mquat-spec)
    (with-specification
     mquat-spec
-    
+
+    (ag-rule
+     check-model
+     (Root
+      (lambda (n)
+        (when (= 0 (length (=every-pe n))) (warn "No resources found"))
+        (when (= 0 (length (=every-container n))) (warn "No container found"))
+        (when (= 0 (length (=every-comp n))) (warn "No component found for request"))
+        (when (= 0 (length (=every-impl n))) (warn "No implementation found for request"))
+        (when (= 0 (length (=every-mode n))) (warn "No modes found for request")))))
+      
     ;;; ILP-Creation rules
     
     ; Return a list of 1 objective, some constraints, some bounds and some generals, everything
@@ -105,6 +116,7 @@
      to-ilp
      (Root
       (lambda (n)
+        (=check-model n)
         (let* ([binary-vars (=ilp-binary-vars n)]
                [result
                 (list
@@ -112,15 +124,17 @@
                  (=ilp-objective n)
                  (list "Subject To")
                  (append
-                  ;(debug "request")
+;                  (debug (list) "request")
                   (=to-ilp (<=request n)) ; request-constraints
-                  ;(debug "arch-c")
+;                  (debug (list) "arch-c")
                   (=to-ilp (->SWRoot n)) ; archtitecture-constraints
-                  ;(debug "nfp-nego")
+;                  (debug (list) "nfp-nego")
                   (=ilp-nego n)) ; NFP-negotiation
+;                 (debug (list) "bounds")
                  (list "Bounds")
                  (append
                   (map (lambda (var) (list 0 "<=" var "<=" 1)) binary-vars))
+;                 (debug (list) "generals")
                  (list "Generals")
                  binary-vars
                  (list "End"))])
@@ -155,10 +169,10 @@
                  (append (fold-left (lambda (inner mode) (cons* "+" (=ilp-binvar-deployed mode pe) inner))
                                     (list) (->* (->Mode* n))) result))
                (list "-" (=ilp-binvar n) "=" 0)
-               (=every-pe n))))))
+               (=every-container n))))))
     
     (ag-rule request-target? (Comp (lambda (n) (eq? (->target (<=request n)) n))))
-    
+
     (ag-rule
      ilp-objective
      (Root
@@ -167,11 +181,12 @@
          (lambda (result mode)
            (cons*
             (fold-left (lambda (inner pe) (append (=ilp-objective pe mode) inner))
-                       (list) (=every-pe n))
+                       (list) (=every-container n))
             result))
          (list) (=every-mode n))))
-     (Resource (lambda (n mode) (debug n mode) (list (prepend-sign (=eval-on (=provided-clause mode pn-energy) n))
-                                      (=ilp-binvar-deployed mode n)))))
+     (Resource (lambda (n mode) (debug n mode) (list (prepend-sign (=eval-on (=provided-clause mode (=objective-name n))
+                                                                             (->type n)))
+                                                     (=ilp-binvar-deployed mode n)))))
     
     ; Creates a list of NFP-negotiation constraints
     (ag-rule
@@ -215,7 +230,7 @@
 ;                  (add-to-al inner (=real (->return-type clause))
 ;                             (list (=eval-on clause pe) (=ilp-binvar-deployed (<<- clause) pe))))
 ;;                             (=ilp-eval-binvar clause pe)))
-;                result (=every-pe n))
+;                result (=every-container n))
 ;               result))
 ;;         (list) (append (=every-clause-of n) (->* (->Constraints (<=request n)))))))
 ;         (list) (=every-clause-of n))))
@@ -231,7 +246,7 @@
                 (lambda (inner pe)
                   (add-to-al inner (=real (->return-type clause))
                              (list (=eval-on clause pe) (=ilp-binvar-deployed n pe))))
-                result (=every-pe n))
+                result (=every-container n))
                result))
 ;         (list) (att-value 'combined-reqs n))))
          (list) (->* (->Clause* n)))))
@@ -287,7 +302,7 @@
                                                    (=eval-on (=provided-clause pe (->name (cdar entry))
                                                                                (->type pe)) pe))))
                                        inner))
-             (list) (=every-pe n))
+             (list) (=every-container n))
             result))
          (list) (=req-hw-clauses n)))))
     
@@ -350,7 +365,7 @@
         (append
          (map (lambda (impl) (=ilp-binvar impl)) (=every-impl n))
          (fold-left (lambda (result mode) (append (map (lambda (pe) (=ilp-binvar-deployed mode pe))
-                                                       (=every-pe n)) result))
+                                                       (=every-container n)) result))
                     (list) (=every-mode n))))))
     
     (ag-rule
