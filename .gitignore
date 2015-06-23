@@ -10,7 +10,4 @@ profiling/*
 !profiling/sol-header
 !profiling/gen-header
 *.log
-gen.pdf
-gen.png
-sol.pdf
-sol.png
+*.png

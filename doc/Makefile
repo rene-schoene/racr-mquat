@@ -1,24 +1,42 @@
-MAIN = racr-mquat.tex
-BIB  = refs.bib
-PDF  = racr-mquat.pdf
+MAIN  = racr-mquat.tex
+BIB   = refs.bib
+PDF   = racr-mquat.pdf
+LATEX = lualatex --synctex=1
 
 IMAGES = 	opt_problem.pdf     \
 			opt_problem_sol.pdf \
-			../gen.pdf          \
-			../sol.pdf
+			gen_sol_arch.pdf    \
+			gen.pdf             \
+			sol.pdf             \
+			comp_sol.pdf
 
-.PHONY: all clean
+CROPPED = $(IMAGES:%.pdf=images/$(basename %.pdf).pdf)
+
+.PHONY: all clean quick
 
 all: $(PDF) presentation.md Makefile
 
 presentation.tex: presentation.md
 	pandoc --latex-engine=xelatex -t beamer presentation.md -o presentation.tex
 
-$(PDF): presentation.tex $(MAIN) $(BIB) $(IMAGES)
-	lualatex $(MAIN)
+$(PDF): presentation.tex $(MAIN) $(BIB) $(CROPPED)
+	$(LATEX) $(MAIN)
+#	lualatex $(MAIN)
 	bibtex racr-mquat
-	lualatex $(MAIN)
-	lualatex $(MAIN)
+	$(LATEX) $(MAIN)
+	$(LATEX) $(MAIN)
+
+quick: presentation.tex $(MAIN) $(BIB) $(CROPPED)
+	$(LATEX) $(MAIN)
+
+images/gen.pdf: gen.pdf
+	pdfcrop --margins='0 0 100 0' $< $@
+
+images/sol.pdf: sol.pdf
+	pdfcrop --margins='0 0 100 0' $< $@
+
+images/%.pdf: %.pdf
+	pdfcrop $< $@
 
 clean:
 	rm -f *~

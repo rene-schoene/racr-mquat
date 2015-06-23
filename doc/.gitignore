@@ -1,6 +1,7 @@
 # Documentation
 *.pdf
 !racr-mquat.pdf
+!/images/*.pdf
 presentation.tex
 tmp
 notes.xml
@@ -11,3 +12,4 @@ notes.xml
 *.out
 *.snm
 *.toc
+*.synctex.gz
