@@ -19,6 +19,7 @@
 (define energy (:RealProperty ms pn-energy "J" 'runtime 'decreasing 'sum))
 (define response-time (:RealProperty ms "Response-time" "ms" 'runtime 'decreasing 'sum))
 (define precision (:RealProperty ms "Precision" #f 'runtime 'increasing 'agg))
+(define pal (list (cons 'energy energy) (cons 'response-time response-time) (cons 'precision precision)))
 ;; MetaParameter-Names and -Nodes
 ;(define workers "workers")
 ;(define particles "particles")
@@ -86,9 +87,12 @@
             (when clause? (rewrite-delete clause?))))) ; delete existing clause
 
 (define (update-request-objective objective)
-  (let ([old-objective (->objective (<=request ast))])
-    (when (not (eq? old-objective objective))
-      (rewrite-terminal 'objective (<=request ast) (->name objective)))))
+  (let ([new-objective (assq objective pal)]
+        [old-objective (->objective (<=request ast))])
+    (if new-objective
+        (when (not (eq? old-objective (cdr new-objective)))
+          (rewrite-terminal 'objective (<=request ast) (->name (cdr new-objective))))
+        (warn "Unknown objective" objective))))
 
 (define (event-work-complete id time work-id)
   ; TODO do something useful

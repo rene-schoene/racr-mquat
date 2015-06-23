@@ -5,7 +5,7 @@ LARCENY_BUILD_DIR = larceny-bin
 RDEPS := $(shell sed -e '1,/@sources:/d' dependencies.txt | while read l; do echo $(RACKET_BUILD_DIR)/mquat/$$l.ss; done)
 LDEPS := $(shell sed -e '1,/@sources:/d' dependencies.txt | while read l; do echo $(LARCENY_BUILD_DIR)/mquat/$$l.sls; done)
 
-.PHONY: larceny racket
+.PHONY: larceny racket run
 # larceny builds everytime, so not included in default target
 all: racket
 
@@ -23,3 +23,9 @@ $(RACKET_BUILD_DIR)/mquat/%.ss: %.scm Makefile
 
 larceny-bin/mquat/%.sls: %.scm
 	cp -a $< $@
+
+SocketTest: SocketTest.java
+	javac SocketTest.java
+
+run: SocketTest
+	rlwrap java SocketTest localhost 1338
