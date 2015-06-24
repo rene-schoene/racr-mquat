@@ -1,7 +1,7 @@
 # Documentation
 *.pdf
 !racr-mquat.pdf
-!/images/*.pdf
+!/images/*
 presentation.tex
 tmp
 notes.xml

@@ -1,8 +1,9 @@
-# Binaries
+# Binaries and temporary files
 racket-bin
 larceny-bin
 compile-stale
 *.pyc
+**/*.scm~
 
 # Test and measurment directories, files and output
 test
@@ -11,3 +12,4 @@ profiling/*
 !profiling/gen-header
 *.log
 *.png
+.ipynb_checkpoints/
