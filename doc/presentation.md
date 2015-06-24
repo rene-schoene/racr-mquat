@@ -225,7 +225,11 @@ SUM:                            19            212            185           1546
 - but expected to be faster than ILP, directly using features of RACR <br/>%
 - static analysis (Phase II), abstract interpretation of program <br/>%
 - formally describe decisions, eliminate unreachable configurations, unify constraints <br/>%
-- could also go in direction of multiple systems
+- could also go in direction of multiple systems <br/>%
+ <br/>%
+- Comment from Markus Daun: They solve similar problems and use an own technique, also with caching. <br/>%
+- Comment from Walte: He thinks, that the one-execution-at-a-time assumptions is quite strict. <br/>%
+	- Further he agrees, that unusable resources can also be found using static analysis.
 }
 
 ## An example application of static analysis
