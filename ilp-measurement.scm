@@ -87,18 +87,18 @@
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))])
      (display id-s) (display+flush " ")
      (sit id-s "01-init" ast)
-     (rw "r-1" rt 'load 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
-;     (check-attribut-is-flushed-to 0.1 ast 'r-1 rt 'load) ;<-larceny bug tracking
-     (rw "r-1" rt 'load 0.5 ast) (sit id-s "03-comp1" ast) (display+flush ".")
-;     (check-attribut-is-flushed-to 0.5 ast 'r-1 rt 'load) ;<-larceny bug tracking
-     (rw "r-1" rt 'load 0.8 ast) (rw "r-2" rt 'load 0.8 ast) (rw "r-3" rt 'load 0.8 ast)
+     (rw "r-1" rt "load" 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.1 ast 'r-1 rt "load") ;<-larceny bug tracking
+     (rw "r-1" rt "load" 0.5 ast) (sit id-s "03-comp1" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.5 ast 'r-1 rt "load") ;<-larceny bug tracking
+     (rw "r-1" rt "load" 0.8 ast) (rw "r-2" rt "load" 0.8 ast) (rw "r-3" rt "load" 0.8 ast)
      (sit id-s "04-three-comps" ast) (display+flush ".")
-;     (check-attribut-is-flushed-to 0.8 ast 'r-1 rt 'load) ;<-larceny bug tracking
-     (rw* rt 'load 0.1 ast) (sit id-s "05-every-comp" ast) (display+flush ".")
+;     (check-attribut-is-flushed-to 0.8 ast 'r-1 rt "load") ;<-larceny bug tracking
+     (rw* rt "load" 0.1 ast) (sit id-s "05-every-comp" ast) (display+flush ".")
 ;     (check-value-is-static ast) ;<-larceny bug tracking
-     (rw* rt 'load #f ast) (sit id-s "06-every-comp-rand" ast) (display+flush ".")
-     (rw* rt 'load #f ast) (sit id-s "07-every-comp-rand" ast) (display+flush ".")
-     (rw* rt 'load #f ast) (sit id-s "08-every-comp-rand" ast) (display+flush ".")))
+     (rw* rt "load" #f ast) (sit id-s "06-every-comp-rand" ast) (display+flush ".")
+     (rw* rt "load" #f ast) (sit id-s "07-every-comp-rand" ast) (display+flush ".")
+     (rw* rt "load" #f ast) (sit id-s "08-every-comp-rand" ast) (display+flush ".")))
 
  (define (print-usage) (error "measurement-cli-call" "No valid arguments found, either use 'all', 'dirs' or a number of ids."))
  

@@ -1,0 +1,4 @@
+#!r6rs
+(import (rnrs) (larceny compiler))
+(compiler-switches (quote fast-safe))
+(compile-stale-libraries)
