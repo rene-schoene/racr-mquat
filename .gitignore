@@ -4,6 +4,7 @@ larceny-bin
 compile-stale
 *.pyc
 **/*.scm~
+*.class
 
 # Test and measurment directories, files and output
 test

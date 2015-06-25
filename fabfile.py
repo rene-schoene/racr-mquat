@@ -3,6 +3,7 @@ import ilp_test as test
 import ilp_measurement as measure
 import ilp_check as check
 import install
+import sockets
 from fabric.api import local, task
 
 @task
