@@ -22,6 +22,8 @@ def run_larceny(*given_ranges):
 	do_run(utils.call_larceny, given_ranges)
 
 def do_run(call_impl, given_ranges):
+	if not os.path.exists('test'):
+		os.mkdir('test')
 	supported_ranges = get_ranges(call_impl)
 	ranges = parse_ranges(supported_ranges, given_ranges)
 	print "Ranges:", ranges
@@ -210,6 +212,9 @@ def _scheme_solution_file(test_nr):
 def _lp_file(test_nr):
 	return "test/{0}.lp".format(test_nr)
 
+def _out_file(test_nr):
+	return "test/{0}.out".format(test_nr)
+
 def run_case(test_nr, thread_id, call_impl):
 	s = '{0}.'.format(test_nr)
 	sys.stdout.write(s)
@@ -224,6 +229,9 @@ def run_case(test_nr, thread_id, call_impl):
 	if os.path.exists(fname_sol):
 		os.remove(fname_sol)
 	out = call_impl('cli.scm', 'test', 'run', test_nr, fname_lp_scheme)
+	with open(_out_file(test_nr), "w") as fd:
+		fd.write(out)
+
 	assertTrue(os.path.exists(fname_lp_scheme), "ILP was not generated\n{0}".format(out))
 	shutil.move(fname_lp_scheme, fname_lp_python)
 	

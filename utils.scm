@@ -5,9 +5,10 @@
  (export add-to-al merge-al union intersect-b ; associate lists
          lonely? recur ; ast
          save-to-file ; files
-         time-it current-date-formatted date-file-name ; measurement
+         time-it current-date-formatted date-file-name; measurement
+         att-value-call att-value-compute print-counts ; profiling
          debug info warn log0) ; logging
- (import (rnrs) (racr core) (racr testing) (srfi :19) (srfi :27)
+ (import (rnrs) (rnrs mutable-pairs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (mquat constants) (mquat properties))
  
  ; Either cons val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
@@ -114,4 +115,37 @@
                     (number->string (date-second now)) "_"
                     (number->string (date-nanosecond now)))))
  
- (define (date-file-name prefix ext) (string-append prefix (current-date-formatted) "." ext)))
+ (define (date-file-name prefix ext) (string-append prefix (current-date-formatted) "." ext))
+
+ ; name -> call-count
+ (define call-counts (list))
+ ; name -> call-count
+ (define compute-counts (list))
+ 
+ (define (updated-al al entry update-f default-f)
+   (if entry (map (lambda (e) (if (eq? e entry) (update-f) e)) al)
+       (cons (default-f) al)))
+ 
+ (define (att-value-call name n . args)
+   (let ([entry (assq name call-counts)])
+     (set! call-counts (updated-al call-counts entry
+                                   (lambda _ (let ([count (cdr entry)])
+                                               (cons (car entry) (+ 1 count))))
+                                   (lambda _ (cons name 1)))))
+   (apply att-value (cons* name n args)))
+ 
+ (define (att-value-compute name)
+   (let ([entry (assq name compute-counts)])
+     (set! compute-counts (updated-al compute-counts entry
+                                      (lambda _ (let ([count (cdr entry)])
+                                                  (cons (car entry) (+ 1 count))))
+                                      (lambda _ (cons name 1))))))
+
+ (define (maybe entry default) (if entry (cdr entry) default))
+
+ (define (print-counts)
+   (info "Counts")
+   (map (lambda (entry) (let ([name (car entry)])
+                          (info name (maybe (assq name compute-counts) "?") "/" (cdr entry))))
+        call-counts)))
+; (define (print-compute-counts) (print-per-line compute-counts #t)))

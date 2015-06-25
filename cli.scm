@@ -4,7 +4,7 @@
 
 (define (print-usage) (error 'cli "No valid arguments found, either use 'test' or 'measure' as first parameter."))
 
-(define cmds (cdr (filter (lambda (arg) (not (cli-debugging-arg=? arg))) (command-line))))
+(define cmds (cdr (command-line)))
 
 (cond
   [(= 0 (length cmds)) (print-usage)]

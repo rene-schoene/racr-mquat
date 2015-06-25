@@ -6,27 +6,27 @@
  (import (rnrs) (racr core) (srfi :19) (prefix (only (srfi :13) string-map) srfi:)
          (mquat properties) (mquat constants) (mquat utils) (mquat ast) (mquat basic-ag))
  
- (define (=check-model n)               (att-value 'check-model n))
- (define (=to-ilp n)                    (att-value 'to-ilp n))
- (define (=ilp-name n)                  (att-value 'ilp-name n))
- (define (=ilp-binvar n)                (att-value 'ilp-binvar n))
- (define (=ilp-binvar-deployed n pe)    (debug "ibd" n pe) (att-value 'ilp-binvar-deployed n pe))
- (define (=ilp-binary-vars n)           (att-value 'ilp-binary-vars n))
+ (define (=check-model n)               (att-value-call 'check-model n))
+ (define (=to-ilp n)                    (att-value-call 'to-ilp n))
+ (define (=ilp-name n)                  (att-value-call 'ilp-name n))
+ (define (=ilp-binvar n)                (att-value-call 'ilp-binvar n))
+ (define (=ilp-binvar-deployed n pe)    (debug "ibd" n pe) (att-value-call 'ilp-binvar-deployed n pe))
+ (define (=ilp-binary-vars n)           (att-value-call 'ilp-binary-vars n))
  (define =ilp-objective
-   (case-lambda ((n)                    (att-value 'ilp-objective n))
-                ((n pe)                 (att-value 'ilp-objective n pe))))
- (define (=ilp-nego n)                  (att-value 'ilp-nego n))
- (define (=ilp-nego-sw n)               (att-value 'ilp-nego-sw n))
- (define (=every-clause-of n)           (att-value 'every-clause-of n))
+   (case-lambda ((n)                    (att-value-call 'ilp-objective n))
+                ((n pe)                 (att-value-call 'ilp-objective n pe))))
+ (define (=ilp-nego n)                  (att-value-call 'ilp-nego n))
+ (define (=ilp-nego-sw n)               (att-value-call 'ilp-nego-sw n))
+ (define (=every-clause-of n)           (att-value-call 'every-clause-of n))
  (define =ilp-nego-reqc
-   (case-lambda ((n comp)               (att-value 'ilp-nego-reqc n comp))
-                ((n clausetype comp)    (att-value 'ilp-nego-reqc n clausetype comp))))
- (define (=ilp-nego-hw n)               (att-value 'ilp-nego-hw n))
- (define (=req-hw-properties n)         (att-value 'required-hw-properties n))
- (define (=req-hw-clauses n)            (att-value 'required-hw-clauses n))
- (define (=every-clause n)              (att-value 'every-clause n))
- (define (=ilp-nego-hw0 n comp prop pe) (att-value 'ilp-nego-hw0 n comp prop pe))
- (define (=ilp-eval-binvar n pe)        (att-value 'ilp-eval-binvar n pe))
+   (case-lambda ((n comp)               (att-value-call 'ilp-nego-reqc n comp))
+                ((n clausetype comp)    (att-value-call 'ilp-nego-reqc n clausetype comp))))
+ (define (=ilp-nego-hw n)               (att-value-call 'ilp-nego-hw n))
+ (define (=req-hw-properties n)         (att-value-call 'required-hw-properties n))
+ (define (=req-hw-clauses n)            (att-value-call 'required-hw-clauses n))
+ (define (=every-clause n)              (att-value-call 'every-clause n))
+ (define (=ilp-nego-hw0 n comp prop pe) (att-value-call 'ilp-nego-hw0 n comp prop pe))
+ (define (=ilp-eval-binvar n pe)        (att-value-call 'ilp-eval-binvar n pe))
  
  (define prepend-sign (lambda (val) (if (< val 0) val (string-append "+ " (number->string val)))))
  ; TODO make bidirectional mapping: {_ - +} -> {_0 _1 _2}
@@ -116,6 +116,7 @@
      to-ilp
      (Root
       (lambda (n)
+        (att-value-compute 'to-ilp)
         (=check-model n)
         (let* ([binary-vars (=ilp-binary-vars n)]
                [result
@@ -138,14 +139,16 @@
                  (list "Generals")
                  binary-vars
                  (list "End"))])
-               (write-result-list "profiling/att-measure" "time")
-               result)))
-     (Request (lambda (n) (=ilp-nego-sw n)))
+          (write-result-list "profiling/att-measure" "time")
+          (print-counts)
+          result)))
+     (Request (lambda (n) (att-value-compute'to-ilp) (=ilp-nego-sw n)))
 ;     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))
-     (SWRoot (lambda (n) (fold-left (lambda (result c) (append (=to-ilp c) result))
+     (SWRoot (lambda (n) (att-value-compute'to-ilp) (fold-left (lambda (result c) (append (=to-ilp c) result))
                                     (list) (=every-comp n))))
      (Comp
       (lambda (n)
+        (att-value-compute'to-ilp)
         (debug "Comp:" (->name n))
 ;        (display (=req-hw-clauses n))
         (cons
@@ -162,6 +165,7 @@
          (recur n cons =to-ilp ->Impl*))))
      (Impl
       (lambda (n)
+        (att-value-compute'to-ilp)
         (debug "Impl:" (->name n))
         (cons (string-append "single(" (=ilp-name n) "): ")
               (fold-left ; deploy one combination of mode and pe for this impl
@@ -177,6 +181,7 @@
      ilp-objective
      (Root
       (lambda (n)
+        (att-value-compute 'ilp-objective)
         (fold-left
          (lambda (result mode)
            (cons*
@@ -184,23 +189,25 @@
                        (list) (=every-container n))
             result))
          (list) (=every-mode n))))
-     (Resource (lambda (n mode) (debug n mode) (list (prepend-sign (=eval-on (=provided-clause mode (=objective-name n))
-                                                                             (->type n)))
-                                                     (=ilp-binvar-deployed mode n)))))
+     (Resource (lambda (n mode) (att-value-compute 'ilp-objective)
+                 (debug n mode) (list (prepend-sign (=eval-on (=provided-clause mode (=objective-name n))
+                                                              (->type n)))
+                                      (=ilp-binvar-deployed mode n)))))
     
     ; Creates a list of NFP-negotiation constraints
     (ag-rule
      ilp-nego
-     (Root (lambda (n) (remove (list) (=ilp-nego (->SWRoot n))))) ; remove empty constraints
-     (SWRoot (lambda (n) (fold-left (lambda (result c) (append (=ilp-nego c) result))
-                                    (list) (=every-comp n))))
-     (Comp (lambda (n) (append (=ilp-nego-sw n)
-                               (=ilp-nego-hw n)))))
+     (Root (lambda (n) (att-value-compute 'ilp-nego) (remove (list) (=ilp-nego (->SWRoot n))))) ; remove empty constraints
+     (SWRoot (lambda (n) (att-value-compute 'ilp-nego) (fold-left (lambda (result c) (append (=ilp-nego c) result))
+                                                                  (list) (=every-comp n))))
+     (Comp (lambda (n) (att-value-compute 'ilp-nego) (append (=ilp-nego-sw n)
+                                                             (=ilp-nego-hw n)))))
 
     (ag-rule
      ilp-nego-sw
      (Comp
       (lambda (n)
+        (att-value-compute 'ilp-nego-sw)
         (fold-left ; fold over req-comp-map
          (lambda (result entry)
            (append
@@ -211,6 +218,7 @@
             result)) (list) (=req-comp-map n))))
      (Request
       (lambda (n)
+        (att-value-compute 'ilp-nego-sw)
         (cons (cons "request_target: " (fold-left (lambda (result impl) (cons* "+" (=ilp-binvar impl) result))
                                                   (list "=" 1) (->* (->Impl* (->target n)))))
               (make-constraints
@@ -220,7 +228,8 @@
     (ag-rule
      ilp-nego-reqc
      (Comp ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode of each impl
-      (lambda (n clausetype comparator) (recur n merge-al =ilp-nego-reqc ->Impl* clausetype comparator)))
+      (lambda (n clausetype comparator)  (att-value-compute 'ilp-nego-reqc)
+        (recur n merge-al =ilp-nego-reqc ->Impl* clausetype comparator)))
 ;      (lambda (n clausetype comparator)
 ;        (fold-left 
 ;         (lambda (result clause)
@@ -236,9 +245,11 @@
 ;         (list) (=every-clause-of n))))
                    
      (Impl ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type in each mode
-      (lambda (n clausetype comparator) (recur n merge-al =ilp-nego-reqc ->Mode* clausetype comparator)))
+      (lambda (n clausetype comparator)  (att-value-compute 'ilp-nego-reqc)
+        (recur n merge-al =ilp-nego-reqc ->Mode* clausetype comparator)))
      (Mode ;→ (prop ((prop-value deployed-mode-name) ... ))-pairs for each Clause with correct type
       (lambda (n clausetype comparator)
+        (att-value-compute 'ilp-nego-reqc)
         (fold-left
          (lambda (result clause)
            (if (and (ast-subtype? clause clausetype) (eq? (->comparator clause) comparator))
@@ -252,6 +263,7 @@
          (list) (->* (->Clause* n)))))
      (Request
       (lambda (n comparator)
+        (att-value-compute 'ilp-nego-reqc)
         (fold-left
          (lambda (result clause)
            (if (eq? (->comparator clause) comparator)
@@ -292,6 +304,7 @@
      ilp-nego-hw
      (Comp
       (lambda (n)
+        (att-value-compute 'ilp-nego-he)
         (fold-left
          (lambda (result entry) ; entry = {(comparator . property) { clauses }}
            (append
@@ -310,6 +323,7 @@
      ilp-nego-hw0
      (Comp
       (lambda (n comp prop pe)
+        (att-value-compute 'ilp-nego-hw0)
         (debug "hw0-comp" (->name n) comp (->name prop) (->name pe))
             (let* ([cp (cons comp prop)]
 ;                   [__ (begin (debug (assp (lambda (x) (eq-pair? cp x)) (=req-hw-clauses n)))
@@ -328,6 +342,7 @@
      ilp-eval-binvar
      (Clause
       (lambda (n pe)
+        (att-value-compute 'ilp-eval-binvar)
 ;        (let ([real-return-type (=real (->return-type n))])
         (debug "ilp-eval-binvar" n (->name pe))
 ;          (if (or (eq? (->type pe) (<<- real-return-type))
@@ -338,22 +353,24 @@
     
     (ag-rule
      required-hw-properties
-     (Comp (lambda (n) (recur n union =req-hw-properties ->Impl*)))
-     (Impl (lambda (n) (recur n union =req-hw-properties ->Mode*)))
-     (Mode (lambda (n) (recur n union =req-hw-properties ->Clause*)))
+     (Comp (lambda (n) (att-value-compute 'required-hw-properties) (recur n union =req-hw-properties ->Impl*)))
+     (Impl (lambda (n) (att-value-compute 'required-hw-properties) (recur n union =req-hw-properties ->Mode*)))
+     (Mode (lambda (n) (att-value-compute 'required-hw-properties) (recur n union =req-hw-properties ->Clause*)))
      (Clause
       (lambda (n)
+        (att-value-compute 'required-hw-properties)
         (let ([prop (=real (->return-type n))])
           (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
               (list (list (->comparator n) prop)) (list))))))
     
     (ag-rule
      required-hw-clauses ; computes {(comp . prop) {clause1 .. clauseN} ... } for each comp and prop + clauseI has comp and prop
-     (Comp (lambda (n) (recur n merge-paired-al =req-hw-clauses ->Impl*)))
-     (Impl (lambda (n) (recur n merge-paired-al =req-hw-clauses ->Mode*)))
-     (Mode (lambda (n) (recur n merge-paired-al =req-hw-clauses ->Clause*)))
+     (Comp (lambda (n) (att-value-compute 'required-hw-clauses) (recur n merge-paired-al =req-hw-clauses ->Impl*)))
+     (Impl (lambda (n) (att-value-compute 'required-hw-clauses) (recur n merge-paired-al =req-hw-clauses ->Mode*)))
+     (Mode (lambda (n) (att-value-compute 'required-hw-clauses) (recur n merge-paired-al =req-hw-clauses ->Clause*)))
      (Clause
       (lambda (n)
+        (att-value-compute 'required-hw-clauses)
         (let ([prop (=real (->return-type n))])
           (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
               (list (list (cons (->comparator n) prop) (list n))) (list))))))
@@ -362,6 +379,7 @@
      ilp-binary-vars
      (Root
       (lambda (n)
+        (att-value-compute 'ilp-binary-vars)
         (append
          (map (lambda (impl) (=ilp-binvar impl)) (=every-impl n))
          (fold-left (lambda (result mode) (append (map (lambda (pe) (=ilp-binvar-deployed mode pe))
@@ -370,21 +388,22 @@
     
     (ag-rule
      ilp-name
-     (Property (lambda (n) (ilp-conform-name (->name n))))
-     (Comp (lambda (n) (ilp-conform-name (->name n))))
-     (Impl (lambda (n) (ilp-conform-name (->name n))))
-     (Mode (lambda (n) (ilp-conform-name (->name n))))
-     (Resource (lambda (n) (ilp-conform-name (->name n)))))
+     (Property (lambda (n) (att-value-compute 'ilp-name) (ilp-conform-name (->name n))))
+     (Comp (lambda (n) (att-value-compute 'ilp-name) (ilp-conform-name (->name n))))
+     (Impl (lambda (n) (att-value-compute 'ilp-name) (ilp-conform-name (->name n))))
+     (Mode (lambda (n) (att-value-compute 'ilp-name) (ilp-conform-name (->name n))))
+     (Resource (lambda (n) (att-value-compute 'ilp-name) (ilp-conform-name (->name n)))))
     
     (ag-rule
      ilp-binvar
-     (Impl (lambda (n) (ilp-conform-name (string-append "b#" (->name (<=comp n)) "#" (if (lonely? n) "" (->name n))))))
-     (Mode (lambda (n) (error "Should not be called for Modes"))))
+     (Impl (lambda (n) (att-value-compute 'ilp-binvar) (ilp-conform-name (string-append "b#" (->name (<=comp n))
+                                                                                        "#" (if (lonely? n) "" (->name n))))))
+     (Mode (lambda (n) (att-value-compute 'ilp-binvar) (error "Should not be called for Modes"))))
     
     (ag-rule
      ilp-binvar-deployed
      (Mode (lambda (n pe)
+             (att-value-compute 'ilp-binvar-deployed)
              (let ([impl (<=impl n)])
                (ilp-conform-name (string-append "b#" (->name (<=comp impl)) "#"  (if (lonely? impl) "" (->name (<=impl n)))
                                                 "#"  (if (lonely? n) "" (->name n)) "#"  (->name pe))))))))))
- 
