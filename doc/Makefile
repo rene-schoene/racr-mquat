@@ -12,9 +12,12 @@ IMAGES = 	opt_problem.pdf     \
 
 CROPPED = $(IMAGES:%.pdf=images/$(basename %.pdf).pdf)
 
-.PHONY: all clean quick
+.PHONY: all clean quick images
 
-all: $(PDF) presentation.md Makefile
+all: $(PDF) presentation.md
+
+images: $(CROPPED)
+	cp -a images/ /home/rschoene/Dokumente/HAEC/HAEC-ENASA-B01/Poster/output15
 
 presentation.tex: presentation.md
 	pandoc --latex-engine=xelatex -t beamer presentation.md -o presentation.tex
