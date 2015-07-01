@@ -102,6 +102,7 @@
      check-model
      (Root
       (lambda (n)
+        (att-value-compute 'check-model)
         (when (= 0 (length (=every-pe n))) (warn "No resources found"))
         (when (= 0 (length (=every-container n))) (warn "No container found"))
         (when (= 0 (length (=every-comp n))) (warn "No component found for request"))
@@ -142,13 +143,13 @@
           (write-result-list "profiling/att-measure" "time")
           (print-counts)
           result)))
-     (Request (lambda (n) (att-value-compute'to-ilp) (=ilp-nego-sw n)))
+     (Request (lambda (n) (att-value-compute 'to-ilp) (=ilp-nego-sw n)))
 ;     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))
-     (SWRoot (lambda (n) (att-value-compute'to-ilp) (fold-left (lambda (result c) (append (=to-ilp c) result))
+     (SWRoot (lambda (n) (att-value-compute 'to-ilp) (fold-left (lambda (result c) (append (=to-ilp c) result))
                                     (list) (=every-comp n))))
      (Comp
       (lambda (n)
-        (att-value-compute'to-ilp)
+        (att-value-compute 'to-ilp)
         (debug "Comp:" (->name n))
 ;        (display (=req-hw-clauses n))
         (cons
@@ -165,7 +166,7 @@
          (recur n cons =to-ilp ->Impl*))))
      (Impl
       (lambda (n)
-        (att-value-compute'to-ilp)
+        (att-value-compute 'to-ilp)
         (debug "Impl:" (->name n))
         (cons (string-append "single(" (=ilp-name n) "): ")
               (fold-left ; deploy one combination of mode and pe for this impl
@@ -304,7 +305,7 @@
      ilp-nego-hw
      (Comp
       (lambda (n)
-        (att-value-compute 'ilp-nego-he)
+        (att-value-compute 'ilp-nego-hw)
         (fold-left
          (lambda (result entry) ; entry = {(comparator . property) { clauses }}
            (append

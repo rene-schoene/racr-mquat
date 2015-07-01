@@ -9,6 +9,7 @@
          att-value-call att-value-compute print-counts ; profiling
          debug info warn log0) ; logging
  (import (rnrs) (rnrs mutable-pairs) (racr core) (racr testing) (srfi :19) (srfi :27)
+         (only (srfi :13) string-pad string-pad-right)
          (mquat constants) (mquat properties))
  
  ; Either cons val to an entry in the [a]ssociate [l]ist, or make a new entry (key (val))
@@ -127,25 +128,30 @@
        (cons (default-f) al)))
  
  (define (att-value-call name n . args)
-   (let ([entry (assq name call-counts)])
-     (set! call-counts (updated-al call-counts entry
-                                   (lambda _ (let ([count (cdr entry)])
-                                               (cons (car entry) (+ 1 count))))
-                                   (lambda _ (cons name 1)))))
+   (when profiling?
+     (let ([entry (assq name call-counts)])
+       (set! call-counts (updated-al call-counts entry
+                                     (lambda _ (let ([count (cdr entry)])
+                                                 (cons (car entry) (+ 1 count))))
+                                     (lambda _ (cons name 1))))))
    (apply att-value (cons* name n args)))
- 
- (define (att-value-compute name)
-   (let ([entry (assq name compute-counts)])
-     (set! compute-counts (updated-al compute-counts entry
-                                      (lambda _ (let ([count (cdr entry)])
-                                                  (cons (car entry) (+ 1 count))))
-                                      (lambda _ (cons name 1))))))
 
- (define (maybe entry default) (if entry (cdr entry) default))
+ (define (att-value-compute name)
+   (when profiling?
+     (let ([entry (assq name compute-counts)])
+       (set! compute-counts (updated-al compute-counts entry
+                                        (lambda _ (let ([count (cdr entry)])
+                                                    (cons (car entry) (+ 1 count))))
+                                        (lambda _ (cons name 1)))))))
+
+ (define (maybe entry default) (if entry (number->string (cdr entry)) default))
 
  (define (print-counts)
    (info "Counts")
-   (map (lambda (entry) (let ([name (car entry)])
-                          (info name (maybe (assq name compute-counts) "?") "/" (cdr entry))))
-        call-counts)))
+   (let ([max-name (apply max (map (lambda (x) (string-length (symbol->string (car x)))) call-counts))])
+     (map (lambda (entry) (let ([name (car entry)])
+                            (info (string-pad-right (symbol->string name) max-name)
+                                  (string-pad (maybe (assq name compute-counts) "?") 10)
+                                  "/" (string-pad (number->string (cdr entry)) 10))))
+          call-counts))))
 ; (define (print-compute-counts) (print-per-line compute-counts #t)))
