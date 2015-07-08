@@ -140,8 +140,9 @@
                  (list "Generals")
                  binary-vars
                  (list "End"))])
-          (write-result-list "profiling/att-measure" "time")
-          (print-counts)
+          (when profiling?
+            (write-result-list "profiling/att-measure" "time")
+            (print-counts))
           result)))
      (Request (lambda (n) (att-value-compute 'to-ilp) (=ilp-nego-sw n)))
 ;     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))
