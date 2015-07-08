@@ -32,18 +32,22 @@ def setup_profiling_dirs(call_impl):
 
 @task(name = 'racket-n')
 def racket_n(number, *dirs):
+	""" Measure Racket n times """
 	do_gen(call_racket, number, dirs)
 
 @task
 def racket(*dirs):
+	""" Measure Racket once """
 	do_gen(call_racket, 1, dirs)
 
 @task(name = 'racket-n')
 def larceny_n(number, *dirs):
+	""" Measure larceny n times """
 	do_gen(call_larceny, number, dirs)
 
 @task
 def larceny(*dirs):
+	""" Measure larceny once. """
 	do_gen(call_larceny, 1, dirs)
 
 def do_gen(call_impl, number, dirs):
@@ -69,10 +73,12 @@ def dirname(d):
 
 @task
 def sol(solver = 'glpsol', pathname = '*', skip_conflate = False):
+	""" Run solver """
 	do_sol(solver, 1, pathname, skip_conflate)
 
 @task(name = 'sol-n')
 def sol_n(number, solver = 'glpsol', pathname = '*', skip_conflate = False):
+	""" Run solver n times """
 	do_sol(number, pathname, skip_conflate)
 
 params = { 'glpsol' : ['glpsol --tmlim 40 --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
@@ -124,6 +130,7 @@ def do_sol(solver, number, pathname, skip_conflate):
 
 @task(name = 'conflate-results')
 def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs'):
+	""" Read lp.time and gen.csv files to produce gen-X-results.csv and sol-Y-results.csv """
 	if not skip_gen:
 		old_cd = os.getcwd()
 		dirs = glob('profiling/{0}/'.format(pathname))
@@ -172,6 +179,7 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 
 @task(name = 'clean-att-measures')
 def clean_att_measures():
+	""" Remove attribute-calling profiling data """
 	local_quiet('rm profiling/att-measure*.time')
 
 if __name__ == '__main__':

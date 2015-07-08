@@ -15,10 +15,12 @@ utils.assertTrue = assertTrueAssertion
 
 @task(name = 'racket')
 def run_racket(*given_ranges):
+	""" Run ILP tests using Racket """
 	do_run(utils.call_racket, given_ranges)
 
 @task(name = 'larceny')
 def run_larceny(*given_ranges):
+	""" Run ILP tests using larceny """
 	do_run(utils.call_larceny, given_ranges)
 
 def do_run(call_impl, given_ranges):

@@ -8,12 +8,15 @@ from fabric.api import local, task
 
 @task
 def call_racket(f, *args):
+	""" Invoke racket with given program and args """
 	utils.call_racket(f, *args, capture = False)
 
 @task
 def call_larceny(f, *args):
+	""" Invoke larceny with given program and args """
 	utils.call_larceny(f, *args, capture = False)
 
 @task
 def cloc():
+	""" Run cloc with some settings """
 	local('cloc . --exclude-dir=doc,gen,profiling,test,racket-bin,larceny-bin --not-match-f="tricks|larceny|Makefile|ls|test"')

@@ -15,12 +15,15 @@ def parse(names = None):
 	return names
 
 @task(name = 'all', default = True)
-def compile_all(*names):
-	compile_racket(names)
-	compile_larceny(names)
+def compile_all():
+	""" Compile each dependency for both, Racket and larceny. """
+	compile_racket()
+	compile_larceny()
 
 @task(name = 'racket')
 def compile_racket(*names):
+	""" Compile every listed source for Racket.
+	If none given, compile each dependency.	"""
 	for name in parse(names):
 		output = 'racket-bin/mquat/{0}'.format('main_.ss' if name == 'main.scm' else (name[:-2] + 's'))
 		if os.path.exists(output):
@@ -37,6 +40,7 @@ compile_stale_text = """#!r6rs
 
 @task(name = 'larceny')
 def compile_larceny():
+	""" Compile each dependency for larceny """
 	larceny_dir = 'larceny-bin/mquat'
 	compile_stale = 'compile-stale'
 	if not os.path.exists(larceny_dir):
