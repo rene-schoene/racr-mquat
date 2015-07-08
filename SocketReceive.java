@@ -1,6 +1,8 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 
 public class SocketReceive {
 
@@ -17,7 +19,7 @@ public class SocketReceive {
                 socket.receive(packet);
                 String received = new String(packet.getData(), 0, packet.getLength());
                 
-                System.out.println("Got response: " + received);
+                System.out.println("Got response at " + timestamp() +  ": " + received);
                 if(received.equals("exit")) {
 					running = false;
 				}
@@ -30,6 +32,13 @@ public class SocketReceive {
 			e.printStackTrace();
 			System.exit(2);
 		} 
+	}
+	
+	private static String timestamp() {
+		Calendar cal = Calendar.getInstance();
+		Date currentTime = cal.getTime();
+		DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SS");
+		return dateFormat.format(currentTime);
 	}
 }
 	
