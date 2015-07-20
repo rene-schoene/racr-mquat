@@ -788,56 +788,81 @@
    ; General description: Systems without a solution, thus, no optimal solution
    (case id
      [(900) ; All hw-reqs not met (min-eq)
-      (let [(ast (create-system 3 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f)))]
+      (let ([ast (create-system 3 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
         (change-hw-prov ast "load" 0.4)
         (change-sw-req ast "load" comp-min-eq 0.7)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast))]
      [(901) ; All hw-reqs not met (max-eq)
-      (let [(ast (create-system 3 0 1 1 2))]
+      (let ([ast (create-system 3 0 1 1 2)])
         (change-hw-prov ast "load" 0.8)
         (change-sw-req ast "load" comp-max-eq 0.3)
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast))]
      [(902) ; Request constraint not met for any mode of the target component (min-eq)
-      (let [(ast (create-system 3 0 1 2 3))]
+      (let ([ast (create-system 3 0 1 2 3)])
         (change-sw-req ast "load" comp-max-eq 0.8)
         (change-sw-prov ast "p-1" 2)
         (change-req-constraint ast "p-1" comp-min-eq 15)
         (save-ilp tmp-lp ast))]
      [(903) ; Request constraint not met for any mode of the target component (max-eq)
-      (let [(ast (create-system 3 0 1 2 3))]
+      (let ([ast (create-system 3 0 1 2 3)])
         (change-sw-req ast "load" comp-max-eq 0.8)
         (change-sw-prov ast "p-1" 7)
         (change-req-constraint ast "p-1" comp-max-eq 4)
         (save-ilp tmp-lp ast))]
      [(904) ; Requirement on second component not met by any of its modes (max-eq)
-      (let [(ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f)))]
+      (let ([ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f))])
         (change-sw-req ast "load" comp-max-eq 0.8)
         (change-sw-prov ast "p-2" 7 "m-2-1-1" "m-2-1-2" "m-2-2-1" "m-2-2-2")
         (change-sw-req ast "p-2" comp-max-eq 4 "m-1-1-1" "m-1-1-2" "m-1-2-1" "m-1-2-2")
         (save-ilp tmp-lp ast))]
      [(905) ; Requirement on second component not met by any of its modes (min-eq)
-      (let [(ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f)))]
+      (let ([ast (create-system 3 0 2 2 2 (list (lambda _ #t) #f #f #f))])
         (change-hw-prov ast "load" 0.8)
         (change-sw-req ast "load" comp-max-eq 0.3)
         (change-sw-prov ast "p-2" 2 "m-2-1-1" "m-2-1-2" "m-2-2-1" "m-2-2-2")
         (change-sw-req ast "p-2" comp-min-eq 15 "m-1-1-1" "m-1-1-2" "m-1-2-1" "m-1-2-2")
         (save-ilp tmp-lp ast))]
      [(906) ; Requirement on third component not met by any of its modes (max-eq)
-      (let [(ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f)))]
+      (let ([ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f))])
         (change-sw-req ast "load" comp-max-eq 0.8)
         (change-sw-prov ast "p-3" 7 "m-3-1-1" "m-3-1-2" "m-3-2-1" "m-3-2-2")
         (change-sw-req ast "p-3" comp-max-eq 4 "m-2-1-1" "m-2-1-2" "m-2-2-1" "m-2-2-2")
         (save-ilp tmp-lp ast))]
      [(907) ; Requirement on third component not met by any of its modes (min-eq)
-      (let [(ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f)))]
+      (let ([ast (create-system 3 0 3 2 2 (list (lambda _ #t) #f #f #f))])
         (change-hw-prov ast "load" 0.8)
         (change-sw-req ast "load" comp-max-eq 0.3)
         (change-sw-prov ast "p-3" 2 "m-3-1-1" "m-3-1-2" "m-3-2-1" "m-3-2-2")
         (change-sw-req ast "p-3" comp-min-eq 15 "m-2-1-1" "m-2-1-2" "m-2-2-1" "m-2-2-2")
         (save-ilp tmp-lp ast))]
-
+     [(908) ; Mutual exclusion of requirements in implementation of first component
+      (let* ([ast (create-system 3 0 2 2 1 (list (lambda _ #t) no-freq-sw-clauses #f #f))]
+             [comp2 (car (->* (->Comp* (->SWRoot ast))))]
+             [p2 (car (->* (->Property* comp2)))]
+             [new-p (:RealProperty mquat-spec "new-p-2" (->unit p2) (->kind p2) (->direction p2) (->agg p2))]
+             [req-cls (=every-req-clause p2 comp-max-eq)]
+             [prov-cls (=every-prov-clause p2 comp-eq)])
+        (change-sw-req ast "load" comp-max-eq 0.8)
+        (rewrite-add (->Property* comp2) new-p)
+        (info p2)
+        (info "reqs" req-cls (length req-cls))
+        (info "provs" prov-cls (length prov-cls))
+        (for-each (lambda (cl) (info "comp" (eq? comp-max-eq (->comparator cl)) "sub" (ast-subtype? cl 'ReqClause)
+                                     "prop" (eq? p2 (=real (->return-type cl))))) (=every-sw-clause ast))
+        ; "clone" req-clauses cls in p1 and change new clauses to target new property
+        (for-each (lambda (cl) (rewrite-add (<- cl) (:ReqClause mquat-spec new-p (->comparator cl) (->value cl)))) req-cls)
+        ; "clone" prov-clauses in p2
+        (for-each (lambda (cl) (rewrite-add (<- cl) (:ProvClause mquat-spec new-p (->comparator cl) (->value cl)))) prov-cls)
+        ; adjust values, s.t. one impl fulfills req for first property only, second impl fulfills req for second property only
+        (change-sw-req ast "p-2" comp-max-eq 10 "m-1-1-1" "m-1-2-1")
+        (change-sw-req ast "new-p-2" comp-max-eq 10 "m-1-1-1" "m-1-2-1")
+        (change-sw-prov ast "p-2" 4 "m-2-1-1")
+        (change-sw-prov ast "p-2" 19 "m-2-2-1")
+        (change-sw-prov ast "new-p-2" 18 "m-2-1-1")
+        (change-sw-prov ast "new-p-2" 3 "m-2-2-1")
+        (save-ilp tmp-lp ast))]
      [else (wrong-id unsolvable id)]))
  
  (define (read-solution table fname)
@@ -936,7 +961,7 @@
        [(402 902 903)         (check-impl 0 (1 (1 2)))]
        [(501 503 600 900 901) (check-impl 0 (1 *))]
        [(603 604)             (check-impl 1 (1 2 *))]
-       [(904 905)             (check-impl 0 (1 2 (1 2)))]
+       [(904 905 908)         (check-impl 0 (1 2 (1 2)))]
        [(906 907)             (check-impl 0 (1 2 3 (1 2)))]
        [else (error #f "Unknown test case id for impls" id)])
      
@@ -1097,6 +1122,7 @@
        [(902 903)     (check-mode 0 (1 (2 (1 2 3 (1 2)))))]
        [(904 905)     (check-mode 0 (1 2 (1 2 (1 2 (1 2)))))]
        [(906 907)     (check-mode 0 (1 2 3 (1 2 (1 2 (1 2)))))]
+       [(908)         (check-mode 0 (1 2 (1 2 (* (1 2)))))]
        [else (error #f "Unknown test case id for modes" id)])
 
      (case id
@@ -1115,11 +1141,11 @@
        [(202 203) (test-obj 50 obj id)] ;15+35
        [(206)     (test-obj 55 obj id)] ;15+40
        [(204 205) (test-obj 70 obj id)] ;25+45
-       [(402 501 503 600 900 901 902 903 904 905 906 907) (test-assert "Objective not zero." (= 0.0 obj))]
+       [(402 501 503 600 900 901 902 903 904 905 906 907 908) (test-assert "Objective not zero." (= 0.0 obj))]
        [else (error #f "Unknown test case id for objectives" id)])))
  
  (define (display-ranges)
-   (display "1 16 30 36 100 129 200 207 300 301 400 404 500 503 600 605 700 702 900 907"))
+   (display "1 16 30 36 100 129 200 207 300 301 400 404 500 503 600 605 700 702 900 908"))
  
  (define (print-testing-usage)
    (display "Parameters: action rest")
