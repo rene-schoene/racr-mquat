@@ -111,18 +111,16 @@
      every-req-clause
      (Property
       (lambda (n comparator)
-        (fold-left (lambda (result cl) (if (and (eq? comparator (->comparator cl)) (ast-subtype? n 'ReqClause)
-                                                (eq? n (=real (->return-type cl)))) (cons cl result) result))
-                   (list) (=every-sw-clause n)))))
+        (filter (lambda (cl) (and (eq? comparator (->comparator cl)) (ast-subtype? cl 'ReqClause)
+                                  (eq? n (=real (->return-type cl))))) (=every-sw-clause n)))))
 
     ; =every-prov-clause: Return every provision clauses referencing this property and using the given comparator
     (ag-rule
      every-prov-clause
      (Property
       (lambda (n comparator)
-        (fold-left (lambda (result cl) (if (and (eq? comparator (->comparator cl)) (ast-subtype? n 'ProvClause)
-                                                (eq? n (=real (->return-type cl)))) (cons cl result) result))
-                   (list) (append (=every-sw-clause n) (=every-hw-clause n))))))
+        (filter (lambda (cl) (and (eq? comparator (->comparator cl)) (ast-subtype? cl 'ProvClause)
+                                  (eq? n (=real (->return-type cl))))) (append (=every-sw-clause n) (=every-hw-clause n))))))
 
     ; =every-container: Returns a list of every pe that can run software on it
     (ag-rule every-container (Root (lambda (n) (filter (lambda (pe) (->container? (->type pe))) (=every-pe n)))))
