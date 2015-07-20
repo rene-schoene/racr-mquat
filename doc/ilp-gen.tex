@@ -1,0 +1,115 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage{todonotes}
+\usepackage{amsmath}
+
+\title{Formal description of the generated ILP}
+
+\begin{document}
+
+\section{Problem description}
+
+Given the following:
+
+\begin{itemize}
+	\item A set of properties $P = P_{software} \cup P_{hardware}$
+	\item A set of software components $C$
+	\item For each software component $c \in C$
+	\begin{itemize}
+		\item a set of provided properties $P(c) \subseteq P_{software}$
+		\item a set of implementations $I(c)$
+	\end{itemize}
+	\item For each implementation $i \in I(c)$ of component $c$
+	\begin{itemize}
+		\item a set of required software components $Req(i) \subseteq C \setminus i$
+		\item a set of modes $M(i)$
+	\end{itemize}
+	\item A set of resources (containers) $R$
+	\item For each resource $r \in R$
+	\begin{itemize}
+		\item a set of provided properties $P(r) \subseteq P_{hardware}$
+	\end{itemize}
+\end{itemize}
+
+The total number of modes is therefore
+\begin{equation}
+	\sum_{c}^{C} \sum_{i}^{I(c)} M(i)
+\end{equation}
+
+Given a mode $m$ of implementation $i$ and component $c$, there is a contract restricting the deployment of $m$, containing any number of the following items
+
+\begin{itemize}
+	\item Constraints $CS(c_{req},m) = (p, \circ, val)$ for a required software component $c_{req} \in Req(i)$
+	\begin{equation}
+	p \circ val, \text{where } p \in P(c_{req}), \circ \in \{<, \leq, >, \geq \}
+	\end{equation}
+	\item Constraints $CR(m) = (p, \circ, val)$ for a resource
+	\begin{equation}
+	p \circ val, \text{where } p \in P_{hardware}, \circ \in \{<, \leq, >, \geq \}
+	\end{equation}
+	\item Provisions $Prov_m = (p, \circ, val)$
+	\begin{equation}
+	p \overset{!}{\circ} val, \text{where } p \in P(c), \circ \in \{<, \leq, >, \geq, = \}
+	\end{equation}
+\end{itemize}
+
+For each element $E$ of a contract, there are functions to ``access'' their sub-elements:
+\begin{equation}
+	E = (p, \circ, val) \Leftrightarrow p(E) = p, sense(E) = \circ, val(E) = val
+\end{equation}
+
+The optimization problem is to find a mapping from one mode of each software component\footnote{which is needed to serve the request} to one resource such that all constraints of the contracts hold.
+
+\section{ILP description}
+
+There are two kinds of used variables, $x_{m,r}$ and $y_{i}$, in the ILP. To describe the constraints, some auxiliary functions are needed:
+\begin{itemize}
+	\item $x_{m,r}$ \dots Deployment of mode $m$ on resource $r$ (binary variable)
+	\item $y_{i}$ \dots Deployment of implementation $i$ (binary variable)
+	\item $reqModes(p)$ \dots Every mode having a constraint on the property~$p$
+	\item $reqModes(p,c) = reqModes(p) \cap \left( \bigcup\limits_i^{I(c)} M(i) \right)$ \dots Every mode of component~$c$ having a constraint on the property $p$
+	\item $Req(c)$ \dots Every component required by implementations of component $c$
+	\item
+	$
+	val(p,x) \in
+	\begin{cases}
+	P_{Software} \times M & \text{value of property }p\text{ required in mode }x \\
+	P_{Hardware} \times R & \text{value of property }p\text{ provided by resource }x \\
+	\end{cases}
+	$
+	\item $req_{all}(c) = \bigcup_i^{I(c)} Req(i) $
+	\item $req_{map}(c) = \bigcup_c^{req_{all}(c)} \langle c, I^{-1}(c)  \rangle $
+\end{itemize}
+
+\subsection{The constraints}
+
+Implementation $i$ is deployed $\Leftrightarrow y_i \equiv 1$, also ensures, that only one mode is deployed per component
+\begin{equation}
+	\forall i \in I: y_i = \sum_{r}^{R} \sum_{m}^{M(i)} x_{m,r} \label{eq:impl-shortcut}
+\end{equation}
+Deploy required components:
+\begin{equation}
+	\forall c \in C, \langle c_{req}, I' \rangle = req_{map}(c):
+	\sum_{i_{req}}^{I(c_{req})} y_{i_{req}} \geq \sum_{i}^{I'} y_i
+	\label{eq:req-comp}
+\end{equation}
+Software property requirement clauses:
+\begin{multline}
+	\forall c \in C, \forall p \in P_{software}: \\
+	\sum_{r_1}^{R} \sum_{c_{req}}^{Req(c)} \sum_{i_{req}}^{I(c_{req})} \sum_m^{M(i_{req})} x_{m_{req},r_1} * val (p, m_{req}) \label{eq:sw-req} \circ \sum_{r_2}^{R} \sum_{m}^{reqModes(p,c)} x_{m,r_2}
+\end{multline}
+Hardware property requirement clauses:
+\begin{equation}
+	\forall r \in R, \forall p \in P(r): \sum_{m}^{reqModes(p)} x_{m,r} * val(p,m) \circ val(p,r) \label{eq:hw-req}
+\end{equation}
+
+The constraint sense $\circ$ in equations \eqref{eq:sw-req} and \eqref{eq:hw-req} are connected to the contract constraints and are read from there. Actually one constraint is created for each unique pair of property and constraint sense. However, putting that into a formula would unnecessarily complicate it.
+
+\subsection{The objective function}
+
+Let $p_{goal} \in P$ be the property to optimize for.
+
+\begin{equation}
+	objective = \sum_{r}^{R} \sum_{m}^{reqModes(p_{goal})} x_{m,r} * val(p_{goal},m)
+\end{equation}
+
+\end{document}
