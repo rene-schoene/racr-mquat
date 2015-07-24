@@ -1,6 +1,8 @@
 \documentclass[10pt,a4paper]{article}
 \usepackage{todonotes}
 \usepackage{amsmath}
+\usepackage{booktabs}                    % Support for better table layout
+\usepackage{tabularx}
 
 \title{Formal description of the generated ILP}
 
@@ -32,7 +34,7 @@ Given the following:
 
 The total number of modes is therefore
 \begin{equation}
-	\sum_{c}^{C} \sum_{i}^{I(c)} M(i)
+	\sum_{c}^{C} \sum_{i}^{I(c)} |M(i)|
 \end{equation}
 
 Given a mode $m$ of implementation $i$ and component $c$, there is a contract restricting the deployment of $m$, containing any number of the following items
@@ -84,7 +86,7 @@ There are two kinds of used variables, $x_{m,r}$ and $y_{i}$, in the ILP. To des
 
 Implementation $i$ is deployed $\Leftrightarrow y_i \equiv 1$, also ensures, that only one mode is deployed per component
 \begin{equation}
-	\forall i \in I: y_i = \sum_{r}^{R} \sum_{m}^{M(i)} x_{m,r} \label{eq:impl-shortcut}
+	\forall c \in C, \forall i \in I(c): y_i = \sum_{r}^{R} \sum_{m}^{M(i)} x_{m,r} \label{eq:impl-shortcut}
 \end{equation}
 Deploy required components:
 \begin{equation}
@@ -111,5 +113,42 @@ Let $p_{goal} \in P$ be the property to optimize for.
 \begin{equation}
 	objective = \sum_{r}^{R} \sum_{m}^{reqModes(p_{goal})} x_{m,r} * val(p_{goal},m)
 \end{equation}
+
+\section{Metrics for the generated ILP}
+
+Number of variables $n$:
+\begin{equation}
+n = |R| * \sum_{c}^{C} \sum_{i}^{I(c)} 1 + |M(i)|
+\end{equation}
+%
+Number of constraints $m$ (at most one required component, some hardware- and $S$~software clauses per mode on average):
+\begin{equation}
+m = |C| + %
+S * \sum_{c}^{C} \sum_{i}^{I(c)} 1 + |M(i)| + %
+\sum_r^{R} * P(r)
+\end{equation}
+
+\subsection{Sample values}
+
+Assuming $S = 2$ and $\overline{P(r)} = 2$.
+
+\begin{table}[th]
+	\aboverulesep0.0mm
+	\belowrulesep0.5mm
+	\centering
+%	\scriptsize
+	\newcolumntype{R}{>{\raggedleft\arraybackslash}X}
+	\begin{tabularx}{.9\linewidth}{ r R R R | R R }
+		$|C|$ & $\overline{|I|}$ & $\overline{|M|}$ & $|R|$ & $n$ & $m$ \\
+		\midrule
+		10           & 10           & 2           & 100           &  20000 &  810 \\
+		\textbf{100} & 10           & 2           & 100           & 200000 & 6300 \\
+		10           & \textbf{100} & 2           & 100           & 200000 & 6210 \\
+		10           & 10           & \textbf{20} & 100           & 200000 & 4410 \\
+		10           & 10           & 2           & \textbf{1000} & 200000 & 2610 \\[1mm]
+	\end{tabularx}
+	\caption{Number of variables $n$ and constraints $m$ for some example values}
+	\label{tab:saved-energy}
+\end{table}
 
 \end{document}
