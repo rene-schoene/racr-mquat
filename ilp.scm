@@ -45,23 +45,23 @@
                                                               (cadr min-req-entry) comp-min-eq request?))
                           constraints)))) (list) provs))
  
- (define (make-constraint prov prov-entry req-entry comp request?)
+ (define (make-constraint prop prov-entry req-entry comp request?)
    (if request?
        (append
-        (list (string-append "request(" (=ilp-name prov) "_" (comp-name comp) "): "))
+        (list (string-append "request(" (=ilp-name prop) "_" (comp-name comp) "): "))
         (fold-left (lambda (constraint pair) (cons* (prepend-sign (car pair)) (cadr pair) constraint)) (list) prov-entry)
         (cons* (comp->rev-string comp) (car req-entry)))
        (let ([f-prov (if (eq? comp comp-max-eq)
                          ; prov for max: (maximum - val)
-                         (lambda (constraint val name) (cons* (prepend-sign (- (=maximum prov) val)) name constraint))
+                         (lambda (constraint val name) (cons* (prepend-sign (- (=maximum prop) val)) name constraint))
                          (lambda (constraint val name) (cons* (prepend-sign val) name constraint)))] ; prov for other: val
              [f-req (if (eq? comp comp-max-eq)
                         ; req for max: - (maximum - val) = val - maximum
-                        (lambda (constraint val name) (cons* (prepend-sign (- val (=maximum prov))) name constraint))
+                        (lambda (constraint val name) (cons* (prepend-sign (- val (=maximum prop))) name constraint))
                         (lambda (constraint val name) (cons* (prepend-sign (- val)) name constraint)))]) ; req for other: -val
 ;         (debug "mc: prov-entry:" prov-entry ",req-entry:" req-entry ",maximum:" maximum ",name:" prov)
          (append
-          (list (string-append (=ilp-name prov) "_" (comp-name comp) ": "))
+          (list (string-append (=ilp-name prop) "_" (comp-name comp) ": "))
           (fold-left (lambda (constraint pair) (f-prov constraint (car pair) (cadr pair))) (list) prov-entry)
           (fold-left (lambda (constraint pair) (f-req constraint (car pair) (cadr pair))) (list) req-entry)
           (list ">= 0")))))
@@ -366,7 +366,7 @@
               (list (list (->comparator n) prop)) (list))))))
     
     (ag-rule
-     required-hw-clauses ; computes {(comp . prop) {clause1 .. clauseN} ... } for each comp and prop + clauseI has comp and prop
+     required-hw-clauses ; computes {(comp . prop) {clause1 .. clauseN} ... } for each comparator and prop
      (Comp (lambda (n) (att-value-compute 'required-hw-clauses) (recur n merge-paired-al =req-hw-clauses ->Impl*)))
      (Impl (lambda (n) (att-value-compute 'required-hw-clauses) (recur n merge-paired-al =req-hw-clauses ->Mode*)))
      (Mode (lambda (n) (att-value-compute 'required-hw-clauses) (recur n merge-paired-al =req-hw-clauses ->Clause*)))

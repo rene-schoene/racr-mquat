@@ -15,7 +15,7 @@
    (map (lambda (l) (append (cons (dirname (car l)) (cdr l))
                             (list (list (lambda _ #t) #f #f #f))))
         ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
-        ;           ID  HW S  #C #I #M
+        ;           ID  HW  S #C #I #M
         (list (list  1  10  0  1  1  2)
               (list  2  10  0 10  1  2)
               (list  3  10  0 10 10  2)
