@@ -21,14 +21,24 @@ class timed(object):
 		self.stop = timeit.default_timer() - self.start
 		print self.msg.format(self.stop)
 
-def setup_profiling_dirs(call_impl):
-	dirs = call_impl('cli.scm', 'measure', 'dirs').split()
+def setup_profiling_dirs(call_impl, cmd):
+	dirs = call_impl('cli.scm', cmd, 'dirs').split()
 	if not os.path.exists('profiling'):
 		os.mkdir('profiling')
 	for d in dirs:
 		name = 'profiling/{0}'.format(d)
 		if not os.path.exists(name):
 			os.mkdir(name)
+
+@task(name = 'paper-n')
+def paper_n(number, *dirs):
+	""" Measure for paper with Racket n times """
+	do_gen(call_racket, number, dirs, paper = True)
+
+@task
+def paper(*dirs):
+	""" Measure for paper with Racket once """
+	do_gen(call_racket, 1, dirs, paper = True)
 
 @task(name = 'racket-n')
 def racket_n(number, *dirs):
@@ -50,11 +60,12 @@ def larceny(*dirs):
 	""" Measure larceny once. """
 	do_gen(call_larceny, 1, dirs)
 
-def do_gen(call_impl, number, dirs):
+def do_gen(call_impl, number, dirs, paper = False):
+	cmd = 'measure-paper' if paper else 'measure'
 	with timed():
-		setup_profiling_dirs(call_impl)
+		setup_profiling_dirs(call_impl, cmd)
 		for _ in xrange(int(number)):
-			call_impl('cli.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
+			call_impl('cli.scm', cmd, 'all' if dirs == () else ' '.join(dirs), capture = False)
 #			call_impl('larceny_profiling.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
 			print '\n'
 #			conflate_results(skip_sol = True)
@@ -71,15 +82,15 @@ all_results = 'all.csv'
 def dirname(d):
 	return os.path.split(os.path.dirname(d))[-1]
 
-@task
-def sol(solver = 'glpsol', pathname = '*', skip_conflate = False):
-	""" Run solver """
-	do_sol(solver, 1, pathname, skip_conflate)
+@task(name = 'paper-sol')
+def paper_sol(number = 1):
+	""" Run solver for paper with preset options """
+	do_sol('glpsol', int(number), 'paper-*', skip_conflate = True)
 
-@task(name = 'sol-n')
-def sol_n(number, solver = 'glpsol', pathname = '*', skip_conflate = False):
-	""" Run solver n times """
-	do_sol(number, pathname, skip_conflate)
+@task(name = 'sol')
+def sol(number = 1, solver = 'glpsol', pathname = '*', skip_conflate = False):
+	""" Run solver n times (default: once) """
+	do_sol(int(number), pathname, skip_conflate)
 
 params = { 'glpsol' : ['glpsol --tmlim 40 --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
 		   'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
@@ -129,8 +140,10 @@ def do_sol(solver, number, pathname, skip_conflate):
 		conflate_results(pathname = pathname, skip_gen = True)
 
 @task(name = 'conflate-results')
-def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs'):
+def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs', paper = False):
 	""" Read lp.time and gen.csv files to produce gen-X-results.csv and sol-Y-results.csv """
+	if paper:
+		pathname = 'paper-*'
 	if not skip_gen:
 		old_cd = os.getcwd()
 		dirs = glob('profiling/{0}/'.format(pathname))
@@ -144,7 +157,7 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 			sys.stdout.flush()
 			if not os.path.exists(gen_old_dir):
 				os.mkdir(gen_old_dir)
-			
+
 			add_header = not os.path.exists(gen_results)
 			# gen-results
 			with open(gen_results, 'a') as fd:
@@ -166,16 +179,16 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
 			os.chdir(old_cd)
 		print ' done'
-		local_quiet('tail -qn +2 profiling/*/{0} > profiling/all-gen-results'.format(gen_results), capture = False)
+		local_quiet('tail -qn +2 profiling/{1}*/{0} > profiling/{1}all-gen-results'.format(gen_results, 'paper-' if paper else ''), capture = False)
 		for impl in impls.split(':'):
-			shutil.copy('profiling/gen-header', 'profiling/gen-{0}-results.csv'.format(impl))
-			local_quiet('grep {0} profiling/all-gen-results | sed "s/{0},//" >> profiling/gen-{0}-results.csv'.format(impl))
+			shutil.copy('profiling/gen-header', 'profiling/{1}gen-{0}-results.csv'.format(impl, 'paper-' if paper else ''))
+			local_quiet('grep {0} profiling/{1}all-gen-results | sed "s/{0},//" >> profiling/{1}gen-{0}-results.csv'.format(impl, 'paper-' if paper else ''))
 
-	local_quiet('tail -n +1 profiling/*/specs > profiling/all-specs', capture = False)
+	local_quiet('tail -n +1 profiling/{0}*/specs > profiling/{0}all-specs'.format('paper-' if paper else ''), capture = False)
 
 	if not skip_sol:
 		# sol-results
-		local_quiet('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/sol-glpk-results.csv'.format(sol_results), capture = False)
+		local_quiet('tail -qn +2 profiling/sol-header profiling/{1}*/{0}> profiling/{1}sol-glpk-results.csv'.format(sol_results, 'paper-' if paper else ''), capture = False)
 
 @task(name = 'clean-att-measures')
 def clean_att_measures():
