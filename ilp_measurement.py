@@ -195,6 +195,39 @@ def clean_att_measures():
 	""" Remove attribute-calling profiling data """
 	local_quiet('rm profiling/att-measure*.time')
 
+@task(name = 'prepare-noncached')
+def prepare_noncached():
+	""" Set ILP Generation to noncached behavior """
+	local_quiet('make ilp-noncached.scm')
+	with lcd('racket-bin/mquat'):
+		local_quiet('rm ilp.ss */ilp_ss.* */*/ilp_ss.*')
+	local_quiet('sed "s/^ilp$/ilp-noncached/" dependencies.txt')
+	local_quiet('make racket -B')
+
+@task(name = 'prepare-normal')
+def prepare_normal():
+	""" Set ILP Generation to normal behavior """
+	with lcd('racket-bin/mquat'):
+		local_quiet('rm ilp-noncached.ss */ilp-noncached_ss.* */*/ilp-noncached_ss.*')
+	local_quiet('sed "s/^ilp-noncached$/ilp/" dependencies.txt')
+	local_quiet('make racket -B')
+
+@task
+def is_cached():
+	""" Checks dependencies.txt whether ilp generation is cached or not """
+	noncached = False
+	with open('dependencies.txt') as fd:
+		if 'ilp-noncached' in fd:
+			noncached = True
+	print '{0} ILP Generation used.'.format('Noncached' if noncached else 'Normal')
+
+@task
+def help():
+	print 'Measurement driver for racr-mquat'
+	print '1. Do generation (racket[-n], larceny[-n], paper[-n]), n defaults to 1.'
+	print '2. (Optional) Do solving (sol[-n], n defaults to 1.)'
+	print '3. (Mandatory) Do conflate-results, to update the {gen/sol}-*-results.csv files'
+
 if __name__ == '__main__':
 	racket()
 	glpsol()

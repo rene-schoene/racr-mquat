@@ -15,7 +15,7 @@ larceny: $(LSRC)
 	@mkdir -p $(LARCENY_BUILD_DIR)
 	@cp compile-stale $(LARCENY_BUILD_DIR)/mquat
 	@cd $(LARCENY_BUILD_DIR)/mquat && larceny --r6rs --path ..:$(RACR_LARCENY_BIN) --program compile-stale
-	
+
 $(RACKET_BUILD_DIR)/mquat/%.ss: %.scm Makefile
 	@mkdir -p $(RACKET_BUILD_DIR)
 	@rm -f $@
@@ -28,3 +28,6 @@ sockets: SocketSend.class SocketReceive.class
 
 %.class: %.java
 	javac $<
+
+ilp-noncached.scm: ilp.scm
+	sed 's/(lambda (n/#f (lambda (n/g' $< > $@
