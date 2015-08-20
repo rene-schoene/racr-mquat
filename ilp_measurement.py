@@ -21,6 +21,10 @@ class timed(object):
 		self.stop = timeit.default_timer() - self.start
 		print self.msg.format(self.stop)
 
+@task(name = 'current-ids')
+def current_ids(paper = False):
+	print call_racket('cli.scm', 'measure-paper' if paper else 'measure', 'dirs')
+
 def setup_profiling_dirs(call_impl, cmd):
 	dirs = call_impl('cli.scm', cmd, 'dirs').split()
 	if not os.path.exists('profiling'):
@@ -202,6 +206,7 @@ def prepare_noncached():
 	with lcd('racket-bin/mquat'):
 		local_quiet('rm ilp.ss */ilp_ss.* */*/ilp_ss.*')
 	local_quiet('sed "s/^ilp$/ilp-noncached/" dependencies.txt')
+	local_quiet('sed "s/measure.non-chached = 0/measure.non-chached = 1/" scheme.properties')
 	local_quiet('make racket -B')
 
 @task(name = 'prepare-normal')
@@ -210,9 +215,10 @@ def prepare_normal():
 	with lcd('racket-bin/mquat'):
 		local_quiet('rm ilp-noncached.ss */ilp-noncached_ss.* */*/ilp-noncached_ss.*')
 	local_quiet('sed "s/^ilp-noncached$/ilp/" dependencies.txt')
+	local_quiet('sed "s/measure.non-chached = 1/measure.non-chached = 0/" scheme.properties')
 	local_quiet('make racket -B')
 
-@task
+@task (name = 'is-chached?')
 def is_cached():
 	""" Checks dependencies.txt whether ilp generation is cached or not """
 	noncached = False

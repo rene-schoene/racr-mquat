@@ -9,7 +9,8 @@
  
  (define (dirname kind id)
    (let ([id-s (if (number? id) (number->string id) id)])
-     (string-append "paper-" kind (if measure-flush? "flush-" "") (make-string (- 3 (string-length id-s)) #\0) id-s)))
+     (string-append "paper-" kind (if measure-non-chached? "noncached-" (if measure-flush? "flush-" ""))
+                    (make-string (- 3 (string-length id-s)) #\0) id-s)))
 
  (define resource-test 'resource-test)
  (define sw-test 'sw-test)

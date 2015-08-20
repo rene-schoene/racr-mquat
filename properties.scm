@@ -2,7 +2,7 @@
 
 (library
  (mquat properties)
- (export timing? profiling? log.debug? log.info? log.warn? write-ilp? measure-flush?)
+ (export timing? profiling? log.debug? log.info? log.warn? write-ilp? measure-flush? measure-non-chached?)
  (import (rnrs) (only (srfi :13) string-tokenize string-index string-trim-both) (srfi :14))
 
  (define (file->char_list path)
@@ -42,4 +42,5 @@
  (define log.info? (get-value "log.info" #t))
  (define log.warn? (get-value "log.warn" #t))
  (define write-ilp? (get-value "measure.lp.write" #f))
- (define measure-flush? (get-value "measure.flush" #f)))
+ (define measure-flush? (get-value "measure.flush" #f))
+ (define measure-non-chached? (get-value "measure.non-chached" #f)))
