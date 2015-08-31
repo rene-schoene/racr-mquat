@@ -1,4 +1,4 @@
-import sys
+import sys, os
 try:
 	from fabric.api import local, quiet
 except ImportError:
@@ -36,3 +36,12 @@ def call_larceny(f, *args, **kwargs):
 	return local_quiet('{0} --r6rs --path {1}:{2} --program {3} -- {4}'.format(larcenyExec,
 		larcenyBin.racr_bin, larcenyBin.mquat_bin, f, ' '.join(str(x) for x in args)),
 		abort_on_stderr = True, capture = kwargs.get('capture', True))
+
+def secure_remove(spec):
+	""" Attempts to remove the given files in the given directories.
+	@param:spec: dict of the form { dir: [file1, file2] } """
+	for d,l in spec.iteritems():
+		for f in l:
+			name = os.path.join(d, f)
+			if os.path.exists(name):
+				os.remove(name)

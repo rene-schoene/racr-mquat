@@ -4,11 +4,11 @@ import sys, re, os, csv, timeit, shutil
 from datetime import datetime
 from glob import glob
 try:
-	from fabric.api import task
+	from fabric.api import task, lcd
 	from fabric.colors import red
 except ImportError:
-	from fabric_workaround import task, red
-from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion
+	from fabric_workaround import task, red, lcd
+from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion, secure_remove
 
 assertTrue = assertTrueAssertion
 
@@ -202,30 +202,39 @@ def clean_att_measures():
 @task(name = 'prepare-noncached')
 def prepare_noncached():
 	""" Set ILP Generation to noncached behavior """
-	local_quiet('make ilp-noncached.scm')
-	with lcd('racket-bin/mquat'):
-		local_quiet('rm ilp.ss */ilp_ss.* */*/ilp_ss.*')
-	local_quiet('sed "s/^ilp$/ilp-noncached/" dependencies.txt')
-	local_quiet('sed "s/measure.non-chached = 0/measure.non-chached = 1/" scheme.properties')
-	local_quiet('make racket -B')
+	local_quiet('touch ilp-measurement*.scm')
+	local_quiet('make ilp-noncached.scm', capture = False)
+	secure_remove({'racket-bin/mquat': ['ilp.ss'], 'racket-bin/mquat/compiled': ['ilp_ss.dep', 'ilp_ss.zo'],
+					'racket-bin/mquat/compiled/drracket/errortrace': ['ilp_ss.dep', 'ilp_ss.zo']})
+	local_quiet('sed -i "s/^ilp$/ilp-noncached/" dependencies.txt', capture = False)
+	local_quiet('sed -i "s/measure.non-chached = 0/measure.non-chached = 1/" scheme.properties', capture = False)
+	local_quiet('make racket', capture = False)
 
 @task(name = 'prepare-normal')
 def prepare_normal():
 	""" Set ILP Generation to normal behavior """
-	with lcd('racket-bin/mquat'):
-		local_quiet('rm ilp-noncached.ss */ilp-noncached_ss.* */*/ilp-noncached_ss.*')
-	local_quiet('sed "s/^ilp-noncached$/ilp/" dependencies.txt')
-	local_quiet('sed "s/measure.non-chached = 1/measure.non-chached = 0/" scheme.properties')
-	local_quiet('make racket -B')
+	local_quiet('touch ilp-measurement*.scm')
+	secure_remove({'racket-bin/mquat': ['ilp.ss'], 'racket-bin/mquat/compiled': ['ilp_ss.dep', 'ilp_ss.zo'],
+					'racket-bin/mquat/compiled/drracket/errortrace': ['ilp_ss.dep', 'ilp_ss.zo']})
+	local_quiet('sed -i "s/^ilp-noncached$/ilp/" dependencies.txt', capture = False)
+	local_quiet('sed -i "s/measure.non-chached = 1/measure.non-chached = 0/" scheme.properties', capture = False)
+	local_quiet('make racket', capture = False)
 
-@task (name = 'is-chached?')
-def is_cached():
-	""" Checks dependencies.txt whether ilp generation is cached or not """
+@task
+def properties():
+	""" Checks dependencies.txt and scheme.properties """
 	noncached = False
 	with open('dependencies.txt') as fd:
-		if 'ilp-noncached' in fd:
+		if 'ilp-noncached\n' in fd:
 			noncached = True
-	print '{0} ILP Generation used.'.format('Noncached' if noncached else 'Normal')
+	with open('scheme.properties') as fd:
+		for line in fd:
+			if line.startswith('measure.flush'):
+				flushed = int(line.split('=')[1].strip()) == 1
+	print 'Evaluation is {0} and {1}.'.format(
+		red('non-cached') if noncached else 'cached',
+		red('flushed') if flushed else 'unflushed')
+
 
 @task
 def help():
