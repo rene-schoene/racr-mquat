@@ -13,3 +13,5 @@ notes.xml
 *.snm
 *.toc
 *.synctex.gz
+*.fdb_latexmk
+*.fls
