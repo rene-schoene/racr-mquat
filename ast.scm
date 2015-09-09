@@ -20,7 +20,7 @@
          :HWRoot :ResourceType :Resource
          :Request :MetaParameter)
  (import (rnrs) (racr core))
- 
+
  (define (->HWRoot n)         (ast-child 'HWRoot n))
  (define (->SWRoot n)         (ast-child 'SWRoot n))
  (define (->Comp* n)          (ast-child 'Comp* n))
@@ -53,8 +53,8 @@
  (define (->* n)              (ast-children n))
  (define (<- n)               (ast-parent n))
  (define (<<- n)              (ast-parent (ast-parent n)))
- 
- (define (:Root spec hw sw r)       (create-ast spec 'Root (list hw sw r)))
+
+ (define (:Root spec hw sw r c)     (create-ast spec 'Root (list hw sw r c)))
  (define (:SWRoot spec c p)         (create-ast spec 'SWRoot (list (create-ast-list c) (create-ast-list p))))
  (define (:Comp spec n i s p)       (create-ast spec 'Comp (list n (create-ast-list i) s (create-ast-list p))))
  (define (:Impl spec n m r d s)     (create-ast spec 'Impl (list n (create-ast-list m) r d s)))
@@ -73,7 +73,7 @@
    (with-specification
     mquat-spec
 
-    (ast-rule 'Root->HWRoot-SWRoot-Request)
+    (ast-rule 'Root->HWRoot-SWRoot-Request-config)
     (ast-rule 'SWRoot->Comp*-RealProperty*)
     (ast-rule 'Comp->name-Impl*-selectedimpl-Property*)
     (ast-rule 'Impl->name-Mode*-reqcomps-deployedon-selectedmode)
@@ -94,5 +94,5 @@
     ; kind=static|runtime|derived. direction=decreasing|increasing. agg = sum|max.
     (ast-rule 'RealProperty:Property->name-unit-kind-direction-agg)
     (ast-rule 'PropertyRef:Property->ref)
-    
+
     (compile-ast-specifications 'Root))))

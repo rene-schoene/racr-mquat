@@ -6,26 +6,26 @@
          freq-name load-name mp-name node-name make-prov make-req)
  (import (rnrs) (racr core) (srfi :27)
          (mquat constants) (mquat ast) (mquat basic-ag) (mquat join) (mquat utils))
- 
+
  ;;; Reusable nodes and names
  (define load-name "load")
  (define freq-name "frequency")
- 
+
  (define mp-name "size")
- 
+
  ;;; Utility definitions
  (define (node-name ident lon) (fold-right (lambda (n s) (string-append s "-" (number->string n))) ident lon))
- 
+
  (define (call-n-times proc n) (letrec ([cnt (lambda (n) (if (>= 0 n) (list) (cons (proc n) (cnt (- n 1)))))]) (cnt n)))
  (define (random n) (random-integer n))
  (define (rand maxVal digits offset) (let* ([factor (expt 10 digits)]
                                             [val (+ offset (inexact (/ (random (* factor maxVal)) factor)))])
                                        (lambda _ val)))
- 
+
  (define (something v) v)
  (define (make-prov property comparator value) (:ProvClause mquat-spec property comparator value))
  (define (make-req property comparator value) (:ReqClause mquat-spec property comparator value))
- 
+
  ; return a proc or #f
  (define (create-clause udfs default-fun name)
    (let ([udf? (udfs name)])
@@ -33,7 +33,7 @@
        ((eq? #t udf?) default-fun) ; not in list, or marked as default
        ((not udf?) #f) ; marked as remove
        (else udf?)))) ; apply user-defined function
- 
+
  ; udfs: function (res-name → function (property → clause)). ud-types: function (res-name → (nr-of-res-type . container?)).
  ; Returns the HWRoot
  (define (create-hw load freq num-pe num-subs ud-clauses ud-types)
@@ -67,7 +67,7 @@
                                                     (create-hw-clause ud-clauses id freq))))))])
      (let ([subs (make-subs "r" num-pe (if (= 0 num-subs) num-pe num-subs))])
        (:HWRoot mquat-spec (map cdr types-al) subs (list load freq)))))
- 
+
  ; udfs: function (mode-name → function (property → clause))
  ; returns (cons SWRoot target-property)
  (define (create-sw load freq num-comp impl-per-comp mode-per-impl ud-clauses reqc)
@@ -128,7 +128,7 @@
                    mquat-spec (call-n-times (lambda (n) (let ([comp (make-comp n)]) (new-comp comp n) comp)) num-comp)
                    (list energy))])
      (cons sw-root (car (prop last-comp-nr)))))
- 
+
  (define (create-request target-property)
    (let* ([make-req (lambda (p maxVal digits offset) (:ReqClause mquat-spec p comp-min-eq (rand maxVal digits offset)))]
           [target (<<- target-property)])
@@ -136,7 +136,7 @@
       mquat-spec
       (list (:MetaParameter mquat-spec mp-name ((rand 100 2 0))))
       target (list (make-req target-property 1 2 0)) #f)))
- 
+
  ; Creates a new system.
  ; num-pe:        total number of resources
  ; num-pe-subs:   number of subresources for every resource (use zero for flat layout)
@@ -172,4 +172,4 @@
           [sw-root (car sw-result)]
           [target-property (cdr sw-result)])
      (:Root mquat-spec (create-hw load freq num-pe num-pe-subs ud-hw-clauses ud-types)
-            sw-root (create-request target-property)))))
+            sw-root (create-request target-property) #f))))
