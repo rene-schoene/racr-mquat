@@ -146,16 +146,19 @@ def do_sol(solver, number, pathname, skip_conflate):
 @task(name = 'conflate-results')
 def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs', paper = False):
 	""" Read lp.time and gen.csv files to produce gen-X-results.csv and sol-Y-results.csv """
-	if paper:
-		pathname = 'paper-*'
 	if not skip_gen:
 		old_cd = os.getcwd()
-		dirs = glob('profiling/{0}/'.format(pathname))
+		if paper:
+			dirs = glob('profiling/{0}/'.format('res-*'))
+			dirs.extend(glob('profiling/{0}/'.format('sw-*')))
+		else:
+			dirs = glob('profiling/{0}/'.format(pathname))
 		sys.stdout.write('Conflating gen-results:')
 		for d in dirs:
 			if not os.path.isdir(d):
 			  print red("Not a valid directory: {0}".format(d))
 			  continue
+			local_quiet('mv profiling/att-measure-{0}* {0}'.format(d))
 			os.chdir(d)
 			sys.stdout.write('.')
 			sys.stdout.flush()
@@ -197,7 +200,7 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 @task(name = 'clean-att-measures')
 def clean_att_measures():
 	""" Remove attribute-calling profiling data """
-	local_quiet('rm profiling/att-measure*.time')
+	local_quiet('rm profiling/att-measure*.time', capture = False)
 
 @task(name = 'prepare-noncached')
 def prepare_noncached():
