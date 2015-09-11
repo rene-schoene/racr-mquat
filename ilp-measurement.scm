@@ -123,6 +123,7 @@
                        node))
 
  (define (run-test id-s specs)
+   (when profiling? (reset-counts))
    (cond
      [(eq? (car specs) resource-test) (run-resource-test id-s (cdr specs))]
      [(eq? (car specs) sw-test) (run-sw-test id-s (cdr specs))]

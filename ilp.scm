@@ -141,8 +141,8 @@
                  (list "End"))])
           (when profiling?
             (save-to-file (date-file-name (string-append "profiling/att-measure-" (or (ast-child 'config n) "noConfig"))
-                                                         "csv") (get-counts))
-            (print-counts))
+                                                         "csv") (get-counts)))
+;            (print-counts))
           result)))
      (Request (lambda (n) (att-value-compute 'to-ilp) (=ilp-nego-sw n)))
 ;     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))

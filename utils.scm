@@ -6,7 +6,7 @@
          lonely? recur ; ast
          save-to-file ; files
          time-it current-date-formatted date-file-name; measurement
-         att-value-call att-value-compute print-counts get-counts ; profiling
+         att-value-call att-value-compute reset-counts print-counts get-counts ; profiling
          debug info warn log0) ; logging
  (import (rnrs) (rnrs mutable-pairs) (racr core) (racr testing) (srfi :19) (srfi :27)
          (only (srfi :13) string-pad string-pad-right string-take)
@@ -146,6 +146,10 @@
                                         (lambda _ (cons name 1)))))))
 
  (define (maybe entry default) (if entry (number->string (cdr entry)) default))
+
+ (define (reset-counts)
+   (set! call-counts (list))
+   (set! compute-counts (list)))
 
  (define (print-counts)
    (info "Counts")

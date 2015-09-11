@@ -22,8 +22,9 @@ class timed(object):
 		print self.msg.format(self.stop)
 
 @task(name = 'current-ids')
-def current_ids(paper = False):
-	print call_racket('cli.scm', 'measure-paper' if paper else 'measure', 'dirs')
+def current_ids():
+	ids = call_racket('cli.scm', 'measure', 'dirs').replace(' ', '\n')
+	print local_quiet('echo "{0}" | sort | column'.format(ids))
 
 def setup_profiling_dirs(call_impl, cmd):
 	dirs = call_impl('cli.scm', cmd, 'dirs').split()
@@ -33,16 +34,6 @@ def setup_profiling_dirs(call_impl, cmd):
 		name = 'profiling/{0}'.format(d)
 		if not os.path.exists(name):
 			os.mkdir(name)
-
-@task(name = 'paper-n')
-def paper_n(number, *dirs):
-	""" Measure for paper with Racket n times """
-	do_gen(call_racket, number, dirs, paper = True)
-
-@task
-def paper(*dirs):
-	""" Measure for paper with Racket once """
-	do_gen(call_racket, 1, dirs, paper = True)
 
 @task(name = 'racket-n')
 def racket_n(number, *dirs):
@@ -64,8 +55,8 @@ def larceny(*dirs):
 	""" Measure larceny once. """
 	do_gen(call_larceny, 1, dirs)
 
-def do_gen(call_impl, number, dirs, paper = False):
-	cmd = 'measure-paper' if paper else 'measure'
+def do_gen(call_impl, number, dirs):
+	cmd = 'measure'
 	with timed():
 		setup_profiling_dirs(call_impl, cmd)
 		for _ in xrange(int(number)):
@@ -85,11 +76,6 @@ all_results = 'all.csv'
 
 def dirname(d):
 	return os.path.split(os.path.dirname(d))[-1]
-
-@task(name = 'paper-sol')
-def paper_sol(number = 1):
-	""" Run solver for paper with preset options """
-	do_sol('glpsol', int(number), 'paper-*', skip_conflate = True)
 
 @task(name = 'sol')
 def sol(number = 1, solver = 'glpsol', pathname = '*', skip_conflate = False):
@@ -144,21 +130,19 @@ def do_sol(solver, number, pathname, skip_conflate):
 		conflate_results(pathname = pathname, skip_gen = True)
 
 @task(name = 'conflate-results')
-def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs', paper = False):
+def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs'):
 	""" Read lp.time and gen.csv files to produce gen-X-results.csv and sol-Y-results.csv """
 	if not skip_gen:
 		old_cd = os.getcwd()
-		if paper:
-			dirs = glob('profiling/{0}/'.format('res-*'))
-			dirs.extend(glob('profiling/{0}/'.format('sw-*')))
-		else:
-			dirs = glob('profiling/{0}/'.format(pathname))
+		dirs = glob('profiling/{0}/'.format(pathname))
 		sys.stdout.write('Conflating gen-results:')
 		for d in dirs:
 			if not os.path.isdir(d):
 			  print red("Not a valid directory: {0}".format(d))
 			  continue
-			local_quiet('mv profiling/att-measure-{0}* {0}'.format(d))
+			att_measures = glob('profiling/att-measure-{0}*'.format(os.path.basename(os.path.normpath(d))))
+			for f in att_measures:
+				os.rename(f, os.path.join(d, os.path.basename(f)))
 			os.chdir(d)
 			sys.stdout.write('.')
 			sys.stdout.flush()
@@ -186,21 +170,21 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
 			os.chdir(old_cd)
 		print ' done'
-		local_quiet('tail -qn +2 profiling/{1}*/{0} > profiling/{1}all-gen-results'.format(gen_results, 'paper-' if paper else ''), capture = False)
+		local_quiet('tail -qn +2 profiling/*/{0} > profiling/all-gen-results'.format(gen_results), capture = False)
 		for impl in impls.split(':'):
-			shutil.copy('profiling/gen-header', 'profiling/{1}gen-{0}-results.csv'.format(impl, 'paper-' if paper else ''))
-			local_quiet('grep {0} profiling/{1}all-gen-results | sed "s/{0},//" >> profiling/{1}gen-{0}-results.csv'.format(impl, 'paper-' if paper else ''))
+			shutil.copy('profiling/gen-header', 'profiling/gen-{0}-results.csv'.format(impl))
+			local_quiet('grep {0} profiling/all-gen-results | sed "s/{0},//" >> profiling/gen-{0}-results.csv'.format(impl))
 
-	local_quiet('tail -n +1 profiling/{0}*/specs > profiling/{0}all-specs'.format('paper-' if paper else ''), capture = False)
+	local_quiet('tail -n +1 profiling/*/specs > profiling/all-specs', capture = False)
 
 	if not skip_sol:
 		# sol-results
-		local_quiet('tail -qn +2 profiling/sol-header profiling/{1}*/{0}> profiling/{1}sol-glpk-results.csv'.format(sol_results, 'paper-' if paper else ''), capture = False)
+		local_quiet('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/sol-glpk-results.csv'.format(sol_results), capture = False)
 
 @task(name = 'clean-att-measures')
 def clean_att_measures():
 	""" Remove attribute-calling profiling data """
-	local_quiet('rm profiling/att-measure*.time', capture = False)
+	local_quiet('rm profiling/att-measure*.csv', capture = False)
 
 @task(name = 'prepare-noncached')
 def prepare_noncached():
@@ -238,14 +222,13 @@ def properties():
 		red('non-cached') if noncached else 'cached',
 		red('flushed') if flushed else 'unflushed')
 
-
 @task
 def help():
 	print 'Measurement driver for racr-mquat'
-	print '1. Do generation (racket[-n], larceny[-n], paper[-n]), n defaults to 1.'
+	print '1. Do generation (racket[-n], larceny[-n]), n defaults to 1.'
 	print '2. (Optional) Do solving (sol[-n], n defaults to 1.)'
 	print '3. (Mandatory) Do conflate-results, to update the {gen/sol}-*-results.csv files'
 
 if __name__ == '__main__':
-	racket()
-	glpsol()
+	properties()
+	help()
