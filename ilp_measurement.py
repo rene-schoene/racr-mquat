@@ -72,6 +72,10 @@ gen_old_dir = '.old'
 sol_results = 'sol.csv'
 sol_header  = ['timestamp', 'dir', 'step', 'rows', 'cols', 'non-zero', 'ilp-sol', 'ti-ilp-sol'] # solving of ilp
 
+att_results = 'att.csv'
+att_header  = ['dir', 'flush', 'noncached', 'attname', 'executed', 'called'] # profiling attributes while generation
+all_att_header  = ['dir', 'attname', 'normalex', 'normalcalled', 'flushedex', 'flushedcalled', 'noncachedex', 'noncachedcalled'] # merged profiling attributes while generation
+
 all_results = 'all.csv'
 
 def dirname(d):
@@ -129,6 +133,50 @@ def do_sol(solver, number, pathname, skip_conflate):
 	if not skip_conflate:
 		conflate_results(pathname = pathname, skip_gen = True)
 
+def analyze_dir(d):
+	name = dirname(d).replace('flush-', '').replace('noncached-', '')
+	return [name, 1 if 'flush' in d else 0, 1 if 'noncached' in d else 0]
+
+class att_measures_run(object):
+	def __init__(self):
+		self.computed = -1
+		self.called = -1
+
+class att_measures_dir(object):
+	def __init__(self):
+		self.normal = att_measures_run()
+		self.flushed = att_measures_run()
+		self.nonchached = att_measures_run()
+
+@task(name = 'merge-att-measurements')
+def merge_att_measurements():
+	runs = {}
+	with open('profiling/all-att-results') as fd:
+		r = csv.reader(fd)
+		for row in r:
+			att = None
+			dir_name = row[0]
+			att_name = row[3]
+			runs.setdefault(dir_name, {})
+			run = runs[dir_name]
+			run.setdefault(att_name, att_measures_dir())
+			if int(row[1]) == 1:
+				att = run[att_name].flushed
+			elif int(row[2]) == 1:
+				att = run[att_name].nonchached
+			else:
+				att = run[att_name].normal
+			att.computed = row[4]
+			att.called = row[5]
+	with open('profiling/all-att-results.csv', 'w') as fd:
+		w = csv.writer(fd)
+		w.writerow(all_att_header)
+		for dir_name, run in runs.iteritems():
+			for att_name, att in run.iteritems():
+				w.writerow([dir_name, att_name, att.normal.computed, att.normal.called,
+					att.flushed.computed, att.flushed.called,
+					att.nonchached.computed, att.nonchached.called])
+
 @task(name = 'conflate-results')
 def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs'):
 	""" Read lp.time and gen.csv files to produce gen-X-results.csv and sol-Y-results.csv """
@@ -140,9 +188,6 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 			if not os.path.isdir(d):
 			  print red("Not a valid directory: {0}".format(d))
 			  continue
-			att_measures = glob('profiling/att-measure-{0}*'.format(os.path.basename(os.path.normpath(d))))
-			for f in att_measures:
-				os.rename(f, os.path.join(d, os.path.basename(f)))
 			os.chdir(d)
 			sys.stdout.write('.')
 			sys.stdout.flush()
@@ -168,13 +213,40 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 					#print row
 					writer.writerow(row)
 					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
+
+			att_measures = glob('*-att.csv')
+			# Search for the one with the highest value for to-ilp, if any
+			max_count = -1
+			for f in att_measures:
+				with open(f) as fd:
+					contents = fd.readlines()
+				count = next(int(line[line.rindex(',')+1:-1]) for line in contents if line.startswith('to-ilp ,'))
+				print f, count, max_count
+				if count > max_count:
+					contents_hightest = contents
+					max_count = count
+#					sys.stdout.write('new highest {}\r'.format(f))
+#					sys.stdout.flush()
+#			sys.stdout.write('\n')
+			if len(att_measures) > 0:
+				with open(att_results, 'w') as fd:
+					w = csv.writer(fd)
+					w.writerow(att_header)
+					for line in contents_hightest:
+						if line.isspace():
+							continue
+						w.writerow(analyze_dir(d) + map(lambda e : e.strip(), line.split(',')))
+
 			os.chdir(old_cd)
+
 		print ' done'
 		local_quiet('tail -qn +2 profiling/*/{0} > profiling/all-gen-results'.format(gen_results), capture = False)
 		for impl in impls.split(':'):
 			shutil.copy('profiling/gen-header', 'profiling/gen-{0}-results.csv'.format(impl))
 			local_quiet('grep {0} profiling/all-gen-results | sed "s/{0},//" >> profiling/gen-{0}-results.csv'.format(impl))
 
+		local_quiet('tail -qn +2 profiling/*/{0} >> profiling/all-att-results'.format(att_results), capture = False)
+		#TODO: merge_att_measurements()
 	local_quiet('tail -n +1 profiling/*/specs > profiling/all-specs', capture = False)
 
 	if not skip_sol:

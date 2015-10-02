@@ -10,7 +10,7 @@
  (define (=to-ilp n)                    (att-value-call 'to-ilp n))
  (define (=ilp-name n)                  (att-value-call 'ilp-name n))
  (define (=ilp-binvar n)                (att-value-call 'ilp-binvar n))
- (define (=ilp-binvar-deployed n pe)    (debug "ibd" n pe) (att-value-call 'ilp-binvar-deployed n pe))
+ (define (=ilp-binvar-deployed n pe)    (att-value-call 'ilp-binvar-deployed n pe))
  (define (=ilp-binary-vars n)           (att-value-call 'ilp-binary-vars n))
  (define =ilp-objective
    (case-lambda ((n)                    (att-value-call 'ilp-objective n))
@@ -139,11 +139,7 @@
                  (list "Generals")
                  binary-vars
                  (list "End"))])
-          (when profiling?
-            (save-to-file (date-file-name (string-append "profiling/att-measure-" (or (ast-child 'config n) "noConfig"))
-                                                         "csv") (get-counts)))
-;            (print-counts))
-          result)))
+          (if profiling? (cons result (get-counts)) result))))
      (Request (lambda (n) (att-value-compute 'to-ilp) (=ilp-nego-sw n)))
 ;     (SWRoot (lambda (n) (recur n append =to-ilp ->Comp*)))
      (SWRoot (lambda (n) (att-value-compute 'to-ilp) (fold-left (lambda (result c) (append (=to-ilp c) result))

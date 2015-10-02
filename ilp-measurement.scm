@@ -100,11 +100,13 @@
 
  (define (sit id-s suffix ast) ; [s]ave-[i]lp-[t]imed
    (debug "sit:" suffix)
-   (let* ([name (string-append "profiling/" id-s "/" suffix ".lp")]
-          [result (time-it (lambda _ (=to-ilp ast)))])
-     (when write-ilp? (save-to-file name (car result)))
+   (let* ([name (string-append "profiling/" id-s "/" suffix)]
+          [result (time-it (lambda _ (=to-ilp ast)))]
+          [ilp (if profiling? (caar result) (car result))])
+     (when write-ilp? (save-to-file (string-append name ".lp") ilp))
      (when measure-flush? (display+flush "_") (touch-terminals ast))
-     (save-to-file (string-append name ".time") (list (car (command-line)) (time-second (cdr result))
+     (when profiling? (save-to-file (string-append name "-att.csv") (cdar result)))
+     (save-to-file (string-append name ".lp.time") (list (car (command-line)) (time-second (cdr result))
                                                       (time-nanosecond (cdr result))))))
 
  (define (cst id-s specs) ; [c]reate-[s]ystem-[t]imed
@@ -224,7 +226,7 @@
    (let* ([ast (cst id-s specs)]
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))])
      (rewrite-terminal 'config ast id-s)
-     (display id-s) (display+flush " ")
+     (display id-s)
      (sit id-s "01-init" ast)
      (rw "r-1" rt "load" 0.1 ast) (sit id-s "02-comp1" ast) (display+flush ".")
 ;     (check-attribut-is-flushed-to 0.1 ast 'r-1 rt "load") ;<-larceny bug tracking
