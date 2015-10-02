@@ -138,15 +138,33 @@ def analyze_dir(d):
 	return [name, 1 if 'flush' in d else 0, 1 if 'noncached' in d else 0]
 
 class att_measures_run(object):
-	def __init__(self):
-		self.computed = -1
-		self.called = -1
+	def __init__(self, defaultValue):
+		self.computed = defaultValue
+		self.called = defaultValue
+	def __str__(self):
+		return '{0}/{1}'.format(self.computed, self.called)
+	def __iadd__(self, other):
+		self.computed += other.computed
+		self.called   += other.called
+		return self
 
-class att_measures_dir(object):
-	def __init__(self):
-		self.normal = att_measures_run()
-		self.flushed = att_measures_run()
-		self.nonchached = att_measures_run()
+class att_measures_att(object):
+	def __init__(self, defaultValue = 0):
+		self.normal = att_measures_run(defaultValue)
+		self.flushed = att_measures_run(defaultValue)
+		self.noncached = att_measures_run(defaultValue)
+	def __str__(self):
+		return 'normal: {0}, flushed: {1}, noncached: {2}'.format(
+			self.normal, self.flushed, self.noncached)
+	def __iadd__(self, other):
+		self.normal    += other.normal
+		self.flushed   += other.flushed
+		self.noncached += other.noncached
+		return self
+	def to_list(self):
+		return [self.normal.computed, self.normal.called,
+			self.flushed.computed, self.flushed.called,
+			self.noncached.computed, self.noncached.called]
 
 @task(name = 'merge-att-measurements')
 def merge_att_measurements():
@@ -159,23 +177,40 @@ def merge_att_measurements():
 			att_name = row[3]
 			runs.setdefault(dir_name, {})
 			run = runs[dir_name]
-			run.setdefault(att_name, att_measures_dir())
+			run.setdefault(att_name, att_measures_att())
 			if int(row[1]) == 1:
 				att = run[att_name].flushed
 			elif int(row[2]) == 1:
-				att = run[att_name].nonchached
+				att = run[att_name].noncached
 			else:
 				att = run[att_name].normal
-			att.computed = row[4]
-			att.called = row[5]
+			att.computed = int(row[4])
+			att.called = int(row[5])
+	totals = {}
 	with open('profiling/all-att-results.csv', 'w') as fd:
 		w = csv.writer(fd)
 		w.writerow(all_att_header)
 		for dir_name, run in runs.iteritems():
+			total = att_measures_att()
 			for att_name, att in run.iteritems():
-				w.writerow([dir_name, att_name, att.normal.computed, att.normal.called,
-					att.flushed.computed, att.flushed.called,
-					att.nonchached.computed, att.nonchached.called])
+				w.writerow([dir_name, att_name] + att.to_list())
+				total += att
+			w.writerow([dir_name, 'total'] + total.to_list())
+			totals[dir_name] = total
+	with open('profiling/att-percentages.csv', 'w') as fd:
+		w = csv.writer(fd)
+		w.writerow(['dir', 'normalBaseline', 'flushedBaseline', 'noncachedBaseline',
+			'ratioToFlushed', 'ratioToNoncached',
+			'speedupToFlushed', 'speedupToNoncached'])
+		baseline = lambda att: att.computed * 1.0 / att.called if att.called > 0 else 0
+		ratio = lambda normal, y: normal.computed * 1.0 / y.called if y.called > 0 else 0
+		for dir_name, total in totals.iteritems():
+			normal, flushed, noncached = total.normal, total.flushed, total.noncached
+			w.writerow([dir_name, baseline(normal), baseline(flushed), baseline(noncached),
+				ratio(normal, flushed), ratio(normal, noncached),
+				baseline(flushed) - ratio(normal, flushed),
+				baseline(noncached) - ratio(normal, noncached)])
+
 
 @task(name = 'conflate-results')
 def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs'):
@@ -246,7 +281,7 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 			local_quiet('grep {0} profiling/all-gen-results | sed "s/{0},//" >> profiling/gen-{0}-results.csv'.format(impl))
 
 		local_quiet('tail -qn +2 profiling/*/{0} >> profiling/all-att-results'.format(att_results), capture = False)
-		#TODO: merge_att_measurements()
+		merge_att_measurements()
 	local_quiet('tail -n +1 profiling/*/specs > profiling/all-specs', capture = False)
 
 	if not skip_sol:
@@ -266,7 +301,7 @@ def prepare_noncached():
 	secure_remove({'racket-bin/mquat': ['ilp.ss'], 'racket-bin/mquat/compiled': ['ilp_ss.dep', 'ilp_ss.zo'],
 					'racket-bin/mquat/compiled/drracket/errortrace': ['ilp_ss.dep', 'ilp_ss.zo']})
 	local_quiet('sed -i "s/^ilp$/ilp-noncached/" dependencies.txt', capture = False)
-	local_quiet('sed -i "s/measure.non-chached = 0/measure.non-chached = 1/" scheme.properties', capture = False)
+	local_quiet('sed -i "s/measure.non-cached = 0/measure.non-cached = 1/" scheme.properties', capture = False)
 	local_quiet('make racket', capture = False)
 
 @task(name = 'prepare-normal')
@@ -276,7 +311,7 @@ def prepare_normal():
 	secure_remove({'racket-bin/mquat': ['ilp.ss'], 'racket-bin/mquat/compiled': ['ilp_ss.dep', 'ilp_ss.zo'],
 					'racket-bin/mquat/compiled/drracket/errortrace': ['ilp_ss.dep', 'ilp_ss.zo']})
 	local_quiet('sed -i "s/^ilp-noncached$/ilp/" dependencies.txt', capture = False)
-	local_quiet('sed -i "s/measure.non-chached = 1/measure.non-chached = 0/" scheme.properties', capture = False)
+	local_quiet('sed -i "s/measure.non-cached = 1/measure.non-cached = 0/" scheme.properties', capture = False)
 	local_quiet('make racket', capture = False)
 
 @task
