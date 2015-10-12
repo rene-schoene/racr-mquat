@@ -4,7 +4,8 @@ import ilp_measurement as measure
 import ilp_check as check
 import install
 import sockets
-from fabric.api import local, task
+import os
+from fabric.api import local, task, get, hosts, run
 
 @task
 def call_racket(f, *args):
@@ -30,3 +31,11 @@ def cloc(not_match, *args, **kwargs):
 	not_match = 'sockets|java|tricks|example-ast|larceny|Makefile|ls' + ('|'+not_match if not_match else '')
 	local('cloc . --exclude-dir=doc,gen,profiling,test,racket-bin,larceny-bin --not-match-f="{0}" {1} {2}'.format(not_match, ' '.join(args),
 		' '.join("{!s}={!r}".format(k,v) for (k,v) in kwargs.iteritems())))
+
+@task
+@hosts('rschoene@141.76.65.177')
+def dl(name, rdir = '~/git/racr-mquat/'):
+	#run('uname -a')
+	target = os.path.join(rdir, name)
+	print target
+	get(target, local_path = name)

@@ -200,17 +200,17 @@ def merge_att_measurements():
 	with open('profiling/att-percentages.csv', 'w') as fd:
 		w = csv.writer(fd)
 		w.writerow(['dir', 'normalBaseline', 'flushedBaseline', 'noncachedBaseline',
-			'ratioToFlushed', 'ratioToNoncached',
-			'speedupToFlushed', 'speedupToNoncached'])
+			'ratioNormalToFlushed', 'ratioNormalToNoncached', 'ratioFlushedToNoncached',
+			'speedupNormalToFlushed', 'speedupNormalToNoncached', 'speedupFlushedToNoncached'])
 		baseline = lambda att: att.computed * 1.0 / att.called if att.called > 0 else 0
-		ratio = lambda normal, y: normal.computed * 1.0 / y.called if y.called > 0 else 0
+		ratio = lambda x, y: x.computed * 1.0 / y.called if y.called > 0 else 0
 		for dir_name, total in totals.iteritems():
 			normal, flushed, noncached = total.normal, total.flushed, total.noncached
 			w.writerow([dir_name, baseline(normal), baseline(flushed), baseline(noncached),
-				ratio(normal, flushed), ratio(normal, noncached),
+				ratio(normal, flushed), ratio(normal, noncached), ratio(flushed, noncached),
 				baseline(flushed) - ratio(normal, flushed),
-				baseline(noncached) - ratio(normal, noncached)])
-
+				baseline(noncached) - ratio(normal, noncached),
+				baseline(noncached) - ratio(flushed, noncached)])
 
 @task(name = 'conflate-results')
 def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls = 'larceny:plt-r6rs'):
@@ -245,7 +245,6 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 						impl = tokens[0].split('/')[-1]
 						gen_time = '.'.join(tokens[1:3])
 					row = [mod.isoformat(), impl, dirname(d), f.split('.')[0], gen_time]
-					#print row
 					writer.writerow(row)
 					os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
 
@@ -256,13 +255,9 @@ def conflate_results(pathname = '*', skip_gen = False, skip_sol = False, impls =
 				with open(f) as fd:
 					contents = fd.readlines()
 				count = next(int(line[line.rindex(',')+1:-1]) for line in contents if line.startswith('to-ilp ,'))
-				print f, count, max_count
 				if count > max_count:
 					contents_hightest = contents
 					max_count = count
-#					sys.stdout.write('new highest {}\r'.format(f))
-#					sys.stdout.flush()
-#			sys.stdout.write('\n')
 			if len(att_measures) > 0:
 				with open(att_results, 'w') as fd:
 					w = csv.writer(fd)
