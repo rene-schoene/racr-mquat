@@ -6,6 +6,7 @@ from glob import glob
 try:
 	from fabric.api import task, lcd
 	from fabric.colors import red
+	from fabric.contrib.console import confirm
 except ImportError:
 	from fabric_workaround import task, red, lcd
 from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion, secure_remove
@@ -330,6 +331,41 @@ def help():
 	print '1. Do generation (racket[-n], larceny[-n]), n defaults to 1.'
 	print '2. (Optional) Do solving (sol[-n], n defaults to 1.)'
 	print '3. (Mandatory) Do conflate-results, to update the {gen/sol}-*-results.csv files'
+
+@task
+def setup(name = None):
+	"""
+	Interactive setup of all settings or given specific one.
+	Overrides the file "scheme.properties"
+	"""
+	def confirm_s(wanted, name, message, default):
+		if not wanted or name.startswith(wanted):
+			return confirm(message, default)
+		return default
+	timing    = confirm_s(name, 'timing', 'Measure runtimes?', False)
+	log_info  = confirm_s(name, 'info', 'Log INFO messages?', True)
+	log_debug = confirm_s(name, 'debug', 'Log Debug messages?', False)
+	lp_write  = confirm_s(name, 'lp', 'Write out ILP files?', False)
+	profiling = confirm_s(name, 'profiling', 'Profile attribute metrics?', True)
+	flushed   = confirm_s(name, 'flushed', 'Use strategy "flushed"?', False)
+	noncached = confirm_s(name, 'noncached', 'Use strategy "noncached"?', False)
+
+	# consistency checking
+	if timing and profiling:
+		print 'Attribute profiling could lead to incorrect runtime measurements...'
+	if flushed and noncached:
+		print 'Disabling "flushed", as noncached is enabled'
+		flushed = False
+	if not (timing or lp_write or profiling):
+		print 'Nothing is done or measured, either set timing, lp_write or profiling'
+
+	def v(value):
+		return 1 if value else 0
+	for name, value in (('timing', timing), ('log.info', log_info), ('log.debug', log_debug),
+						('measure.lp.write', lp_write), ('measure.profiling', profiling),
+						('measure.flush', flushed), ('measure.non-chached', noncached)):
+		local_quiet(r'sed -i "s/{0}\(\s*\)= {1}/{0}\1= {2}/" scheme.properties'.format(name, v(not value), v(value)))
+
 
 if __name__ == '__main__':
 	properties()
