@@ -3,7 +3,7 @@
 (library
  (mquat ilp-measurement)
  (export measurement-cli-call)
- (import (rnrs) (racr core) (srfi :19)
+ (import (rnrs) (racr core) (srfi :19) (only (srfi :13) string-prefix? string-suffix?)
          (mquat ast) (mquat basic-ag) (mquat utils) (mquat join) (mquat ilp) (mquat constants)
          (mquat ast-generation) (mquat properties))
 
@@ -268,11 +268,18 @@
      (rw* rt "load" #f ast) (sit id-s "07-every-comp-rand" ast) (display+flush ".")
      (rw* rt "load" #f ast) (sit id-s "08-every-comp-rand" ast) (display+flush ".")))
 
- (define (print-usage) (error "measurement-cli-call" "No valid arguments found, use 'all', 'dirs' or a number of ids."))
+ (define (print-usage) (error "measurement-cli-call" "No valid arguments found, use 'all', 'dirs', 'prefix', 'suffix' or a number of ids."))
 
  (define (measurement-cli-call command-line)
-   (cond
-     [(= 0 (length command-line)) (print-usage)]
-     [(string=? "all" (car command-line)) (for-each run-test (map car params) (map cdr params))]
-     [(string=? "dirs" (car command-line)) (for-each (lambda (entry) (display (car entry)) (display " ")) params)]
-     [else (for-each run-test command-line (map (lambda (id) (cdr (assoc id params))) command-line))])))
+   (let ([first (if (= 0 (length command-line)) #f (car command-line))])
+       (cond
+         [(= 0 (length command-line)) (print-usage)]
+         [(string=? "all" first) (for-each run-test (map car params) (map cdr params))]
+         [(string=? "dirs" first) (for-each (lambda (entry) (display (car entry)) (display " ")) params)]
+         [(string=? "prefix" first)
+            (let ([param_subset (filter (lambda (p) (string-prefix? (cadr command-line) (car p))) params)])
+                (for-each run-test (map car param_subset) (map cdr param_subset)))]
+         [(string=? "suffix" first)
+            (let ([param_subset (filter (lambda (p) (string-suffix? (cadr command-line) (car p))) params)])
+                (for-each run-test (map car param_subset) (map cdr param_subset)))]
+         [else (for-each run-test command-line (map (lambda (id) (cdr (assoc id params))) command-line))]))))
