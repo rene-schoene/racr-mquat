@@ -37,11 +37,27 @@ def call_larceny(f, *args, **kwargs):
 		larcenyBin.racr_bin, larcenyBin.mquat_bin, f, ' '.join(str(x) for x in args)),
 		abort_on_stderr = True, capture = kwargs.get('capture', True))
 
-def secure_remove(spec):
+def secure_remove(spec, globbing = False, dryrun = False):
 	""" Attempts to remove the given files in the given directories.
-	@param:spec: dict of the form { dir: [file1, file2] } """
+	@param:spec: dict of the form { dir: [file1, file2] }
+	@param:globbing: if globbing is enable (handling of *), disabled by default
+	@param:dryrun: only lists files to be deleted, disabled by default """
+	def remove(f):
+		if os.path.exists(f):
+			if dryrun:
+				print 'rm "{}"'.format(f)
+			else:
+				os.remove(f)
+	total = 0
 	for d,l in spec.iteritems():
 		for f in l:
 			name = os.path.join(d, f)
-			if os.path.exists(name):
-				os.remove(name)
+			if globbing and '*' in f:
+				from glob import glob
+				for instance in glob(name):
+					remove(instance)
+					total += 1
+			else:
+				remove(name)
+				total += 1
+	return total
