@@ -9,8 +9,8 @@ larceny-bin
 # Test and measurment directories, files and output
 test
 profiling/*
-!profiling/sol-header
-!profiling/gen-header
+!profiling/*-header
+!profiling/kinds.json
 *.log
 *.png
 .ipynb_checkpoints/
