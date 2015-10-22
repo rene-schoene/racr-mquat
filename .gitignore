@@ -14,6 +14,8 @@ profiling/*
 *.log
 *.png
 .ipynb_checkpoints/
+/.tmp
+/m_*.tar
 
 # Generated from ilp.scm
 ilp-noncached.scm

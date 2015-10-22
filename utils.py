@@ -1,6 +1,6 @@
-import sys, os
+import sys, os, csv, shutil
 try:
-	from fabric.api import local, quiet
+	from fabric.api import local, quiet, task
 except ImportError:
 	from fabric_workaround import local, quiet
 from constants import racketBin, larcenyBin, racketExec, larcenyExec
@@ -61,3 +61,41 @@ def secure_remove(spec, globbing = False, dryrun = False):
 				remove(name)
 				total += 1
 	return total
+
+@task
+def merge_csv(f1, f2, primaryColumn1 = 0, primaryColumn2 = 0, dryrun = False):
+    """ Merges second csv file into first csv """
+    if dryrun:
+        print 'Merge {0} into {1}'.format(f2, f1)
+        return
+    dir1 = os.path.dirname(f1)
+    if not os.path.exists(dir1):
+        print 'Creating directory "{}"'.format(os.path.dirname(f1))
+        os.mkdir(dir1)
+    if not os.path.exists(f1):
+        print 'Copying "{0}" to "{1}"'.format(f2, f1)
+        shutil.copy(f2, f1)
+        return
+	with open(f1) as fd1, open(f2) as fd2:
+		csv1, csv2 = csv.reader(fd1), csv.reader(fd2)
+		result_rows = [row for row in csv1]
+		primaries = set([row[primaryColumn1] for row in result_rows])
+		for row in csv2:
+			if row[primaryColumn2] not in primaries:
+				result_rows.append(row)
+	with open(f1, 'w') as fd1:
+		csv1 = csv.writer(fd1)
+		csv1.writerows(result_rows)
+
+@task
+def ccsv():
+	with open('a.csv', 'w') as fd1, open('b.csv', 'w') as fd2:
+		fd1.write('a,b,c\n')
+		fd1.write('1,b1,c1\n')
+		fd1.write('2,b2,c2\n')
+		fd1.write('3,b3,c3\n')
+
+		fd2.write('a,b,c\n')
+		fd2.write('3,b3.1,c3.1\n')
+		fd2.write('4,b4,c4\n')
+		fd2.write('5,b5,c4\n')

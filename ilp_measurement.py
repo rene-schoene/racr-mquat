@@ -2,14 +2,14 @@
 
 import sys, re, os, csv, timeit, shutil, json
 from datetime import datetime
-from glob import glob
+from glob import glob, iglob
 try:
-    from fabric.api import task, lcd
+    from fabric.api import task, lcd, hosts, cd, run, get, execute
     from fabric.colors import red
     from fabric.contrib.console import confirm
 except ImportError:
     from fabric_workaround import task, red, lcd
-from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion, secure_remove
+from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion, secure_remove, merge_csv
 
 assertTrue = assertTrueAssertion
 
@@ -306,28 +306,36 @@ def change_distinction():
         return unnormal if strategy == 'normal' else '-e {0}'.format(strategy)
     if not os.path.exists('profiling/splitted'):
         os.mkdir('profiling/splitted')
-    for f in glob('profiling/gen-*-results.csv'):
-        name = os.path.basename(f)[4:-12]
-        for change in d['changes']:
-            for strategy in d['strategies']:
-                gen_target = 'profiling/splitted/gen_{0}_{1}_{2}.csv'.format(change, strategy, name)
-                sol_target = 'profiling/splitted/sol_{0}_{1}_{2}.csv'.format(change, strategy, name)
-                shutil.copy('profiling/gen-header', gen_target)
-                local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
-                    f, change, get_strategy_pattern(strategy), gen_target))
-    f = 'profiling/all-att-results.csv'
     for change in d['changes']:
-        for strategy in d['strategies']:
-            target = 'profiling/splitted/att_{0}_{1}.csv'.format(change, strategy)
-            local_quiet('head -n 1 profiling/att-totals.csv > {}'.format(target))
-            local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
-                f, change, get_strategy_pattern(strategy), target))
-    f = 'profiling/att-percentages.csv'
-    for change in d['changes']:
+        sys.stdout.write(':')
+        for f in glob('profiling/sol-*-results.csv'):
+            sol_name = os.path.basename(f)[4:-12]
+            sol_target = 'profiling/splitted/sol_{0}_{1}.csv'.format(change, sol_name)
+            local_quiet('tail -n +2 profiling/sol-header > {0}'.format(sol_target))
+            local_quiet('tail -n +2 {0} | grep -e {1} | cat >> {2}'.format(f, change, sol_target))
+
+        # att percentages (only per change kinds)
+        f = 'profiling/att-percentages.csv'
         target = 'profiling/splitted/att-percentages_{}.csv'.format(change)
         local_quiet('head -n 1 profiling/att-percentages.csv > {}'.format(target))
         local_quiet('tail -n +2 {0} | grep -e {1} | cat >> {2}'.format(
             f, change, target))
+
+        for strategy in d['strategies']:
+            sys.stdout.write('.')
+            # gen
+            for f in glob('profiling/gen-*-results.csv'):
+                name = os.path.basename(f)[4:-12]
+                gen_target = 'profiling/splitted/gen_{0}_{1}_{2}.csv'.format(change, strategy, name)
+                shutil.copy('profiling/gen-header', gen_target)
+                local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
+                    f, change, get_strategy_pattern(strategy), gen_target))
+            # att totals
+            f = 'profiling/all-att-results.csv'
+            target = 'profiling/splitted/att_{0}_{1}.csv'.format(change, strategy)
+            local_quiet('head -n 1 profiling/att-totals.csv > {}'.format(target))
+            local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
+                f, change, get_strategy_pattern(strategy), target))
 
 
 @task(name = 'prepare-noncached')
@@ -407,6 +415,38 @@ def setup(name = None):
                         ('measure.flush', flushed), ('measure.non-chached', noncached)):
         local_quiet(r'sed -i "s/{0}\(\s*\)= {1}/{0}\1= {2}/" scheme.properties'.format(name, v(not value), v(value)))
 
+@task(name = 'new-measurements')
+def new_measurements():
+    name = execute(get_remote_measurements)
+    execute(incoporate_remote_measurements)
+
+@task(name = 'get-remote-measurements')
+@hosts('rschoene@141.76.65.177')
+def get_remote_measurements(rdir = '~/git/racr-mquat/'):
+    rdir = os.path.join(rdir, 'profiling')
+    print rdir
+    with open('profiling/kinds.json') as fd:
+        d = json.load(fd)
+    with cd(rdir):
+        import time, datetime
+        name = 'm_{}.tar'.format(int(time.mktime(datetime.datetime.now().timetuple())))
+        run('tar cf {} *-*/*.csv'.format(name))
+        get(os.path.join(rdir, name), local_path = name)
+        run('rm {}'.format(name))
+    return name
+
+@task(name = 'incoporate-remote-measurements')
+def incoporate_remote_measurements(archive):
+    tmp = '.tmp'
+    if not os.path.exists(tmp):
+        os.mkdir(tmp)
+    local_quiet('tar xf {0} -C {1}'.format(archive, tmp))
+    for f in iglob('{}/*/*.csv'.format(tmp)):
+        sys.stdout.write('.')
+        d, name = os.path.split(f)
+        d = os.path.split(d)[1]
+        merge_csv(os.path.join('profiling', d, name), f)
+    sys.stdout.write('\n')
 
 if __name__ == '__main__':
     properties()
