@@ -297,8 +297,18 @@ def clean(dryrun = False):
     total += secure_remove({'profiling/splitted': ['*.csv']}, globbing = True, dryrun = dryrun)
     print 'Removed {} files.'.format(total)
 
+dummy_values = {'timestamp': '1970-01-01T00:00:00.00', 'dir': 'dummy-001', 'step': '01-dummy', 'attname': 'dummyatt'}
+
 @task(name = 'distinction-of-changes')
 def change_distinction():
+    def maybe_insert_dummy(f):
+        with open(f, 'a+') as fd:
+            header = next(fd)
+            if not next(fd, False):
+                # insert dummy data
+                keys = (key.strip() for key in header.split(','))
+                values = [dummy_values.get(key, '0') for key in keys]
+                fd.write(','.join(values))
     with open(change_kinds) as fd:
         d = json.load(fd)
     unnormal = '-v -e ' + ' -e '.join((c for c in d['strategies'] if c != 'normal'))
@@ -313,6 +323,7 @@ def change_distinction():
             sol_target = 'profiling/splitted/sol_{0}_{1}.csv'.format(change, sol_name)
             local_quiet('tail -n +2 profiling/sol-header > {0}'.format(sol_target))
             local_quiet('tail -n +2 {0} | grep -e {1} | cat >> {2}'.format(f, change, sol_target))
+            maybe_insert_dummy(sol_target)
 
         # att percentages (only per change kinds)
         f = 'profiling/att-percentages.csv'
@@ -320,6 +331,7 @@ def change_distinction():
         local_quiet('head -n 1 profiling/att-percentages.csv > {}'.format(target))
         local_quiet('tail -n +2 {0} | grep -e {1} | cat >> {2}'.format(
             f, change, target))
+        maybe_insert_dummy(target)
 
         for strategy in d['strategies']:
             sys.stdout.write('.')
@@ -330,13 +342,14 @@ def change_distinction():
                 shutil.copy('profiling/gen-header', gen_target)
                 local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
                     f, change, get_strategy_pattern(strategy), gen_target))
+                maybe_insert_dummy(gen_target)
             # att totals
             f = 'profiling/all-att-results.csv'
             target = 'profiling/splitted/att_{0}_{1}.csv'.format(change, strategy)
             local_quiet('head -n 1 profiling/att-totals.csv > {}'.format(target))
             local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
                 f, change, get_strategy_pattern(strategy), target))
-
+            maybe_insert_dummy(target)
 
 @task(name = 'prepare-noncached')
 def prepare_noncached():
