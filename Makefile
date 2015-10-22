@@ -10,6 +10,7 @@ LDEPS := $(shell sed -e '1,/@sources:/d' -e '/^\#/d' dependencies.txt | while re
 all: racket
 
 racket: $(RDEPS) Makefile
+	@rm -f $(RACKET_BUILD_DIR)/mquat/ilp.ss
 
 larceny: $(LSRC)
 	@mkdir -p $(LARCENY_BUILD_DIR)
