@@ -106,6 +106,10 @@
     (let ([result (proc)])
       (cons result (time-difference (current-time) before)))))
 
+ (define (safe-string-take s k padchar)
+   (let ([len (string-length s)])
+     (if (< len k) (string-pad s k padchar) (string-take s k))))
+
  (define (current-date-formatted)
    (let ([now (current-date)])
      (string-append (number->string (date-year now)) "_"
@@ -114,7 +118,7 @@
                     (number->string (date-hour now)) "_"
                     (number->string (date-minute now)) "_"
                     (number->string (date-second now)) "_"
-                    (string-take (number->string (date-nanosecond now)) 3))))
+                    (safe-string-take (number->string (date-nanosecond now)) 3 #\0))))
 
  (define (date-file-name prefix ext) (string-append prefix (if measure-non-chached? "-noncached" (if measure-flush? "-flush" ""))
                                                     "-" (current-date-formatted) "." ext))

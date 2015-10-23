@@ -249,7 +249,8 @@ def conflate_results(pathname = '*-*', skip_gen = False, skip_sol = False, impls
                     with open(f) as fd:
                         tokens = fd.readline().split()
                         impl = tokens[0].split('/')[-1]
-                        gen_time = '.'.join(tokens[1:3])
+#                        gen_time = '.'.join(tokens[1:3])
+                        gen_time = '{0}.{1}'.format(tokens[1], tokens[3].zfill(9))
                     row = [mod.isoformat(), impl, dirname(d), f.split('.')[0], gen_time]
                     writer.writerow(row)
                     os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
@@ -297,7 +298,7 @@ def clean(dryrun = False):
     total += secure_remove({'profiling/splitted': ['*.csv']}, globbing = True, dryrun = dryrun)
     print 'Removed {} files.'.format(total)
 
-dummy_values = {'timestamp': '1970-01-01T00:00:00.00', 'dir': 'dummy-001', 'step': '01-dummy', 'attname': 'dummyatt'}
+dummy_values = {'timestamp': '2070-01-01T00:00:00.00', 'dir': 'dummy-001', 'step': '01-dummy', 'attname': 'dummyatt'}
 
 @task(name = 'distinction-of-changes')
 def change_distinction():
