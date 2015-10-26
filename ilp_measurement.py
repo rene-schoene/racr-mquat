@@ -5,11 +5,12 @@ from datetime import datetime
 from glob import glob, iglob
 try:
     from fabric.api import task, lcd, hosts, cd, run, get, execute
-    from fabric.colors import red
+    from fabric.colors import red, green
     from fabric.contrib.console import confirm
 except ImportError:
-    from fabric_workaround import task, red, lcd
+    from fabric_workaround import task, red, lcd, green
 from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion, secure_remove, merge_csv
+import properties
 
 assertTrue = assertTrueAssertion
 
@@ -374,19 +375,29 @@ def prepare_normal():
     local_quiet('make racket', capture = False)
 
 @task
-def properties():
+def check():
     """ Checks dependencies.txt and scheme.properties """
-    noncached = False
+    def nc_tostring(val):
+        return red('non-cached') if val else 'cached'
+    noncached_scm = False
     with open('dependencies.txt') as fd:
         if 'ilp-noncached\n' in fd:
-            noncached = True
-    with open('scheme.properties') as fd:
-        for line in fd:
-            if line.startswith('measure.flush'):
-                flushed = int(line.split('=')[1].strip()) == 1
-    print 'Evaluation is {0} and {1}.'.format(
-        red('non-cached') if noncached else 'cached',
-        red('flushed') if flushed else 'unflushed')
+            noncached_scm = True
+    print 'Evaluation is set to:\n- {0}, {1}\n- {2}\n- {3}'.format(
+        red('non-cached') if properties.noncached.value else 'cached',
+        red('flushed') if properties.flushed.value else 'unflushed',
+        (green('yes: ') if properties.timing.value else 'No ') + 'measurement of execution times',
+        (green('yes: ') if properties.profiling.value else 'No ') + 'profiling of attribute metrics')
+    if noncached_scm != properties.noncached.value:
+        print 'Attention: Compiled ilp ({}) differs from properties file setting ({}).'.format(
+            nc_tostring(noncached_scm), nc_tostring(properties.noncached.value))
+    if properties.timing.value and properties.profiling.value:
+        print 'Attention: Both, enabled profiling will influence timing.'
+    if properties.flushed.value and properties.noncached.value:
+        print 'Disabling "flushed", as noncached is enabled'
+        properties.flushed.value = False
+    if not (properties.timing.value or properties.lp_write.value or properties.profiling.value):
+        print 'Nothing is done or measured, either set timing, lp_write or profiling'
 
 @task
 def help():
@@ -398,39 +409,27 @@ def help():
     print '5. (Optional) Rerun notebook to update diagrams'
 
 @task
-def setup(name = None):
+def setup(name = None, to_default = False):
     """
     Interactive setup of all settings or given specific one.
     Overrides the file "scheme.properties"
     """
-    def confirm_s(wanted, name, message, default):
-        if not wanted or name.startswith(wanted):
-            return confirm(message, default)
-        return default
-    timing    = confirm_s(name, 'timing', 'Measure runtimes?', False)
-    log_info  = confirm_s(name, 'info', 'Log INFO messages?', True)
-    log_debug = confirm_s(name, 'debug', 'Log Debug messages?', False)
-    lp_write  = confirm_s(name, 'lp', 'Write out ILP files?', False)
-    profiling = confirm_s(name, 'profiling', 'Profile attribute metrics?', True)
-    flushed   = confirm_s(name, 'flushed', 'Use strategy "flushed"?', False)
-    noncached = confirm_s(name, 'noncached', 'Use strategy "noncached"?', False)
+    def default_val(item):
+        return item.default if to_default else item.value
+    def confirm_s(wanted, item):
+        if not wanted or item.name.startswith(wanted):
+            return confirm(item.question, default_val(item))
+        return default_val(item)
+    for p in properties.items:
+        p.value = confirm_s(name, p)
 
     # consistency checking
-    if timing and profiling:
-        print 'Attribute profiling could lead to incorrect runtime measurements...'
-    if flushed and noncached:
-        print 'Disabling "flushed", as noncached is enabled'
-        flushed = False
-    if not (timing or lp_write or profiling):
-        print 'Nothing is done or measured, either set timing, lp_write or profiling'
+    check()
 
-    def v(value):
-        return 1 if value else 0
-    for name, value in (('timing', timing), ('log.info', log_info), ('log.debug', log_debug),
-                        ('measure.lp.write', lp_write), ('measure.profiling', profiling),
-                        ('measure.flush', flushed), ('measure.non-cached', noncached)):
-        local_quiet(r'sed -i "s/{0}\(\s*\)= {1}/{0}\1= {2}/" scheme.properties'.format(name, v(not value), v(value)))
-    print 'Remember to invoke prepare-{} if noncached setting was changed'.format('noncached' if noncached else 'normal')
+    for p in properties.items:
+        p.write_value()
+    print 'Remember to invoke prepare-{} if noncached setting was changed'.format(
+        'noncached' if properties.noncached.value else 'normal')
 
 @task(name = 'new-measurements')
 def new_measurements():
@@ -470,5 +469,5 @@ def incoporate_remote_measurements(archive, dryrun = False):
     sys.stdout.write('\n')
 
 if __name__ == '__main__':
-    properties()
+    check()
     help()
