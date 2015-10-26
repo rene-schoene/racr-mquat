@@ -9,7 +9,7 @@
 
  (define (dirname kind id)
    (let ([id-s (if (number? id) (number->string id) id)])
-     (string-append kind (if measure-non-chached? "noncached-" (if measure-flush? "flush-" ""))
+     (string-append kind (if measure-non-cached? "noncached-" (if measure-flush? "flush-" ""))
                     (make-string (- 3 (string-length id-s)) #\0) id-s)))
 
  (define resource-test 'resource-test)

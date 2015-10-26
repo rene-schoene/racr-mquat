@@ -64,25 +64,29 @@ def secure_remove(spec, globbing = False, dryrun = False):
 
 @task
 def merge_csv(f1, f2, primaryColumn1 = 0, primaryColumn2 = 0, dryrun = False):
-    """ Merges second csv file into first csv """
-    if dryrun:
-        print 'Merge {0} into {1}'.format(f2, f1)
-        return
-    dir1 = os.path.dirname(f1)
-    if not os.path.exists(dir1):
-        print 'Creating directory "{}"'.format(os.path.dirname(f1))
-        os.mkdir(dir1)
-    if not os.path.exists(f1):
-        print 'Copying "{0}" to "{1}"'.format(f2, f1)
-        shutil.copy(f2, f1)
-        return
+	""" Merges second csv file into first csv """
+	if dryrun:
+		print 'Merge {0} into {1}'.format(f2, f1)
+	dir1 = os.path.dirname(f1)
+	if not os.path.exists(dir1):
+		print 'Creating directory "{}"'.format(os.path.dirname(f1))
+		os.mkdir(dir1)
+	if not os.path.exists(f1):
+		print 'Copying "{0}" to "{1}"'.format(f2, f1)
+		shutil.copy(f2, f1)
+		return
 	with open(f1) as fd1, open(f2) as fd2:
 		csv1, csv2 = csv.reader(fd1), csv.reader(fd2)
 		result_rows = [row for row in csv1]
-		primaries = set([row[primaryColumn1] for row in result_rows])
+		old_len = len(result_rows)
+		primaries = set([row[primaryColumn1] for row in result_rows if len(row) > 0])
 		for row in csv2:
-			if row[primaryColumn2] not in primaries:
+			if len(row) > 0 and row[primaryColumn2] not in primaries:
 				result_rows.append(row)
+	new_len = len(result_rows)
+	if dryrun:
+		print 'Old: {0}, new: {1}'.format(old_len, new_len)
+		return
 	with open(f1, 'w') as fd1:
 		csv1 = csv.writer(fd1)
 		csv1.writerows(result_rows)

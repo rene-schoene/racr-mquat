@@ -250,7 +250,7 @@ def conflate_results(pathname = '*-*', skip_gen = False, skip_sol = False, impls
                         tokens = fd.readline().split()
                         impl = tokens[0].split('/')[-1]
 #                        gen_time = '.'.join(tokens[1:3])
-                        gen_time = '{0}.{1}'.format(tokens[1], tokens[3].zfill(9))
+                        gen_time = '{0}.{1}'.format(tokens[1], tokens[2].zfill(9))
                     row = [mod.isoformat(), impl, dirname(d), f.split('.')[0], gen_time]
                     writer.writerow(row)
                     os.rename(f, os.path.join(gen_old_dir, os.path.basename(f)))
@@ -282,7 +282,7 @@ def conflate_results(pathname = '*-*', skip_gen = False, skip_sol = False, impls
             shutil.copy('profiling/gen-header', 'profiling/gen-{0}-results.csv'.format(impl))
             local_quiet('grep {0} profiling/all-gen-results | sed "s/{0},//" >> profiling/gen-{0}-results.csv'.format(impl))
 
-        local_quiet('tail -qn +2 profiling/*/{0} >> profiling/all-att-results'.format(att_results), capture = False)
+        local_quiet('tail -qn +2 profiling/*/{0} > profiling/all-att-results'.format(att_results), capture = False)
         merge_att_measurements()
     local_quiet('tail -n +1 profiling/*/specs > profiling/all-specs', capture = False)
 
@@ -393,7 +393,9 @@ def help():
     print 'Measurement driver for racr-mquat'
     print '1. Do generation (racket[-n], larceny[-n]), n defaults to 1.'
     print '2. (Optional) Do solving (sol[-n], n defaults to 1.)'
-    print '3. (Mandatory) Do conflate-results, to update the {gen/sol}-*-results.csv files'
+    print '3. (Mandatory) Execute conflate-results, to update the {gen/sol}-*-results.csv files'
+    print '4. (Mandatory) Execute distinction-of-changes, to create splitted csv files'
+    print '5. (Optional) Rerun notebook to update diagrams'
 
 @task
 def setup(name = None):
@@ -426,8 +428,9 @@ def setup(name = None):
         return 1 if value else 0
     for name, value in (('timing', timing), ('log.info', log_info), ('log.debug', log_debug),
                         ('measure.lp.write', lp_write), ('measure.profiling', profiling),
-                        ('measure.flush', flushed), ('measure.non-chached', noncached)):
+                        ('measure.flush', flushed), ('measure.non-cached', noncached)):
         local_quiet(r'sed -i "s/{0}\(\s*\)= {1}/{0}\1= {2}/" scheme.properties'.format(name, v(not value), v(value)))
+    print 'Remember to invoke prepare-{} if noncached setting was changed'.format('noncached' if noncached else 'normal')
 
 @task(name = 'new-measurements')
 def new_measurements():
@@ -450,16 +453,20 @@ def get_remote_measurements(rdir = '~/git/racr-mquat/'):
     return name
 
 @task(name = 'incoporate-remote-measurements')
-def incoporate_remote_measurements(archive):
+def incoporate_remote_measurements(archive, dryrun = False):
+    shutil.copy(archive, os.path.join('.archives', os.path.basename(archive)))
     tmp = '.tmp'
-    if not os.path.exists(tmp):
+    if os.path.exists(tmp):
+        local_quiet('rm -rf {}/*'.format(tmp))
+    else:
         os.mkdir(tmp)
     local_quiet('tar xf {0} -C {1}'.format(archive, tmp))
     for f in iglob('{}/*/*.csv'.format(tmp)):
-        sys.stdout.write('.')
+        if not dryrun:
+            sys.stdout.write('.')
         d, name = os.path.split(f)
         d = os.path.split(d)[1]
-        merge_csv(os.path.join('profiling', d, name), f)
+        merge_csv(os.path.join('profiling', d, name), f, dryrun = dryrun)
     sys.stdout.write('\n')
 
 if __name__ == '__main__':
