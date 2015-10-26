@@ -120,7 +120,7 @@
                     (number->string (date-second now)) "_"
                     (safe-string-take (number->string (date-nanosecond now)) 3 #\0))))
 
- (define (date-file-name prefix ext) (string-append prefix (if measure-non-chached? "-noncached" (if measure-flush? "-flush" ""))
+ (define (date-file-name prefix ext) (string-append prefix (if measure-non-cached? "-noncached" (if measure-flush? "-flush" ""))
                                                     "-" (current-date-formatted) "." ext))
 
  ; name -> call-count
