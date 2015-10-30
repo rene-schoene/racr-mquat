@@ -138,14 +138,6 @@
                                              (begin (debug "rewrite-terminal" i node child) (rewrite-terminal i node child))))
                        node))
 
- (define (run-test id-s specs)
-   (when profiling? (reset-counts))
-   (cond
-     [(eq? (car specs) resource-test) (run-resource-test id-s (cdr specs))]
-     [(eq? (car specs) sw-test) (run-sw-test id-s (cdr specs))]
-     [(eq? (car specs) update-test) (run-update-test id-s (cdr specs))]
-     [else (error "Unknown kind" (car specs))]))
-
  (define (ret-odds lst)
    (if (null? lst) (list)
        (cons (car lst)
@@ -296,6 +288,16 @@
        (for-each (lambda (rp) (rewrite-add (cdr rp) (car rp))) (reverse removed))
        (rw* rt "load" #f ast) (sit id-s "10-add-odd-pes" ast) (display+flush "."))
      (delete-odd-modes ast) (sit id-s "11-del-modes" ast) (display+flush ".")))
+
+ (define tests (list (cons resource-test run-resource-test)
+                     (cons sw-test run-sw-test)
+                     (cons update-test run-update-test)
+                     (cons complex-test run-complex-test)))
+
+ (define (run-test id-s specs)
+   (when profiling? (reset-counts))
+   (let ([f (assoc (car specs) tests)])
+     (if f ((cdr f) id-s (cdr specs)) (error "Unknown kind" (car specs)))))
 
  (define (print-usage) (error "measurement-cli-call" "No valid arguments found, use 'all', 'dirs', 'prefix', 'suffix' or a number of ids."))
 

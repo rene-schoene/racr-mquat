@@ -131,3 +131,9 @@ def kill_lines(*files):
 		if doit:
 			with open(f, 'w') as fd:
 				fd.write(''.join(lines))
+
+@task(name = 'load-completion')
+def load_completion():
+	local_quiet('wget -q https://raw.githubusercontent.com/kbakulin/fabric-completion/master/fabric-completion.bash', capture = False)
+#	print 'Please sudo move fabric-completion.bash to /etc/bash_completion.d/ now ...'
+	local_quiet('sudo mv fabric-completion.bash /etc/bash_completion.d/')
