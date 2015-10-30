@@ -1,6 +1,6 @@
-import sys, os, csv, shutil
+import sys, os, csv, shutil, json
 try:
-	from fabric.api import local, quiet, task
+	from fabric.api import local, quiet, task, env
 except ImportError:
 	from fabric_workaround import local, quiet
 from constants import racketBin, larcenyBin, racketExec, larcenyExec
@@ -15,6 +15,7 @@ def assertTrueExit(expr, msg):
 		sys.exit(0)
 
 assertTrue = assertTrueExit
+change_kinds_fname = 'profiling/kinds.json'
 
 def local_quiet(cmd, abort_on_stderr = False, capture = True):
 	""" Runs the command quietly (by default), asserts successful execution and returns stdout """
@@ -62,6 +63,10 @@ def secure_remove(spec, globbing = False, dryrun = False):
 				total += 1
 	return total
 
+def change_kinds(fname = change_kinds_fname):
+    with open(fname) as fd:
+        return json.load(fd)
+
 @task
 def merge_csv(f1, f2, primaryColumn1 = 0, primaryColumn2 = 0, dryrun = False):
 	""" Merges second csv file into first csv """
@@ -69,10 +74,16 @@ def merge_csv(f1, f2, primaryColumn1 = 0, primaryColumn2 = 0, dryrun = False):
 		print 'Merge {0} into {1}'.format(f2, f1)
 	dir1 = os.path.dirname(f1)
 	if not os.path.exists(dir1):
-		print 'Creating directory "{}"'.format(os.path.dirname(f1))
+		if dryrun:
+			print 'Creating directory "{}"'.format(os.path.dirname(f1))
+		else:
+			sys.stdout.write('d({})'.format(os.path.basename(os.path.dirname(f1))))
 		os.mkdir(dir1)
 	if not os.path.exists(f1):
-		print 'Copying "{0}" to "{1}"'.format(f2, f1)
+		if dryrun:
+			print 'Copying "{0}" to "{1}"'.format(f2, f1)
+		else:
+			sys.stdout.write('c')
 		shutil.copy(f2, f1)
 		return
 	with open(f1) as fd1, open(f2) as fd2:
@@ -103,3 +114,20 @@ def ccsv():
 		fd2.write('3,b3.1,c3.1\n')
 		fd2.write('4,b4,c4\n')
 		fd2.write('5,b5,c4\n')
+
+@task(name = 'kill-lines')
+def kill_lines(*files):
+	start, end, doit = int(env.get('start', 8)), int(env.get('end', 16)), bool(env.get('doit', False))
+	for f in files:
+		print f
+		with open(f, 'r') as fd:
+			lines = fd.readlines()
+			if not doit:
+				print ''.join(lines) + '\n'
+			lines = lines[0:start]+lines[end+1:]
+			if not doit:
+				print ''.join(lines)
+
+		if doit:
+			with open(f, 'w') as fd:
+				fd.write(''.join(lines))

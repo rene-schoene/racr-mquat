@@ -9,10 +9,10 @@ try:
     from fabric.contrib.console import confirm
 except ImportError:
     from fabric_workaround import task, red, lcd, green
-from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion, secure_remove, merge_csv
-import properties
+import utils, properties
+from utils import local_quiet, call_racket, call_larceny, assertTrue, secure_remove
 
-assertTrue = assertTrueAssertion
+assertTrue = utils.assertTrueAssertion
 
 gen_results = 'gen.csv'
 gen_header  = ['timestamp', 'impl', 'dir', 'step', 'ilp-gen'] # generation of ilp
@@ -26,8 +26,6 @@ att_header  = ['dir', 'flush', 'noncached', 'attname', 'executed', 'called'] # p
 all_att_header  = ['dir', 'attname', 'normalex', 'normalcalled', 'flushedex', 'flushedcalled', 'noncachedex', 'noncachedcalled'] # merged profiling attributes while generation
 
 all_results = 'all.csv'
-
-change_kinds = 'profiling/kinds.json'
 
 class timed(object):
     def __enter__(self, msg = ' done in {0:.3f}s'):
@@ -292,6 +290,11 @@ def conflate_results(pathname = '*-*', skip_gen = False, skip_sol = False, impls
         local_quiet('tail -qn +2 profiling/sol-header profiling/*/{0}> profiling/sol-glpk-results.csv'.format(sol_results), capture = False)
 
 @task
+def test():
+    for change in utils.change_kinds()['changes']:
+        local_quiet('tail -qn +2 profiling/*{0}*/{1} > profiling/splitted/att-{0}-results.csv'.format(change, att_results), capture = False)
+
+@task
 def clean(dryrun = False):
     """ Remove all generated files """
 #	local_quiet('rm profiling/att-measure*.csv', capture = False)
@@ -302,7 +305,7 @@ def clean(dryrun = False):
 dummy_values = {'timestamp': '2070-01-01T00:00:00.00', 'dir': 'dummy-001', 'step': '01-dummy', 'attname': 'dummyatt'}
 
 @task(name = 'distinction-of-changes')
-def change_distinction():
+def distinction_of_changes():
     def maybe_insert_dummy(f):
         with open(f, 'a+') as fd:
             header = next(fd)
@@ -311,8 +314,7 @@ def change_distinction():
                 keys = (key.strip() for key in header.split(','))
                 values = [dummy_values.get(key, '0') for key in keys]
                 fd.write(','.join(values))
-    with open(change_kinds) as fd:
-        d = json.load(fd)
+    d = utils.change_kinds()
     unnormal = '-v -e ' + ' -e '.join((c for c in d['strategies'] if c != 'normal'))
     def get_strategy_pattern(strategy):
         return unnormal if strategy == 'normal' else '-e {0}'.format(strategy)
@@ -435,14 +437,16 @@ def setup(name = None, to_default = False):
 def new_measurements():
     name = execute(get_remote_measurements)
     execute(incoporate_remote_measurements)
+    execute(conflate_results)
+    execute(distinction_of_changes)
 
 @task(name = 'get-remote-measurements')
 @hosts('rschoene@141.76.65.177')
 def get_remote_measurements(rdir = '~/git/racr-mquat/'):
+    with cd(rdir):
+        run('fab measure.conflate-results:skip_sol=True')
     rdir = os.path.join(rdir, 'profiling')
     print rdir
-    with open('profiling/kinds.json') as fd:
-        d = json.load(fd)
     with cd(rdir):
         import time, datetime
         name = 'm_{}.tar'.format(int(time.mktime(datetime.datetime.now().timetuple())))
@@ -465,8 +469,18 @@ def incoporate_remote_measurements(archive, dryrun = False):
             sys.stdout.write('.')
         d, name = os.path.split(f)
         d = os.path.split(d)[1]
-        merge_csv(os.path.join('profiling', d, name), f, dryrun = dryrun)
+        utils.merge_csv(os.path.join('profiling', d, name), f, dryrun = dryrun)
     sys.stdout.write('\n')
+
+@task
+def factor(incremental, flushed, noncached):
+    def get_average_time(f):
+        with open(f) as fd:
+            r = csv.reader(fd)
+            values = [float(row[-1]) for row in r if not row[0].isalpha()]
+            return sum(values) / float(len(values))
+    avi, avf, avn = map(get_average_time, [incremental, flushed, noncached])
+    print avi, avf, avn
 
 if __name__ == '__main__':
     check()

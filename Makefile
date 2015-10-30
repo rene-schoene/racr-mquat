@@ -5,7 +5,7 @@ LARCENY_BUILD_DIR = larceny-bin
 RDEPS := $(shell sed -e '1,/@sources:/d' -e '/^\#/d' dependencies.txt | while read l; do echo $(RACKET_BUILD_DIR)/mquat/$$l.ss; done)
 LDEPS := $(shell sed -e '1,/@sources:/d' -e '/^\#/d' dependencies.txt | while read l; do echo $(LARCENY_BUILD_DIR)/mquat/$$l.sls; done)
 
-.PHONY: larceny racket run sockets
+.PHONY: larceny racket run sockets clean
 # larceny builds everytime, so not included in default target
 all: racket
 
@@ -32,3 +32,7 @@ sockets: SocketSend.class SocketReceive.class
 
 ilp-noncached.scm: ilp.scm
 	sed 's/(lambda (n/#f (lambda (n/g' $< > $@
+
+clean:
+	rm -rf $(RACKET_BUILD_DIR)/*
+	rm -rf $(LARCENY_BUILD_DIR)/*

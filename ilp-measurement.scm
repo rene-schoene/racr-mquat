@@ -15,40 +15,21 @@
  (define resource-test 'resource-test)
  (define sw-test 'sw-test)
  (define update-test 'update-test)
- (define raw-paper-params
+ (define complex-test 'complex-test)
+ (define raw-short-params
    ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
    ;           ID  HW  S #C #I #M
    (list (list  1  10  0  2  1  2)
-         (list  2  10  0 10  1  2)
-         (list  3  10  0 10 10  2)
-         (list  4  10  0 10 10 10)
-         (list  5  20  0  1  1  2)
-         (list  6  20  0 10  1  2)
-         (list  7  20  0 10 10  2)
-         (list  8  20  0 10 10 10)
-         (list  9  20  0 20  2  2)
-         (list 10  25  0 25  2  2)
-         (list 11  30  0 30  2  2)
-         (list 12  40  0 40  2  2)
-         (list 13  50  0 50  2  2)
-         (list 14  60  0 50  2  2)
-         (list 15  70  0 50  2  2)
-         (list 16  80  0 50  2  2)
-         (list 17  80  0 60  2  2)
-         (list 18  80  0 70  2  2)
-         (list 19  80  0 80  2  2)
-         (list 20  90  0 60  2  2)
-         (list 21  90  0 70  2  2)
-         (list 22  90  0 80  2  2)
-         (list 23  90  0 90  2  2)
-         (list 24 100 10 10  2  2)
-         (list 25 200 10 10  2  2)
-         (list 26 300 10 10  2  2)
-         (list 27 400 10 10  2  2)
-         (list 28  10  0 10  2  2)
-         (list 29  10  0 20  2  2)
-         (list 30  10  0 40  2  2)
-         (list 31  10  0 80  2  2)))
+         (list  2  40  0 40  2  2)
+         (list  3  50  0 50  2  2)
+         (list  4  60  0 50  2  2)
+         (list  5  70  0 50  2  2)
+         (list  6  80  0 50  2  2)
+         (list  7  90  0 60  2  2)
+         (list  8 100 10 10  2  2)
+         (list  9 200 10 10  2  2)
+         (list 10 300 10 10  2  2)
+         (list 11 400 10 10  2  2)))
  (define raw-params
    ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
    ;           ID  HW  S #C #I #M
@@ -85,18 +66,24 @@
          (list 31  10  0 80  2  2)))
  (define params
    (append
-     ; paper params
+     ; res and sw params
      (reverse
       (fold-left
        (lambda (all l) (let ([rest (append (cdr l) (list (list (lambda _ #t) #f #f #f)))])
                          (cons* (cons* (dirname "res-" (car l)) resource-test rest)
                                 (cons* (dirname "sw-" (car l))  sw-test rest)
+                                (cons* (dirname "update-" (car l))  update-test rest)
                                 all)))
-       (list) raw-paper-params))
-     ; normal params
-     (map (lambda (l) (append (cons* (dirname "update-" (car l)) update-test (cdr l))
-                              (list (list (lambda _ #t) #f #f #f))))
-          raw-params)))
+       (list) raw-params))
+     ; complex params
+          (map (lambda (l) (append (cons* (dirname "complex-" (car l)) complex-test (cdr l))
+                                   (list (list (lambda _ #t) #f #f #f))))
+               raw-short-params)
+;     ; normal params
+;     (map (lambda (l) (append (cons* (dirname "update-" (car l)) update-test (cdr l))
+;                              (list (list (lambda _ #t) #f #f #f))))
+;          raw-params)
+          ))
 
  (define (valf val) (lambda _ val))
 
@@ -189,65 +176,65 @@
        (for-each (lambda (rp) (rewrite-add (cdr rp) (car rp))) (reverse removed))
        (rw* rt "load" #f ast) (sit id-s "07-add-odd-pes" ast) (display+flush "."))))
 
- (define (run-sw-test id-s specs)
-   (let* ([ast (cst id-s specs)]
-          [energy (ast-find-child (lambda (i child) (string=? (->name child) pn-energy)) (->RealProperty* (->SWRoot ast)))])
-     (define (add-comp comp-nr)
-       (debug "#create new comp" comp-nr)
-       (let ([new (:Comp mquat-spec (node-name "c" (list comp-nr)) (list) #f
-                         (list (:RealProperty mquat-spec (node-name "p" (list comp-nr))
-                                              #f "runtime" 'increasing agg-sum)
-                               (:PropertyRef mquat-spec energy)))])
-         (rewrite-add (->Comp* (->SWRoot ast)) new) new))
-     (define (find-create l prefix lon make-new)
-       (let ([name (node-name prefix lon)])
-         (or (ast-find-child (lambda (i child) (string=? (->name child) name)) l) (make-new))))
-     (define (find-create-comp comp-nr) (find-create (->Comp* (->SWRoot ast)) "c" (list comp-nr) (lambda _ (add-comp comp-nr))))
-     (define (add-impl comp-nr impl-nr reqcomps)
-       (debug "#create new impl" comp-nr impl-nr reqcomps)
-       (let ([new (:Impl mquat-spec (node-name "i" (list impl-nr comp-nr)) (list)
-                         (map (lambda (nr) (find-create-comp nr)) reqcomps) #f #f)])
-         (rewrite-add (->Impl* (find-create-comp comp-nr)) new) new))
-     (define (find-create-impl comp-nr impl-nr reqcomps) (find-create (->Impl* (find-create-comp comp-nr)) "i"
-                                                                      (list impl-nr comp-nr)
-                                                                      (lambda _ (add-impl comp-nr impl-nr reqcomps))))
-     (define (add-mode comp-nr impl-nr mode-nr req-comp-nr load-f energy-f prov-f prev-f)
-       (debug "#create new mode" comp-nr impl-nr mode-nr req-comp-nr)
-       (let* ([impl (find-create-impl comp-nr impl-nr (if req-comp-nr (list req-comp-nr) (list)))]
-              [find-prop-hw (lambda (name) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
-                                                           (->Property* (car (->* (->ResourceType* (->HWRoot ast)))))))]
-              [find-prop-sw (lambda (name comp) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
-                                                                (->Property* comp)))]
-              [load (find-prop-hw load-name)]
-              [energy (find-prop-sw pn-energy (find-create-comp comp-nr))]
-              [prev-p (and req-comp-nr (find-prop-sw (node-name "p" (list req-comp-nr)) (find-create-comp req-comp-nr)))]
-              [this-p (find-prop-sw (node-name "p" (list comp-nr)) (find-create-comp comp-nr))]
-              [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec load comp-max-eq load-f)
-                                                    (:ProvClause mquat-spec energy comp-max-eq energy-f)
-                                                    (:ProvClause mquat-spec this-p comp-max-eq prov-f)
-                                                    (and req-comp-nr (:ReqClause mquat-spec prev-p comp-max-eq prev-f))))]
-              [new (:Mode mquat-spec (node-name "m" (list mode-nr impl-nr comp-nr)) clauses)])
-         (rewrite-add (->Mode* impl) new) new))
-     (define (comp-nr-of i) (ast-child-index (<=comp i)))
-     (define (impl-nr-of i) (ast-child-index i))
-     (define (make-new-modes)
-       ; Add new mode to every impl
-       (for-each (lambda (i) (let ([comp-nr (comp-nr-of i)])
-                               (add-mode comp-nr (impl-nr-of i) (+ 1 (length (->* (->Mode* i))))
-                                         (if (eq? comp-nr 1) #f (- comp-nr 1)) (lambda _ 0.8) ;req-comp-nr load-f
-                                         (lambda _ 20) (lambda _ 2) (lambda _ 7)))) ;energy-f prov-f prev-f
-                 (=every-impl ast)))
-     (define (delete-odd-modes) (for-each (lambda (m) (rewrite-delete m)) (ret-odds (=every-mode ast))))
+ (define (add-comp ast comp-nr)
+   (debug "#create new comp" comp-nr)
+   (let* ([energy (ast-find-child (lambda (i child) (string=? (->name child) pn-energy)) (->RealProperty* (->SWRoot ast)))]
+          [new (:Comp mquat-spec (node-name "c" (list comp-nr)) (list) #f
+                      (list (:RealProperty mquat-spec (node-name "p" (list comp-nr))
+                                           #f "runtime" 'increasing agg-sum)
+                            (:PropertyRef mquat-spec energy)))])
+     (rewrite-add (->Comp* (->SWRoot ast)) new) new))
+ (define (find-create ast l prefix lon make-new)
+   (let ([name (node-name prefix lon)])
+     (or (ast-find-child (lambda (i child) (string=? (->name child) name)) l) (make-new))))
+ (define (find-create-comp ast comp-nr) (find-create ast (->Comp* (->SWRoot ast)) "c" (list comp-nr) (lambda _ (add-comp ast comp-nr))))
+ (define (add-impl ast comp-nr impl-nr reqcomps)
+   (debug "#create new impl" comp-nr impl-nr reqcomps)
+   (let ([new (:Impl mquat-spec (node-name "i" (list impl-nr comp-nr)) (list)
+                     (map (lambda (nr) (find-create-comp ast nr)) reqcomps) #f #f)])
+     (rewrite-add (->Impl* (find-create-comp ast comp-nr)) new) new))
+ (define (find-create-impl ast comp-nr impl-nr reqcomps) (find-create ast (->Impl* (find-create-comp ast comp-nr)) "i"
+                                                                  (list impl-nr comp-nr)
+                                                                  (lambda _ (add-impl ast comp-nr impl-nr reqcomps))))
+ (define (add-mode ast comp-nr impl-nr mode-nr req-comp-nr load-f energy-f prov-f prev-f)
+   (debug "#create new mode" comp-nr impl-nr mode-nr req-comp-nr)
+   (let* ([impl (find-create-impl ast comp-nr impl-nr (if req-comp-nr (list req-comp-nr) (list)))]
+          [find-prop-hw (lambda (name) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
+                                                       (->Property* (car (->* (->ResourceType* (->HWRoot ast)))))))]
+          [find-prop-sw (lambda (name comp) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
+                                                            (->Property* comp)))]
+          [load (find-prop-hw load-name)]
+          [energy (find-prop-sw pn-energy (find-create-comp ast comp-nr))]
+          [prev-p (and req-comp-nr (find-prop-sw (node-name "p" (list req-comp-nr)) (find-create-comp ast req-comp-nr)))]
+          [this-p (find-prop-sw (node-name "p" (list comp-nr)) (find-create-comp ast comp-nr))]
+          [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec load comp-max-eq load-f)
+                                                (:ProvClause mquat-spec energy comp-max-eq energy-f)
+                                                (:ProvClause mquat-spec this-p comp-max-eq prov-f)
+                                                (and req-comp-nr (:ReqClause mquat-spec prev-p comp-max-eq prev-f))))]
+          [new (:Mode mquat-spec (node-name "m" (list mode-nr impl-nr comp-nr)) clauses)])
+     (rewrite-add (->Mode* impl) new) new))
+ (define (comp-nr-of i) (ast-child-index (<=comp i)))
+ (define (impl-nr-of i) (ast-child-index i))
+ (define (make-new-modes ast)
+   ; Add new mode to every impl
+   (for-each (lambda (i) (let ([comp-nr (comp-nr-of i)])
+                           (add-mode ast comp-nr (impl-nr-of i) (+ 1 (length (->* (->Mode* i))))
+                                     (if (eq? comp-nr 1) #f (- comp-nr 1)) (lambda _ 0.8) ;req-comp-nr load-f
+                                     (lambda _ 20) (lambda _ 2) (lambda _ 7)))) ;energy-f prov-f prev-f
+             (=every-impl ast)))
+ (define (delete-odd-modes ast) (for-each (lambda (m) (rewrite-delete m)) (ret-odds (=every-mode ast))))
 
+ (define (run-sw-test id-s specs)
+   (let ([ast (cst id-s specs)])
      (display id-s)
      (rewrite-terminal 'config ast id-s)
      (sit id-s "01-init" ast) (display+flush ".")
-     (make-new-modes) (sit id-s "02-new-modes" ast) (display+flush ".")
-     (make-new-modes) (sit id-s "03-new-modes" ast) (display+flush ".")
-     (make-new-modes) (sit id-s "04-new-modes" ast) (display+flush ".")
-     (delete-odd-modes) (sit id-s "05-del-modes" ast) (display+flush ".")
-     (delete-odd-modes) (sit id-s "06-del-modes" ast) (display+flush ".")
-     (delete-odd-modes) (sit id-s "07-del-modes" ast) (display+flush ".")))
+     (make-new-modes ast) (sit id-s "02-new-modes" ast) (display+flush ".")
+     (make-new-modes ast) (sit id-s "03-new-modes" ast) (display+flush ".")
+     (make-new-modes ast) (sit id-s "04-new-modes" ast) (display+flush ".")
+     (delete-odd-modes ast) (sit id-s "05-del-modes" ast) (display+flush ".")
+     (delete-odd-modes ast) (sit id-s "06-del-modes" ast) (display+flush ".")
+     (delete-odd-modes ast) (sit id-s "07-del-modes" ast) (display+flush ".")))
 
  (define (run-update-test id-s specs)
    (let* ([ast (cst id-s specs)]
@@ -267,6 +254,48 @@
      (rw* rt "load" #f ast) (sit id-s "06-every-comp-rand" ast) (display+flush ".")
      (rw* rt "load" #f ast) (sit id-s "07-every-comp-rand" ast) (display+flush ".")
      (rw* rt "load" #f ast) (sit id-s "08-every-comp-rand" ast) (display+flush ".")))
+
+ ; 01 init (4 sw component, N containers)
+ ; 02 change values of containers
+ ; 03 create new modes for each implementation
+ ; 04 change values of containers
+ ; 05 add new software component
+ ; 06 change values of containers
+ ; 07 remove some containers
+ ; 08 change values of containers
+ ; 09 (change nothing)
+ ; 10 add previously removed containers (from 07)
+ ; 11 remove some modes
+ (define (run-complex-test id-s specs)
+   (define (new-request-comp ast)
+     (let ([req-comp-nr (ast-child-index (->target (<=request ast)))]
+           [new-comp-nr (+ 1 (ast-num-children (->Comp* (->SWRoot ast))))])
+       ;params of add-mode: ast comp-nr impl-nr mode-nr req-comp-nr load-f energy-f prov-f prev-f
+       (add-mode ast new-comp-nr 1 1 ;comp-nr impl-nr mode-nr
+                 req-comp-nr (lambda _ 0.8) ;req-comp-nr load-f
+                 (lambda _ 20) (lambda _ 2) (lambda _ 7)) ;energy-f prov-f prev-f
+       ;adjust request to target new comp
+       (rewrite-terminal 'target (<=request ast) (find-create-comp ast new-comp-nr))))
+   (let* ([ast (cst id-s specs)]
+          [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))]
+          [pe+parent (lambda (pe) (cons pe (<- pe)))]
+          [odd-pes (map pe+parent (ret-odds (=every-container ast)))])
+     (rewrite-terminal 'config ast id-s)
+     (display id-s)
+     (sit id-s "01-init" ast)
+     (rw* rt "load" #f ast) (sit id-s "02-every-comp-rand" ast) (display+flush ".")
+     (make-new-modes ast) (sit id-s "03-new-modes" ast) (display+flush ".")
+     (rw* rt "load" #f ast) (sit id-s "04-every-comp-rand" ast) (display+flush ".")
+     (new-request-comp ast) (sit id-s "05-new-comp" ast) (display+flush ".")
+     (rw* rt "load" #f ast) (sit id-s "06-every-comp-rand" ast) (display+flush ".")
+     (let ([removed (map (lambda (pp) (cons (rewrite-delete (car pp)) (cdr pp))) odd-pes)])
+       (sit id-s "07-del-odd-pes" ast) (display+flush ".")
+       (rw* rt "load" #f ast) (sit id-s "08-every-comp-rand" ast) (display+flush ".")
+       (sit id-s "09-no-change" ast) (display+flush ".")
+       ;rp = removed and parent
+       (for-each (lambda (rp) (rewrite-add (cdr rp) (car rp))) (reverse removed))
+       (rw* rt "load" #f ast) (sit id-s "10-add-odd-pes" ast) (display+flush "."))
+     (delete-odd-modes ast) (sit id-s "11-del-modes" ast) (display+flush ".")))
 
  (define (print-usage) (error "measurement-cli-call" "No valid arguments found, use 'all', 'dirs', 'prefix', 'suffix' or a number of ids."))
 
