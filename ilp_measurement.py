@@ -337,6 +337,14 @@ def distinction_of_changes():
             f, change, target))
         maybe_insert_dummy(target)
 
+        # att totals
+        f = 'profiling/all-att-results.csv'
+        target = 'profiling/splitted/att_{0}.csv'.format(change)
+        local_quiet('head -n 1 profiling/att-totals.csv > {}'.format(target))
+        local_quiet('tail -n +2 {0} | grep -e ^{1} | cat >> {2}'.format(
+            f, change, target))
+        maybe_insert_dummy(target)
+
         for strategy in d['strategies']:
             sys.stdout.write('.')
             # gen
@@ -347,13 +355,6 @@ def distinction_of_changes():
                 local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
                     f, change, get_strategy_pattern(strategy), gen_target))
                 maybe_insert_dummy(gen_target)
-            # att totals
-            f = 'profiling/all-att-results.csv'
-            target = 'profiling/splitted/att_{0}_{1}.csv'.format(change, strategy)
-            local_quiet('head -n 1 profiling/att-totals.csv > {}'.format(target))
-            local_quiet('tail -n +2 {0} | grep -e {1} | grep {2} | cat >> {3}'.format(
-                f, change, get_strategy_pattern(strategy), target))
-            maybe_insert_dummy(target)
 
 @task(name = 'prepare-noncached')
 def prepare_noncached():
