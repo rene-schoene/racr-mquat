@@ -436,7 +436,8 @@ def setup(name = None, to_default = False):
 
 @task(name = 'new-measurements')
 def new_measurements():
-    name = execute(get_remote_measurements)
+    result = execute(get_remote_measurements)
+    name = result.values()[0] # result maps hosts to result
     execute(incoporate_remote_measurements, name)
     execute(conflate_results)
     execute(distinction_of_changes)
