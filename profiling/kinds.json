@@ -1,1 +1,1 @@
-{"strategies": ["normal", "flush", "noncached"], "changes": ["update", "sw", "res", "complex"]}
+{"strategies": ["normal", "flush", "noncached"], "changes": ["update", "sw", "res", "complex", "mixed"]}

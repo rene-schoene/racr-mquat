@@ -3,7 +3,7 @@
 (library
  (mquat ilp-measurement)
  (export measurement-cli-call)
- (import (rnrs) (racr core) (srfi :19) (only (srfi :13) string-prefix? string-suffix?)
+ (import (rnrs) (racr core) (srfi :19) (only (srfi :13) string-prefix? string-suffix? string-pad)
          (mquat ast) (mquat basic-ag) (mquat utils) (mquat join) (mquat ilp) (mquat constants)
          (mquat ast-generation) (mquat properties))
 
@@ -16,6 +16,12 @@
  (define sw-test 'sw-test)
  (define update-test 'update-test)
  (define complex-test 'complex-test)
+ (define mixed-test 'mixed-test)
+ (define raw-mixed-params
+   ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
+   ;           ID  HW  S #C #I #M
+   (list (list  1 300  0 10  2  2)
+         (list  2 400  0 10  2  2)))
  (define raw-short-params
    ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
    ;           ID  HW  S #C #I #M
@@ -76,13 +82,13 @@
                                 all)))
        (list) raw-params))
      ; complex params
-          (map (lambda (l) (append (cons* (dirname "complex-" (car l)) complex-test (cdr l))
-                                   (list (list (lambda _ #t) #f #f #f))))
-               raw-short-params)
-;     ; normal params
-;     (map (lambda (l) (append (cons* (dirname "update-" (car l)) update-test (cdr l))
-;                              (list (list (lambda _ #t) #f #f #f))))
-;          raw-params)
+     (map (lambda (l) (append (cons* (dirname "complex-" (car l)) complex-test (cdr l))
+                              (list (list (lambda _ #t) #f #f #f))))
+          raw-short-params)
+     ; mixed params
+     (map (lambda (l) (append (cons* (dirname "mixed-" (car l)) mixed-test (cdr l))
+                              (list (list (lambda _ #t) #f #f #f))))
+          raw-mixed-params)
           ))
 
  (define (valf val) (lambda _ val))
@@ -179,7 +185,8 @@
  (define (find-create ast l prefix lon make-new)
    (let ([name (node-name prefix lon)])
      (or (ast-find-child (lambda (i child) (string=? (->name child) name)) l) (make-new))))
- (define (find-create-comp ast comp-nr) (find-create ast (->Comp* (->SWRoot ast)) "c" (list comp-nr) (lambda _ (add-comp ast comp-nr))))
+ (define (find-create-comp ast comp-nr) (find-create ast (->Comp* (->SWRoot ast)) "c" (list comp-nr)
+                                                     (lambda _ (add-comp ast comp-nr))))
  (define (add-impl ast comp-nr impl-nr reqcomps)
    (debug "#create new impl" comp-nr impl-nr reqcomps)
    (let ([new (:Impl mquat-spec (node-name "i" (list impl-nr comp-nr)) (list)
@@ -289,17 +296,62 @@
        (rw* rt "load" #f ast) (sit id-s "10-add-odd-pes" ast) (display+flush "."))
      (delete-odd-modes ast) (sit id-s "11-del-modes" ast) (display+flush ".")))
 
+ ; make change kind frequency according to some measure, e.g. 80% update, 10% res, 5% sw, 5% no change
+ ; = 5x (16 update, 2 res, 1 sw, 1 no)
+ ; = 5x (3 update + res + 3 update + sw + 4 update + no + 3 update + res + 3 update)
+ (define (run-mixed-test id-s specs)
+   (define ast (cst id-s specs))
+   (define rt (ast-child 1 (->ResourceType* (->HWRoot ast))))
+   (define pe+parent (lambda (pe) (cons pe (<- pe))))
+   (define odd-pes (map pe+parent (ret-odds (=every-container ast))))
+   (define (make-step-name outer step suffix) (string-append (string-pad (number->string (+ (* 20 outer) step)) 2 #\0) suffix))
+   (define (add-new-resource)
+     (let* ([max-id (apply max (map (lambda (pe) (string->number (substring (->name pe) 2))) (=every-container ast)))]
+            [first-clauses (->* (->ProvClause* (car (=every-container ast))))]
+            [new-clauses (map (lambda (cl) (make-prov (->return-type cl) (->comparator cl) (rand 50 2 0))) first-clauses)] ;TODO
+            [new-res (:Resource mquat-spec (number->string (+ 1 max-id)) rt online (list) new-clauses)])
+        (rewrite-add (->SubResources (->HWRoot ast)) new-res)))
+   (define (update-change outer steps)
+     (for-each
+       (lambda (step)
+         (when (not (and (= outer 4) (= step 20)))
+           (rw* rt "load" #f ast) (sit id-s (make-step-name outer step "-every-comp-rand") ast) (display+flush "."))) steps))
+   (rewrite-terminal 'config ast id-s)
+   (display+flush id-s)
+
+;   (info (map (lambda (pe) (string->number (substring (->name pe) 2))) (=every-container ast)))
+   (add-new-resource) ;; <- just for testing
+
+   (sit id-s "00-init" ast)
+   (for-each
+    (lambda (outer)
+      (update-change outer (list 1 2 3))
+;      (let ([removed (map (lambda (pp) (cons (rewrite-delete (car pp)) (cdr pp))) odd-pes)])
+;        (sit id-s (make-step-name outer 4 "-del-odd-pes") ast) (display+flush ".")
+        (add-new-resource) (sit id-s (make-step-name outer 4 "-add-new-pes") ast) (display+flush ".")
+        (update-change outer (list 5 6 7))
+        (make-new-modes ast) (sit id-s (make-step-name outer 8 "-new-modes") ast) (display+flush ".")
+        (update-change outer (list 9 10 11 12))
+        (sit id-s (make-step-name outer 13 "-no-change") ast)
+        (update-change outer (list 14 15 16))
+;        (for-each (lambda (rp) (rewrite-add (cdr rp) (car rp))) (reverse removed))
+;        (rw* rt "load" #f ast) (sit id-s (make-step-name outer 17 "-add-odd-pes") ast) (display+flush "."))
+      (add-new-resource) (sit id-s (make-step-name outer 17 "-add-new-pes") ast) (display+flush ".")
+      (update-change outer (list 18 19 20))) (list 0 1 2 3 4)))
+
  (define tests (list (cons resource-test run-resource-test)
                      (cons sw-test run-sw-test)
                      (cons update-test run-update-test)
-                     (cons complex-test run-complex-test)))
+                     (cons complex-test run-complex-test)
+                     (cons mixed-test run-mixed-test)))
 
  (define (run-test id-s specs)
    (when profiling? (reset-counts))
    (let ([f (assoc (car specs) tests)])
      (if f ((cdr f) id-s (cdr specs)) (error "Unknown kind" (car specs)))))
 
- (define (print-usage) (error "measurement-cli-call" "No valid arguments found, use 'all', 'dirs', 'prefix', 'suffix' or a number of ids."))
+ (define (print-usage) (error "measurement-cli-call"
+                              "No valid arguments found, use 'all', 'dirs', 'prefix', 'suffix' or a number of ids."))
 
  (define (measurement-cli-call command-line)
    (let ([first (if (= 0 (length command-line)) #f (car command-line))])

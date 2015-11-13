@@ -29,12 +29,14 @@ all_results = 'all.csv'
 
 class timed(object):
     def __enter__(self, msg = ' done in {0:.3f}s'):
+        print 'Starting measurement at {:%d, %b %Y at %H:%M:%S.%f}'.format(datetime.today())
         self.start = timeit.default_timer()
         self.msg = msg
         return self
     def __exit__(self, ex_type, value, traceback):
         self.stop = timeit.default_timer() - self.start
         print self.msg.format(self.stop)
+        print 'Finished measurement at {:%d, %b %Y at %H:%M:%S.%f}'.format(datetime.today())
 
 @task(name = 'current-ids')
 def current_ids():
@@ -475,14 +477,13 @@ def incoporate_remote_measurements(archive, dryrun = False):
     sys.stdout.write('\n')
 
 @task
-def factor(incremental, flushed, noncached):
+def factor(column, *files):
     def get_average_time(f):
         with open(f) as fd:
             r = csv.reader(fd)
-            values = [float(row[-1]) for row in r if not row[0].isalpha()]
+            values = [float(row[int(column)]) for row in r if not row[0].isalpha()]
             return sum(values) / float(len(values))
-    avi, avf, avn = map(get_average_time, [incremental, flushed, noncached])
-    print avi, avf, avn
+    print map(get_average_time, files)
 
 if __name__ == '__main__':
     check()
