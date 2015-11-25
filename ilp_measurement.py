@@ -477,13 +477,14 @@ def incoporate_remote_measurements(archive, dryrun = False):
     sys.stdout.write('\n')
 
 @task
-def factor(column, *files):
-    def get_average_time(f):
+def avg(column, *files):
+    """ Caclulate the average of the given column for all given files. """
+    def get_average_value(f):
         with open(f) as fd:
             r = csv.reader(fd)
             values = [float(row[int(column)]) for row in r if not row[0].isalpha()]
             return sum(values) / float(len(values))
-    print map(get_average_time, files)
+    print { f : get_average_value(f) for f in files }
 
 if __name__ == '__main__':
     check()
