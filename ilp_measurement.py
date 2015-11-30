@@ -486,6 +486,43 @@ def avg(column, *files):
             return sum(values) / float(len(values))
     print { f : get_average_value(f) for f in files }
 
+@task(name = 'agt')
+def att_graph_totals():
+    def parse_name(d):
+        tokens = d.split('-')
+        if len(tokens) == 2:
+            return (d,'normal')
+        else:
+            return (tokens[0]+'-'+tokens[2],tokens[1])
+    files = glob('profiling/*/*-att.csv')
+    files.sort()
+    # strategy -> dir -> step -> (comp,called)
+    tups = {}
+    last_name = None
+    for f in files:
+        d,b = os.path.split(f)
+        name,strategy = parse_name(os.path.basename(d))
+        dirs  = tups.setdefault(strategy,{})
+        steps = dirs.setdefault(name,{})
+        if last_name != name:
+            last_comp,last_called=0,0
+#            print ' ** reset comp+called', strategy, last_name, '->', name
+        last_name = name
+        with open(f) as fd:
+            r = csv.reader(fd)
+            comp,called = reduce(lambda s,e: (s[0]+int(e[1]),s[1]+int(e[2])) if len(e)>0 else s, r, (-last_comp,-last_called))
+        steps[b[:2]] = (comp,called)
+        last_comp,last_called = (last_comp+comp,last_called+called)
+#        print strategy, name, b, comp, called, '(', last_comp, last_called, ')'
+#    print tups
+    for strategy,dirs in tups.iteritems():
+        for name, steps in dirs.iteritems():
+            with open('profiling/splitted/att-totals-{0}-{1}.csv'.format(name, strategy), 'w') as fd:
+                fd.write('step,comp,called\n')
+                for step in sorted(steps):
+                    csv.writer(fd).writerow([step]+list(steps[step]))
+
+
 if __name__ == '__main__':
     check()
     help()
