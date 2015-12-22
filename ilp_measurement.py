@@ -88,7 +88,7 @@ def dirname(d):
 @task(name = 'sol')
 def sol(number = 1, solver = 'glpsol', pathname = '*', skip_conflate = False):
     """ Run solver n times (default: once) """
-    do_sol(int(number), pathname, skip_conflate)
+    do_sol(solver, int(number), pathname, skip_conflate)
 
 params = { 'glpsol' : ['glpsol --tmlim 40 --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
            'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
