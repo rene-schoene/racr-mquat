@@ -14,6 +14,10 @@ def assertTrueExit(expr, msg):
 		print msg
 		sys.exit(0)
 
+def assertTrueContinue(expr, msg):
+	if not expr:
+		print msg
+
 assertTrue = assertTrueExit
 change_kinds_fname = 'profiling/kinds.json'
 

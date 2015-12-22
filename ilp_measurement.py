@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import sys, re, os, csv, timeit, shutil, json
 from datetime import datetime
@@ -94,6 +95,7 @@ params = { 'glpsol' : ['glpsol --tmlim 40 --lp {lp} -w {sol}', 'INTEGER OPTIMAL 
            'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
 
 def do_sol(solver, number, pathname, skip_conflate):
+    assertTrue = utils.assertTrueContinue
     old_cd = os.getcwd()
     dirs = glob('profiling/{0}/'.format(pathname))
     dirs.sort()
@@ -101,17 +103,21 @@ def do_sol(solver, number, pathname, skip_conflate):
         if not os.path.isdir(d):
             print red("Not a valid directory: {0}".format(d))
             continue
+        sys.stdout.write(d)
+        os.chdir(d)
+        files = glob('*.lp')
+        if len(files) == 0:
+            print ': ø'
+            os.chdir(old_cd)
+            continue
+        files.sort()
         with timed():
             total_start = timeit.default_timer()
-            sys.stdout.write(d)
-            os.chdir(d)
             add_header = not os.path.exists(sol_results)
             with open(sol_results, 'a') as fd:
                 writer = csv.writer(fd)
                 if add_header:
                     writer.writerow(sol_header)
-                files = os.listdir('.')
-                files.sort()
                 for _ in xrange(int(number)):
                     sys.stdout.write(':')
                     for ilp in files:

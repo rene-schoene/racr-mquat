@@ -309,7 +309,7 @@
      (let* ([max-id (apply max (map (lambda (pe) (string->number (substring (->name pe) 2))) (=every-container ast)))]
             [first-clauses (->* (->ProvClause* (car (=every-container ast))))]
             [new-clauses (map (lambda (cl) (make-prov (->return-type cl) (->comparator cl) (rand 50 2 0))) first-clauses)] ;TODO
-            [new-res (:Resource mquat-spec (number->string (+ 1 max-id)) rt online (list) new-clauses)])
+            [new-res (:Resource mquat-spec (string-append "r-" (number->string (+ 1 max-id))) rt online (list) new-clauses)])
         (rewrite-add (->SubResources (->HWRoot ast)) new-res)))
    (define (update-change outer steps)
      (for-each
