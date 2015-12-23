@@ -29,16 +29,18 @@ all_att_header  = ['dir', 'attname', 'normalex', 'normalcalled', 'flushedex', 'f
 all_results = 'all.csv'
 
 class timed(object):
-    def __enter__(self, what = 'measurement', msg = ' done in {0:.3f}s'):
-        print 'Starting {} at {:%d, %b %Y at %H:%M:%S.%f}'.format(what, datetime.today())
+    def __init__(self, what = 'measurement'):
+        self.what = what
+    def __enter__(self, msg = ' done in {0:.3f}s'):
+        print 'Starting {} at {:%d, %b %Y at %H:%M:%S.%f}'.format(self.what, datetime.today())
         self.start = timeit.default_timer()
         self.msg = msg
-        self.what = what
+#        self.what = what
         return self
     def __exit__(self, ex_type, value, traceback):
         self.stop = timeit.default_timer() - self.start
         print self.msg.format(self.stop)
-        print 'Finished {} at {:%d, %b %Y at %H:%M:%S.%f}'.format(what, datetime.today())
+        print 'Finished {} at {:%d, %b %Y at %H:%M:%S.%f}'.format(self.what, datetime.today())
 
 @task(name = 'current-ids')
 def current_ids():
