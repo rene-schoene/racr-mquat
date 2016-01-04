@@ -4,6 +4,7 @@
 import sys, re, os, csv, timeit, shutil, json
 from datetime import datetime
 from glob import glob, iglob
+from subprocess import Popen
 try:
     from fabric.api import task, lcd, hosts, cd, run, get, execute
     from fabric.colors import red, green
@@ -66,6 +67,11 @@ def racket(*dirs):
     """ Measure Racket once """
     do_gen(call_racket, 1, dirs)
 
+@task(name = 'racket-memory')
+def racket_memory(*dirs):
+    """ Measure Racket, restarting for each run and measuring its memory consumption """
+    do_gen(call_racket, 1, dirs, memory = True)
+
 @task(name = 'racket-n')
 def larceny_n(number, *dirs):
     """ Measure larceny n times """
@@ -76,18 +82,27 @@ def larceny(*dirs):
     """ Measure larceny once. """
     do_gen(call_larceny, 1, dirs)
 
-def do_gen(call_impl, number, dirs):
+def do_gen(call_impl, number, dirs, memory = False):
     cmd = 'measure'
     with timed():
         setup_profiling_dirs(call_impl, cmd)
         for _ in xrange(int(number)):
-            call_impl('cli.scm', cmd, 'all' if dirs == () else ' '.join(dirs), capture = False)
+            if memory:
+                FNULL = open(os.devnull, 'w')
+                dstat_cmds = ['dstat', '-tclmdC', 'total,0,1,2,3', '--output']#, logfile_id]
+                for d in dirs:
+                    process = Popen(dstat_cmds + [dstat_log(d)], stdout = FNULL)
+                    call_impl('cli.scm', cmd, d, capture = False)
+                    process.kill()
+            else:
+                call_impl('cli.scm', cmd, 'all' if dirs == () else ' '.join(dirs), capture = False)
 #			call_impl('larceny_profiling.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
             print '\n'
 #			conflate_results(skip_sol = True)
 
-def dirname(d):
-    return os.path.split(os.path.dirname(d))[-1]
+def dstat_log(directory): return 'profiling/{}/dstat.log'.format(directory)
+
+def dirname(d): return os.path.split(os.path.dirname(d))[-1]
 
 @task(name = 'sol')
 def sol(number = 1, solver = 'glpsol', pathname = '*', skip_conflate = False):
@@ -397,11 +412,12 @@ def check():
     with open('dependencies.txt') as fd:
         if 'ilp-noncached\n' in fd:
             noncached_scm = True
-    print 'Evaluation is set to:\n- {0}, {1}\n- {2}\n- {3}'.format(
+    print 'Evaluation is set to:\n- {0}, {1}\n- {2}\n- {3}\n- {4}'.format(
         red('non-cached') if properties.noncached.value else 'cached',
         red('flushed') if properties.flushed.value else 'unflushed',
-        (green('yes: ') if properties.timing.value else 'No ') + 'measurement of execution times',
-        (green('yes: ') if properties.profiling.value else 'No ') + 'profiling of attribute metrics')
+        (green('Yes: ') if properties.timing.value else 'No ') + 'measurement of execution times',
+        (green('Yes: ') if properties.profiling.value else 'No ') + 'profiling of attribute metrics',
+        (green('Yes: ') if properties.lp_write.value else 'No ') + 'write of LP files',)
     if noncached_scm != properties.noncached.value:
         print 'Attention: Compiled ilp ({}) differs from properties file setting ({}).'.format(
             nc_tostring(noncached_scm), nc_tostring(properties.noncached.value))
