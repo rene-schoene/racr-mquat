@@ -104,15 +104,24 @@ def dstat_log(directory): return 'profiling/{}/dstat.log'.format(directory)
 
 def dirname(d): return os.path.split(os.path.dirname(d))[-1]
 
-@task(name = 'sol')
-def sol(number = 1, solver = 'glpsol', pathname = '*', skip_conflate = False):
-    """ Run solver n times (default: once) """
-    do_sol(solver, int(number), pathname, skip_conflate)
+@task
+def prepare_dstat(f):
+    newFile = f.replace('.log', '.csv')
+    schema  = ['time'] + [cpu+t for t in  ("usr","sys","idl","wai","hiq","siq") for cpu in ("total","cpu0","cpu1","cpu2","cpu3")] + \
+      ["1m","5m","15m","used","buff","cach","free","read","writ"]
+    with open(newFile, 'w') as fd:
+        fd.write(",".join(schema))
+    local_quiet('grep -Ev ^\\" {0} >> {1}'.format(f,newFile))
 
-params = { 'glpsol' : ['glpsol --tmlim 40 --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
+@task(name = 'sol')
+def sol(number = 1, solver = 'glpsol', pathname = '*', skip_conflate = False, timeout = 40):
+    """ Run solver n times (default: once) """
+    do_sol(solver, int(number), pathname, skip_conflate, int(timeout))
+
+params = { 'glpsol' : ['glpsol --tmlim {timeout} --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
            'gurobi' : ['gurobi_cl ResultFile={sol} {lp}', 'Optimal solution found', 'in (.*?) seconds', 'Optimize a model with (\d+) rows, (\d+) columns and (\d+) nonzeros']}
 
-def do_sol(solver, number, pathname, skip_conflate):
+def do_sol(solver, number, pathname, skip_conflate, timeout):
     assertTrue = utils.assertTrueContinue
     old_cd = os.getcwd()
     dirs = glob('profiling/{0}/'.format(pathname))
@@ -142,7 +151,7 @@ def do_sol(solver, number, pathname, skip_conflate):
                         if not ilp.endswith('.lp'):
                             continue
                         start = timeit.default_timer()
-                        out = local_quiet(params[solver][0].format(lp = ilp, sol = ilp.replace('lp','sol')))
+                        out = local_quiet(params[solver][0].format(lp = ilp, sol = ilp.replace('lp','sol'), timeout = timeout))
                         stop = timeit.default_timer()
                         today = datetime.today()
                         if re.search(params[solver][1], out):

@@ -35,6 +35,8 @@ def cloc(not_match, *args, **kwargs):
 @task
 @hosts('rschoene@141.76.65.177')
 def dl(name, rdir = '~/git/racr-mquat/'):
+	""" Download a single file from the remote host.
+	Arguments: name, [absolute-remote-directory] """
 	#run('uname -a')
 	target = os.path.join(rdir, name)
 	print target
