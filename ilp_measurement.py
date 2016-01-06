@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys, re, os, csv, timeit, shutil, json
+import sys, re, os, csv, timeit, shutil, json, threading, time
 from datetime import datetime
 from glob import glob, iglob
-from subprocess import Popen
+from subprocess import Popen, check_output, CalledProcessError
 try:
     from fabric.api import task, lcd, hosts, cd, run, get, execute
     from fabric.colors import red, green
-    from fabric.contrib.console import confirm
+#    from fabric.contrib.console import confirm
 except ImportError:
     from fabric_workaround import task, red, lcd, green
 import utils, properties
@@ -82,18 +82,57 @@ def larceny(*dirs):
     """ Measure larceny once. """
     do_gen(call_larceny, 1, dirs)
 
+class MemoryMeasurement(threading.Thread):
+    def __init__(self, logfile_id, prog_name):
+        threading.Thread.__init__(self)
+        self.logfile_id = logfile_id
+        self.prog_name = prog_name
+        self.running = True
+        self.pid = None
+        self.daemon = True
+
+    def run(self):
+        # find pid of prog
+        while self.running:
+            try:
+                self.pid = int(check_output(['pidof', '-s', self.prog_name]))
+                break
+            except CalledProcessError:
+                time.sleep(0.5)
+        # start thread periodically reading from /proc/$pid/status | grep VmSize
+        with open(self.logfile_id, 'w') as out_fd:
+            writer = csv.writer(out_fd)
+            writer.writerow(['time','vmsize'])
+            try:
+                while self.running:
+                    time.sleep(1)
+                    with open('/proc/{}/status'.format(self.pid)) as proc_fd:
+                        lines = proc_fd.readlines()
+                    size = next((l.split(':')[1].strip() for l in lines if l.startswith('VmSize')), None)
+                    writer.writerow([datetime.today().isoformat(), size])
+            except IOError:
+                self.running = False
+
+    def abort(self):
+        self.running = False
+
+def start_memory_measurement(logfile_id, prog_name):
+    thr = MemoryMeasurement(logfile_id, prog_name)
+    thr.start()
+    return thr
+
 def do_gen(call_impl, number, dirs, memory = False):
     cmd = 'measure'
     with timed():
         setup_profiling_dirs(call_impl, cmd)
         for _ in xrange(int(number)):
             if memory:
-                FNULL = open(os.devnull, 'w')
-                dstat_cmds = ['dstat', '-tclmdC', 'total,0,1,2,3', '--output']#, logfile_id]
                 for d in dirs:
-                    process = Popen(dstat_cmds + [dstat_log(d)], stdout = FNULL)
+                    thr = start_memory_measurement(memory_log(d), \
+                      'racket' if call_impl == call_racket else 'larceny')
                     call_impl('cli.scm', cmd, d, capture = False)
-                    process.kill()
+                    thr.abort()
+                    thr.join()
             else:
                 call_impl('cli.scm', cmd, 'all' if dirs == () else ' '.join(dirs), capture = False)
 #			call_impl('larceny_profiling.scm', 'measure', 'all' if dirs == () else ' '.join(dirs), capture = False)
@@ -101,6 +140,7 @@ def do_gen(call_impl, number, dirs, memory = False):
 #			conflate_results(skip_sol = True)
 
 def dstat_log(directory): return 'profiling/{}/dstat.log'.format(directory)
+def memory_log(directory): return 'profiling/{}/memory.csv'.format(directory)
 
 def dirname(d): return os.path.split(os.path.dirname(d))[-1]
 
@@ -427,12 +467,13 @@ def check():
     with open('dependencies.txt') as fd:
         if 'ilp-noncached\n' in fd:
             noncached_scm = True
-    print 'Evaluation is set to:\n- {0}, {1}\n- {2}\n- {3}\n- {4}'.format(
+    print 'Evaluation is set to:\n'+'\n- '.join((
         red('non-cached') if properties.noncached.value else 'cached',
         red('flushed') if properties.flushed.value else 'unflushed',
         (green('Yes: ') if properties.timing.value else 'No ') + 'measurement of execution times',
         (green('Yes: ') if properties.profiling.value else 'No ') + 'profiling of attribute metrics',
-        (green('Yes: ') if properties.lp_write.value else 'No ') + 'write of LP files',)
+        (green('Yes: ') if properties.lp_write.value else 'No ') + 'write of LP files',
+        'Wait {0} second(s) before each experiment'.format(properties.preesleep.value)))
     if noncached_scm != properties.noncached.value:
         print 'Attention: Compiled ilp ({}) differs from properties file setting ({}).'.format(
             nc_tostring(noncached_scm), nc_tostring(properties.noncached.value))
@@ -452,6 +493,19 @@ def help():
     print '3. (Mandatory) Execute conflate-results, to update the {gen/sol}-*-results.csv files'
     print '4. (Mandatory) Execute distinction-of-changes, to create splitted csv files'
     print '5. (Optional) Rerun notebook to update diagrams'
+
+def confirm(question, default_val = False):
+    prompt = question
+    if isinstance(default_val, bool):
+        prompt += ' [{0}]'.format('Y/n' if default_val else 'y/N')
+    answer = raw_input(prompt + ' ')
+    if answer == '':
+        answer = default_val
+    if isinstance(default_val, bool):
+        return answer in ('y','Y','yes','Yes',True)
+    if isinstance(default_val,int):
+        return int(answer)
+    return answer
 
 @task
 def setup(name = None, to_default = False):

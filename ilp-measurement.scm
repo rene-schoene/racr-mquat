@@ -354,15 +354,16 @@
                               "No valid arguments found, use 'all', 'dirs', 'prefix', 'suffix' or a number of ids."))
 
  (define (measurement-cli-call command-line)
-   (let ([first (if (= 0 (length command-line)) #f (car command-line))])
-       (cond
-         [(= 0 (length command-line)) (print-usage)]
-         [(string=? "all" first) (for-each run-test (map car params) (map cdr params))]
-         [(string=? "dirs" first) (for-each (lambda (entry) (display (car entry)) (display " ")) params)]
-         [(string=? "prefix" first)
-            (let ([param_subset (filter (lambda (p) (string-prefix? (cadr command-line) (car p))) params)])
-                (for-each run-test (map car param_subset) (map cdr param_subset)))]
-         [(string=? "suffix" first)
-            (let ([param_subset (filter (lambda (p) (string-suffix? (cadr command-line) (car p))) params)])
-                (for-each run-test (map car param_subset) (map cdr param_subset)))]
-         [else (for-each run-test command-line (map (lambda (id) (cdr (assoc id params))) command-line))]))))
+   (if (= 0 (length command-line)) (print-usage)
+       (let ([first (car command-line)])
+           (sleep preesleep)
+           (cond
+             [(string=? "all" first) (for-each run-test (map car params) (map cdr params))]
+             [(string=? "dirs" first) (for-each (lambda (entry) (display (car entry)) (display " ")) params)]
+             [(string=? "prefix" first)
+                (let ([param_subset (filter (lambda (p) (string-prefix? (cadr command-line) (car p))) params)])
+                    (for-each run-test (map car param_subset) (map cdr param_subset)))]
+             [(string=? "suffix" first)
+                (let ([param_subset (filter (lambda (p) (string-suffix? (cadr command-line) (car p))) params)])
+                    (for-each run-test (map car param_subset) (map cdr param_subset)))]
+             [else (for-each run-test command-line (map (lambda (id) (cdr (assoc id params))) command-line))])))))
