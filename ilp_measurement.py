@@ -139,8 +139,9 @@ def do_gen(call_impl, number, dirs, memory = False):
             print '\n'
 #			conflate_results(skip_sol = True)
 
-def dstat_log(directory): return 'profiling/{}/dstat.log'.format(directory)
-def memory_log(directory): return 'profiling/{}/memory.csv'.format(directory)
+def timestamp_filename(): return datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+def dstat_log(directory): return 'profiling/{0}/dstat-{1}.log'.format(directory, timestamp_filename())
+def memory_log(directory): return 'profiling/{0}/memory-{1}.csv'.format(directory, timestamp_filename())
 
 def dirname(d): return os.path.split(os.path.dirname(d))[-1]
 
@@ -467,7 +468,7 @@ def check():
     with open('dependencies.txt') as fd:
         if 'ilp-noncached\n' in fd:
             noncached_scm = True
-    print 'Evaluation is set to:\n'+'\n- '.join((
+    print '\n- '.join(( 'Evaluation is set to:',
         red('non-cached') if properties.noncached.value else 'cached',
         red('flushed') if properties.flushed.value else 'unflushed',
         (green('Yes: ') if properties.timing.value else 'No ') + 'measurement of execution times',

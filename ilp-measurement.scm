@@ -81,10 +81,6 @@
                                 (cons* (dirname "update-" (car l))  update-test rest)
                                 all)))
        (list) raw-params))
-     ; complex params
-     (map (lambda (l) (append (cons* (dirname "complex-" (car l)) complex-test (cdr l))
-                              (list (list (lambda _ #t) #f #f #f))))
-          raw-short-params)
      ; mixed params
      (map (lambda (l) (append (cons* (dirname "mixed-" (car l)) mixed-test (cdr l))
                               (list (list (lambda _ #t) #f #f #f))))
