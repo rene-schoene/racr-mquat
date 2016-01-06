@@ -115,7 +115,8 @@ def prepare_dstat(f):
 
 @task(name = 'sol')
 def sol(number = 1, solver = 'glpsol', pathname = '*', skip_conflate = False, timeout = 40):
-    """ Run solver n times (default: once) """
+    """ Run solver n times (default: once)
+    Possible solvers: glpsol (default), gurobi """
     do_sol(solver, int(number), pathname, skip_conflate, int(timeout))
 
 params = { 'glpsol' : ['glpsol --tmlim {timeout} --lp {lp} -w {sol}', 'INTEGER OPTIMAL SOLUTION FOUND', 'Time used:[\s]*(.*?) secs', '(\d+) rows, (\d+) columns, (\d+) non-zeros'],
@@ -129,6 +130,9 @@ def do_sol(solver, number, pathname, skip_conflate, timeout):
     for d in dirs:
         if not os.path.isdir(d):
             print red("Not a valid directory: {0}".format(d))
+            continue
+        if '-noncached-' in d or '-flushed-' in d:
+            # skip this, as ILP would be the same
             continue
         sys.stdout.write(d)
         os.chdir(d)
@@ -156,12 +160,14 @@ def do_sol(solver, number, pathname, skip_conflate, timeout):
                         today = datetime.today()
                         if re.search(params[solver][1], out):
                             duration = re.search(params[solver][2], out).group(1)
-                            # stats=row,col,nonzero
-                            stats = re.search(params[solver][3], out).groups()
                             sys.stdout.write('.')
                         else:
-                            sys.stdout.write(red('!'))
                             duration = -1
+                            sys.stdout.write(red('!'))
+                        # stats=row,col,nonzero
+                        stats = re.search(params[solver][3], out).groups()
+                        if len(stats) == 0:
+                            stats = [-1,-1,-1]
                         sys.stdout.flush()
                         row = list((today.isoformat(),dirname(d), ilp.rsplit('.', 1)[0]) +
                                     stats + (duration, stop-start))
