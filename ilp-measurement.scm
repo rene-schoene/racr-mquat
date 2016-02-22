@@ -1,5 +1,13 @@
 #!r6rs
 
+; Measurement definitions
+; To add a new measurement FOO:
+;   1) define a new scheme symbol (define foo-test 'foo-test)
+;   2) reuse or define a new set of raw parameters
+;   3) append raw parameters to params
+;   4) define a method (define (run-foo-test id-s specs) to run the measurement, taking two input parameters (id and parameters)
+;   5) append (cons foo-test run-foo-test) to tests
+
 (library
  (mquat ilp-measurement)
  (export measurement-cli-call)
@@ -17,11 +25,25 @@
  (define update-test 'update-test)
  (define complex-test 'complex-test)
  (define mixed-test 'mixed-test)
+ (define scaling-test 'scaling-test)
  (define raw-mixed-params
    ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
    ;           ID  HW  S #C #I #M
    (list (list  1 300  0 10  2  2)
          (list  2 400  0 10  2  2)))
+ (define raw-scaling-params
+   ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
+   ;           ID  HW  S #C #I #M
+   (list (list  1     10  0 10  2  2)
+         (list  2     50  0 10  2  2)
+         (list  2    100  0 10  2  2)
+         (list  2    500  0 10  2  2)
+         (list  2   1000  0 10  2  2)
+         (list  2   5000  0 10  2  2)
+         (list  2  10000  0 10  2  2)
+         (list  2  50000  0 10  2  2)
+         (list  2 100000  0 10  2  2)
+         (list  2 500000  0 10  2  2)))
  (define raw-short-params
    ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
    ;           ID  HW  S #C #I #M
@@ -72,7 +94,7 @@
          (list 31  10  0 80  2  2)))
  (define params
    (append
-     ; res and sw params
+     ; update, res and sw params
      (reverse
       (fold-left
        (lambda (all l) (let ([rest (append (cdr l) (list (list (lambda _ #t) #f #f #f)))])
@@ -85,6 +107,10 @@
      (map (lambda (l) (append (cons* (dirname "mixed-" (car l)) mixed-test (cdr l))
                               (list (list (lambda _ #t) #f #f #f))))
           raw-mixed-params)
+     ; scaling params
+     (map (lambda (l) (append (cons* (dirname "scaling-" (car l)) mixed-test (cdr l))
+                              (list (list (lambda _ #t) #f #f #f))))
+          raw-scaling-params)
           ))
 
  (define (valf val) (lambda _ val))
@@ -335,11 +361,52 @@
       (add-new-resource) (sit id-s (make-step-name outer 17 "-add-new-pes") ast) (display+flush ".")
       (update-change outer (list 18 19 20))) (list 0 1 2 3 4)))
 
+ ; make change kind frequency according to some measure, e.g. 80% update, 10% res, 5% sw, 5% no change
+ ; = 16 update, 2 res, 1 sw, 1 no
+ (define (run-scaling-test id-s specs)
+   (define ast (cst id-s specs))
+   (define rt (ast-child 1 (->ResourceType* (->HWRoot ast))))
+   (define pe+parent (lambda (pe) (cons pe (<- pe))))
+   (define odd-pes (map pe+parent (ret-odds (=every-container ast))))
+   (define (make-step-name step suffix) (string-append (string-pad (number->string step) 2 #\0) suffix))
+   (define (add-new-resource)
+     (let* ([max-id (apply max (map (lambda (pe) (string->number (substring (->name pe) 2))) (=every-container ast)))]
+            [first-clauses (->* (->ProvClause* (car (=every-container ast))))]
+            [new-clauses (map (lambda (cl) (make-prov (->return-type cl) (->comparator cl) (rand 50 2 0))) first-clauses)] ;TODO
+            [new-res (:Resource mquat-spec (string-append "r-" (number->string (+ 1 max-id))) rt online (list) new-clauses)])
+        (rewrite-add (->SubResources (->HWRoot ast)) new-res)))
+   (define (update-change steps)
+     (for-each
+       (lambda (step)
+         (when (not (= step 20))
+           (rw* rt "load" #f ast) (sit id-s (make-step-name step "-every-comp-rand") ast) (display+flush "."))) steps))
+   (rewrite-terminal 'config ast id-s)
+   (display+flush id-s)
+
+;   (info (map (lambda (pe) (string->number (substring (->name pe) 2))) (=every-container ast)))
+   (add-new-resource) ;; <- just for testing
+
+   (sit id-s "00-init" ast)
+   (update-change (list 1 2 3))
+;       (let ([removed (map (lambda (pp) (cons (rewrite-delete (car pp)) (cdr pp))) odd-pes)])
+;         (sit id-s (make-step-name 4 "-del-odd-pes") ast) (display+flush ".")
+     (add-new-resource) (sit id-s (make-step-name 4 "-add-new-pes") ast) (display+flush ".")
+     (update-change (list 5 6 7))
+     (make-new-modes ast) (sit id-s (make-step-name 8 "-new-modes") ast) (display+flush ".")
+     (update-change (list 9 10 11 12))
+     (sit id-s (make-step-name 13 "-no-change") ast)
+     (update-change (list 14 15 16))
+;        (for-each (lambda (rp) (rewrite-add (cdr rp) (car rp))) (reverse removed))
+;        (rw* rt "load" #f ast) (sit id-s (make-step-name 17 "-add-odd-pes") ast) (display+flush "."))
+   (add-new-resource) (sit id-s (make-step-name 17 "-add-new-pes") ast) (display+flush ".")
+   (update-change (list 18 19 20)))
+
  (define tests (list (cons resource-test run-resource-test)
                      (cons sw-test run-sw-test)
                      (cons update-test run-update-test)
                      (cons complex-test run-complex-test)
-                     (cons mixed-test run-mixed-test)))
+                     (cons mixed-test run-mixed-test)
+                     (cons scaling-test run-scaling-test)))
 
  (define (run-test id-s specs)
    (when profiling? (reset-counts))
