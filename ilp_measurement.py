@@ -578,7 +578,7 @@ def avg(column, *files):
         with open(f) as fd:
             r = csv.reader(fd)
             values = [float(row[int(column)]) for row in r if not row[0].isalpha()]
-            return sum(values) / float(len(values))
+            return sum(values) * 1.0 / len(values)
     print { f : get_average_value(f) for f in files }
 
 @task(name = 'agt')
@@ -616,6 +616,27 @@ def att_graph_totals():
                 fd.write('step,comp,called\n')
                 for step in sorted(steps):
                     csv.writer(fd).writerow([step]+list(steps[step]))
+
+@task
+def sums(f, namecol = 1, stepcol = 2, valuecol = 3, start = '00'):
+    """ Sums up one column blockwise, where start is the prefix of the name column and marks the begin of a block """
+    total, length, last_name = 0.0, 0, '?'
+    total_total, total_length = 0.0, 0
+    with open(f) as fd:
+        r = csv.reader(fd)
+        next(r)
+        for row in r:
+            if row[stepcol].startswith(start):
+                last_name = row[namecol]
+                if length > 0:
+                    print('{0:15}: {1:3}, Sum: {2:8.3f}, Average: {3:.3f}'.format(last_name, length, total, total*1.0/length))
+                total_total  += total
+                total_length += length
+                total, length = 0.0, 0
+            else:
+                total  += float(row[valuecol])
+                length += 1
+    print('Total elements: {0:3}, total sum: {1:3.3f}, total average: {2:.3f}'.format(total_length, total_total, total_total*1.0/total_length))
 
 
 if __name__ == '__main__':

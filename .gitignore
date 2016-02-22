@@ -12,7 +12,8 @@ profiling/*
 !profiling/*-header
 !profiling/kinds.json
 *.log
-*.png
+pngs/*.png
+pdfs/*.pdf
 .ipynb_checkpoints/
 /.tmp
 /m_*.tar
