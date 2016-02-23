@@ -1,4 +1,8 @@
 #!r6rs
+; This program and the accompanying materials are made available under the
+; terms of the MIT license (X11 license) which accompanies this distribution.
+
+; Author: R. Schöne
 
 (import (rnrs) (racr core) (racr testing)
         (mquat constants) (mquat utils) (mquat join) (mquat ast) (mquat basic-ag)

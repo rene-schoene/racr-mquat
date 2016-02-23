@@ -1,3 +1,7 @@
+# This program and the accompanying materials are made available under the
+# terms of the MIT license (X11 license) which accompanies this distribution.
+
+# Author: R. Schöne
 RACR_RACKET_BIN   = $$HOME/git/2bt/racr/racr/racket-bin
 RACR_LARCENY_BIN  = $$HOME/git/2bt/racr/racr/larceny-bin
 RACKET_BUILD_DIR  = racket-bin
