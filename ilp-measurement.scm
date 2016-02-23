@@ -4,7 +4,7 @@
 ; To add a new measurement FOO:
 ;   1) define a new scheme symbol (define foo-test 'foo-test)
 ;   2) reuse or define a new set of raw parameters
-;   3) append raw parameters to params
+;   3) append raw parameters to params, ensure to use the symbol from (1)
 ;   4) define a method (define (run-foo-test id-s specs) to run the measurement, taking two input parameters (id and parameters)
 ;   5) append (cons foo-test run-foo-test) to tests
 
@@ -33,17 +33,17 @@
          (list  2 400  0 10  2  2)))
  (define raw-scaling-params
    ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
-   ;           ID  HW  S #C #I #M
-   (list (list  1     10  0 10  2  2)
-         (list  2     50  0 10  2  2)
-         (list  2    100  0 10  2  2)
-         (list  2    500  0 10  2  2)
-         (list  2   1000  0 10  2  2)
-         (list  2   5000  0 10  2  2)
-         (list  2  10000  0 10  2  2)
-         (list  2  50000  0 10  2  2)
-         (list  2 100000  0 10  2  2)
-         (list  2 500000  0 10  2  2)))
+   ;            ID   HW    S #C #I #M
+   (list (list   1     10  0 10  2  2)
+         (list   2     50  0 10  2  2)
+         (list   3    100  0 10  2  2)
+         (list   4    500  0 10  2  2)
+         (list   5   1000  0 10  2  2)
+         (list   6   5000  0 10  2  2)
+         (list   7  10000  0 10  2  2)
+         (list   8  50000  0 10  2  2)
+         (list   9 100000  0 10  2  2)
+         (list  10 500000  0 10  2  2)))
  (define raw-short-params
    ; HW = number hw. S = number of sub-per-hw. #C[omp], #I[mpl], #M[ode]
    ;           ID  HW  S #C #I #M
@@ -108,7 +108,7 @@
                               (list (list (lambda _ #t) #f #f #f))))
           raw-mixed-params)
      ; scaling params
-     (map (lambda (l) (append (cons* (dirname "scaling-" (car l)) mixed-test (cdr l))
+     (map (lambda (l) (append (cons* (dirname "scaling-" (car l)) scaling-test (cdr l))
                               (list (list (lambda _ #t) #f #f #f))))
           raw-scaling-params)
           ))
@@ -419,7 +419,7 @@
  (define (measurement-cli-call command-line)
    (if (= 0 (length command-line)) (print-usage)
        (let ([first (car command-line)])
-           (sleep preesleep)
+           ;(sleep preesleep)
            (cond
              [(string=? "all" first) (for-each run-test (map car params) (map cdr params))]
              [(string=? "dirs" first) (for-each (lambda (entry) (display (car entry)) (display " ")) params)]
