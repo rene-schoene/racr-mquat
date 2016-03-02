@@ -3,7 +3,7 @@
 # This program and the accompanying materials are made available under the
 # terms of the MIT license (X11 license) which accompanies this distribution.
 
-# Author: R. Schöne
+# Author: R. Schoene
 
 import sys, re, os, csv, timeit, shutil, json, threading, time
 from datetime import datetime
@@ -575,12 +575,18 @@ def incoporate_remote_measurements(archive, dryrun = False):
         utils.merge_csv(os.path.join('profiling', d, name), f, dryrun = dryrun)
     sys.stdout.write('\n')
 
+first_file = True
 @task
 def avg(column, *files):
     """ Caclulate the average of the given column for all given files. """
     def get_average_value(f):
+        global first_file
         with open(f) as fd:
             r = csv.reader(fd)
+            first_row = next(r)
+            if first_file:
+                print first_row[int(column)]
+                first_file = False
             values = [float(row[int(column)]) for row in r if not row[0].isalpha()]
             return sum(values) * 1.0 / len(values)
     print { f : get_average_value(f) for f in files }

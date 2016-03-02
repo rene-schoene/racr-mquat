@@ -1,7 +1,7 @@
 # This program and the accompanying materials are made available under the
 # terms of the MIT license (X11 license) which accompanies this distribution.
 
-# Author: R. Schöne
+# Author: R. Schoene
 class Bin(object):
 	def __init__(self, racr_bin, mquat_bin):
 		self.racr_bin = racr_bin
