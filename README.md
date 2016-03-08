@@ -3,6 +3,11 @@ terms of the MIT license (X11 license) which accompanies this distribution.
 
 Author: R. Schöne
 
+# Description
+
+This project combines two technologies/approaches from different areas, namely [MQuAT](https://bitbucket.org/rschoene/mquat) and [RACR](https://github.com/christoff-buerger/racr/)
+with the aim to build efficient self-adaptive systems.
+
 # Setup
 
 - clone [the racr repo](https://github.com/christoff-buerger/racr.git)
@@ -12,4 +17,4 @@ Author: R. Schöne
 
 # Links
 
-- view measurement results [online](http://nbviewer.ipython.org/urls/bitbucket.org/rschoene/racr-mquat/raw/master/ilp-measurement.ipynb)
+- measurement results can be viewed [online at github](https://github.com/rene-schoene/racr-mquat/blob/master/ilp-measurement.ipynb)
