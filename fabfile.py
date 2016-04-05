@@ -2,12 +2,10 @@
 # terms of the MIT license (X11 license) which accompanies this distribution.
 
 # Author: R. Schoene
-import utils
+import properties, utils, install, sockets
 import ilp_test as test
 import ilp_measurement as measure
 import ilp_check as check
-import install
-import sockets
 import os
 from fabric.api import local, task, get, hosts, run
 

@@ -7,7 +7,7 @@ try:
 	from fabric.api import lcd, task
 except ImportError:
 	from fabric_workaround import lcd, task
-from constants import racketBin, larcenyBin, racketExec, larcenyExec
+from constants import racketBin, larcenyBin, racketExec, larcenyExec, PROGRAM_PACKAGE
 from utils import local_quiet
 
 def parse(names = None):
@@ -29,7 +29,7 @@ def compile_racket(*names):
 	""" Compile every listed source for Racket.
 	If none given, compile each dependency.	"""
 	for name in parse(names):
-		output = 'racket-bin/mquat/{0}'.format('main_.ss' if name == 'main.scm' else (name[:-2] + 's'))
+		output = 'racket-bin/{0}/{1}'.format(PROGRAM_PACKAGE, 'main_.ss' if name == 'main.scm' else (name[:-2] + 's'))
 		if os.path.exists(output):
 			os.remove(output)
 		local_quiet('{0} ++path {1} --install --collections racket-bin {2}'.
@@ -45,7 +45,7 @@ compile_stale_text = """#!r6rs
 @task(name = 'larceny')
 def compile_larceny():
 	""" Compile each dependency for larceny """
-	larceny_dir = 'larceny-bin/mquat'
+	larceny_dir = 'larceny-bin/' + PROGRAM_PACKAGE
 	compile_stale = 'compile-stale'
 	if not os.path.exists(larceny_dir):
 		os.makedirs(larceny_dir)

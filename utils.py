@@ -38,12 +38,12 @@ def local_quiet(cmd, abort_on_stderr = False, capture = True):
 
 def call_racket(f, *args, **kwargs):
 	return local_quiet('{0} ++path {1} ++path {2} {3} {4}'.format(racketExec,
-		racketBin.racr_bin, racketBin.mquat_bin, f, ' '.join(str(x) for x in args)),
+		racketBin.racr_bin, racketBin.program_bin, f, ' '.join(str(x) for x in args)),
 		capture = kwargs.get('capture', True))
 
 def call_larceny(f, *args, **kwargs):
 	return local_quiet('{0} --r6rs --path {1}:{2} --program {3} -- {4}'.format(larcenyExec,
-		larcenyBin.racr_bin, larcenyBin.mquat_bin, f, ' '.join(str(x) for x in args)),
+		larcenyBin.racr_bin, larcenyBin.program_bin, f, ' '.join(str(x) for x in args)),
 		abort_on_stderr = True, capture = kwargs.get('capture', True))
 
 def secure_remove(spec, globbing = False, dryrun = False):

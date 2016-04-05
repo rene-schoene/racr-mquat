@@ -15,8 +15,9 @@ try:
 #    from fabric.contrib.console import confirm
 except ImportError:
     from fabric_workaround import task, red, lcd, green
-import utils, properties
-from utils import local_quiet, call_racket, call_larceny, assertTrue, secure_remove
+import utils
+from utils import local_quiet, call_racket, call_larceny, assertTrue, assertTrueAssertion, secure_remove
+from properties import timing, log_info, log_debug, lp_write, profiling, flushed, noncached, preesleep, items
 
 assertTrue = utils.assertTrueAssertion
 
@@ -464,33 +465,6 @@ def prepare_normal():
     local_quiet('make racket', capture = False)
 
 @task
-def check():
-    """ Checks dependencies.txt and scheme.properties """
-    def nc_tostring(val):
-        return red('non-cached') if val else 'cached'
-    noncached_scm = False
-    with open('dependencies.txt') as fd:
-        if 'ilp-noncached\n' in fd:
-            noncached_scm = True
-    print '\n- '.join(( 'Evaluation is set to:',
-        red('non-cached') if properties.noncached.value else 'cached',
-        red('flushed') if properties.flushed.value else 'unflushed',
-        (green('Yes: ') if properties.timing.value else 'No ') + 'measurement of execution times',
-        (green('Yes: ') if properties.profiling.value else 'No ') + 'profiling of attribute metrics',
-        (green('Yes: ') if properties.lp_write.value else 'No ') + 'write of LP files',
-        'Wait {0} second(s) before each experiment'.format(properties.preesleep.value)))
-    if noncached_scm != properties.noncached.value:
-        print 'Attention: Compiled ilp ({}) differs from properties file setting ({}).'.format(
-            nc_tostring(noncached_scm), nc_tostring(properties.noncached.value))
-    if properties.timing.value and properties.profiling.value:
-        print 'Attention: Both, enabled profiling will influence timing.'
-    if properties.flushed.value and properties.noncached.value:
-        print 'Disabling "flushed", as noncached is enabled'
-        properties.flushed.value = False
-    if not (properties.timing.value or properties.lp_write.value or properties.profiling.value):
-        print 'Nothing is done or measured, either set timing, lp_write or profiling'
-
-@task
 def help():
     print 'Measurement driver for racr-mquat'
     print '1. Do generation (racket[-n], larceny[-n]), n defaults to 1.'
@@ -498,42 +472,6 @@ def help():
     print '3. (Mandatory) Execute conflate-results, to update the {gen/sol}-*-results.csv files'
     print '4. (Mandatory) Execute distinction-of-changes, to create splitted csv files'
     print '5. (Optional) Rerun notebook to update diagrams'
-
-def confirm(question, default_val = False):
-    prompt = question
-    if isinstance(default_val, bool):
-        prompt += ' [{0}]'.format('Y/n' if default_val else 'y/N')
-    answer = raw_input(prompt + ' ')
-    if answer == '':
-        answer = default_val
-    if isinstance(default_val, bool):
-        return answer in ('y','Y','yes','Yes',True)
-    if isinstance(default_val,int):
-        return int(answer)
-    return answer
-
-@task
-def setup(name = None, to_default = False):
-    """
-    Interactive setup of all settings or given specific one.
-    Overrides the file "scheme.properties"
-    """
-    def default_val(item):
-        return item.default if to_default else item.value
-    def confirm_s(wanted, item):
-        if not wanted or item.name.startswith(wanted):
-            return confirm(item.question, default_val(item))
-        return default_val(item)
-    for p in properties.items:
-        p.value = confirm_s(name, p)
-
-    # consistency checking
-    check()
-
-    for p in properties.items:
-        p.write_value()
-    print 'Remember to invoke prepare-{} if noncached setting was changed'.format(
-        'noncached' if properties.noncached.value else 'normal')
 
 @task(name = 'new-measurements')
 def new_measurements():
