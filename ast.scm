@@ -97,6 +97,6 @@
     (ast-rule 'Property->)
     ; kind=static|runtime|derived. direction=decreasing|increasing. agg = sum|max.
     (ast-rule 'RealProperty:Property->name-unit-kind-direction-agg)
-    (ast-rule 'PropertyRef:Property->ref)
+    (ast-rule 'PropertyRef:Property->refname)
 
     (compile-ast-specifications 'Root))))

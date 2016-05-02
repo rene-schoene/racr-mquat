@@ -26,7 +26,10 @@
  (define (=eval-on n pe)       (att-value 'eval-on n pe))
  (define (=hw? n)              (att-value 'hw? n))
  (define (<=impl n)            (att-value 'get-impl n))
- (define (=lookup-clause n prop)      (att-value 'lookup-clause n prop))
+ (define (=lookup-clause n prop)
+                               (att-value 'lookup-clause n prop))
+ (define (=lookup-property n propname)
+                               (att-value 'lookup-property n propname))
  (define (=maximum n)          (att-value 'maximum n))
  (define (=max-help n arg0)    (att-value 'max-help n arg0))
  (define (=mode-to-use n)      (att-value 'mode-to-use n))
@@ -40,6 +43,7 @@
  (define (=req-comp-all n)     (att-value 'req-comp-all n))
  (define (<=request n)         (att-value 'get-request n))
  (define (=real n)             (att-value 'real n))
+ (define (<=root n)            (att-value 'get-root n))
  (define (=selected? n)        (att-value 'selected? n))
  (define (=every-pe n)         (att-value 'every-pe n))
  (define (=every-container n)  (att-value 'every-container n))
@@ -59,6 +63,8 @@
  (define (=search-pe n name)   (att-value 'search-pe n name))
  (define (=value-attr n)       (att-value 'value-attr n))
  (define (=value-of n name)    (att-value 'value-of n name))
+
+ (define (find-prop propname subtree) (ast-find-child (lambda (i n) (string=? propname (->name n))) subtree))
 
  (define (add-basic-ags mquat-spec)
    (with-specification
@@ -176,6 +182,19 @@
      (Resource (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->return-type cl)))) (->ProvClause* n))))
      (Mode (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->return-type cl)))) (->Clause* n)))))
 
+    ; =lookup-property: Given the name of the property, resolves to a RealProperty. Always invoke on Root.
+    (ag-rule
+     lookup-property
+     (Root (lambda (n propname) (or (=lookup-property (->SWRoot n) propname) (=lookup-property (->HWRoot n) propname) (error "Could not find " propname))))
+     (SWRoot (lambda (n propname) (or (find-prop propname (->RealProperty* n))
+                                      (ast-find-child (lambda (i c) (=lookup-property c propname)) (->Comp* n)))))
+     (Comp (lambda (n propname) (find-prop propname (->Property* n))))
+     (HWRoot (lambda (n propname) (or (ast-find-child (lambda (i rt) (=lookup-property rt propname)) (->ResourceType* n))
+                                      (ast-find-child (lambda (i r) (=lookup-property r propname)) (->SubResources n)))))
+     (ResourceType (lambda (n propname) (find-prop propname (->RealProperty* n))))
+     (Resource (lambda (n propname) (or (find-prop propname (->Property* n))
+                                        (ast-find-child (lambda (i sr) (=lookup-property sr propname)) (->SubResources n))))))
+
     ; <=impl: Get Impl in subtree of the Impl
     (ag-rule get-impl (Impl (lambda (n) n)))
 
@@ -234,7 +253,7 @@
     (ag-rule
      real
      (RealProperty (lambda (n) n))
-     (PropertyRef  (lambda (n) (=real (ast-child 'ref n)))))
+     (PropertyRef  (lambda (n) (=real (=lookup-property (<=root n) (ast-child 'refname n))))))
 
     ; =req-comp-map: Returns a associate list, mapping required components to a list of implementations requiring that component
     (ag-rule
@@ -268,6 +287,9 @@
 
     ; <=request: Get request from every node
     (ag-rule get-request (Root (lambda (n) (ast-child 'Request n))))
+
+    ; <=root: Get Root from every node
+    (ag-rule get-root (Root (lambda (n) n)))
 
     ; Returns all resources of the type
     (ag-rule resources-of (ResourceType (lambda (n) (filter (lambda (pe) (eq? n (->type pe))) (=every-pe n)))))
