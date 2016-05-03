@@ -232,10 +232,10 @@
           [energy (find-prop-sw pn-energy (find-create-comp ast comp-nr))]
           [prev-p (and req-comp-nr (find-prop-sw (node-name "p" (list req-comp-nr)) (find-create-comp ast req-comp-nr)))]
           [this-p (find-prop-sw (node-name "p" (list comp-nr)) (find-create-comp ast comp-nr))]
-          [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec (:PropertyRef pn-load) comp-max-eq load-f)
-                                                (:ProvClause mquat-spec (:PropertyRef pn-energy) comp-max-eq energy-f)
-                                                (:ProvClause mquat-spec (:PropertyRef (->name this-p)) comp-max-eq prov-f)
-                                                (and req-comp-nr (:ReqClause mquat-spec (:PropertyRef (->name prev-p)) comp-max-eq prev-f))))]
+          [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec (:PropertyRef mquat-spec pn-load) comp-max-eq load-f)
+                                                (:ProvClause mquat-spec (:PropertyRef mquat-spec pn-energy) comp-max-eq energy-f)
+                                                (:ProvClause mquat-spec (:PropertyRef mquat-spec (->name this-p)) comp-max-eq prov-f)
+                                                (and req-comp-nr (:ReqClause mquat-spec (:PropertyRef mquat-spec (->name prev-p)) comp-max-eq prev-f))))]
           [new (:Mode mquat-spec (node-name "m" (list mode-nr impl-nr comp-nr)) clauses)])
      (rewrite-add (->Mode* impl) new) new))
  (define (comp-nr-of i) (ast-child-index (<=comp i)))
@@ -334,7 +334,7 @@
    (define (add-new-resource)
      (let* ([max-id (apply max (map (lambda (pe) (string->number (substring (->name pe) 2))) (=every-container ast)))]
             [first-clauses (->* (->ProvClause* (car (=every-container ast))))]
-            [new-clauses (map (lambda (cl) (make-prov (:PropertyRef (ast-child 'refname (->ReturnType cl))) (->comparator cl) (rand 50 2 0))) first-clauses)] ;TODO
+            [new-clauses (map (lambda (cl) (make-prov (:PropertyRef mquat-spec (ast-child 'refname (->ReturnType cl))) (->comparator cl) (rand 50 2 0))) first-clauses)] ;TODO
             [new-res (:Resource mquat-spec (string-append "r-" (number->string (+ 1 max-id))) rt online (list) new-clauses)])
         (rewrite-add (->SubResources (->HWRoot ast)) new-res)))
    (define (update-change outer steps)
@@ -376,7 +376,7 @@
    (define (add-new-resource)
      (let* ([max-id (apply max (map (lambda (pe) (string->number (substring (->name pe) 2))) (=every-container ast)))]
             [first-clauses (->* (->ProvClause* (car (=every-container ast))))]
-            [new-clauses (map (lambda (cl) (make-prov (:PropertyRef (ast-child 'refname (->ReturnType cl))) (->comparator cl) (rand 50 2 0))) first-clauses)] ;TODO
+            [new-clauses (map (lambda (cl) (make-prov (:PropertyRef mquat-spec (ast-child 'refname (->ReturnType cl))) (->comparator cl) (rand 50 2 0))) first-clauses)] ;TODO
             [new-res (:Resource mquat-spec (string-append "r-" (number->string (+ 1 max-id))) rt online (list) new-clauses)])
         (rewrite-add (->SubResources (->HWRoot ast)) new-res)))
    (define (update-change steps)

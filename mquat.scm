@@ -57,7 +57,7 @@
 (define (make-mode workers particles)
   (:Mode ms (string-append "KLD-" (number->string workers) "-" (number->string particles))
          (list (:ProvClause ms (:PropertyRef ms energy) comp-max-eq (make-energy-f workers particles))
-               (:ProvClause ms (:PropertyRef (->name precision)) comp-min-eq (make-precision-f workers particles))
+               (:ProvClause ms (:PropertyRef ms (->name precision)) comp-min-eq (make-precision-f workers particles))
                (:ProvClause ms (:PropertyRef ms response-time) comp-max-eq (make-rt-f workers particles))
                )))
 (define modes (map make-mode (list 1 1 1 3 3 3 5 5 5) (list 300 500 700 300 500 700 300 500 700)))
@@ -87,7 +87,7 @@
         (if (and property-value (> 0 property-value))
             (if clause? (rewrite-terminal 'value clause? (lambda _ property-value)) ; rewrite existing clause
                 ; add new clause
-                (rewrite-add (->Constraints (<=request ast)) (:ReqClause ms (:PropertyRef (->name (=real property))) comparator (lambda _ property-value))))
+                (rewrite-add (->Constraints (<=request ast)) (:ReqClause ms (:PropertyRef ms (->name (=real property))) comparator (lambda _ property-value))))
             (when clause? (rewrite-delete clause?))))) ; delete existing clause
 
 (define (update-request-objective objective)

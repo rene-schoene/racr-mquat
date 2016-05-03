@@ -27,8 +27,8 @@
                                        (lambda _ val)))
 
  (define (something v) v)
- (define (make-prov propname comparator value) (:ProvClause mquat-spec (:PropertyRef propname) comparator value))
- (define (make-req  propname comparator value) (:ReqClause  mquat-spec (:PropertyRef propname) comparator value))
+ (define (make-prov propname comparator value) (:ProvClause mquat-spec (:PropertyRef mquat-spec propname) comparator value))
+ (define (make-req  propname comparator value) (:ReqClause  mquat-spec (:PropertyRef mquat-spec propname) comparator value))
 
  ; return a proc or #f
  (define (create-clause udfs default-fun name)

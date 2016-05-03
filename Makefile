@@ -13,7 +13,7 @@ LDEPS := $(shell sed -e '1,/@sources:/d' -e '/^\#/d' dependencies.txt | while re
 # larceny builds everytime, so not included in default target
 all: racket
 
-racket: $(RDEPS) Makefile
+racket: $(RDEPS)
 	@rm -f $(RACKET_BUILD_DIR)/mquat/ilp.ss
 
 larceny: $(LSRC)
@@ -21,7 +21,7 @@ larceny: $(LSRC)
 	@cp compile-stale $(LARCENY_BUILD_DIR)/mquat
 	@cd $(LARCENY_BUILD_DIR)/mquat && larceny --r6rs --path ..:$(RACR_LARCENY_BIN) --program compile-stale
 
-$(RACKET_BUILD_DIR)/mquat/%.ss: %.scm Makefile
+$(RACKET_BUILD_DIR)/mquat/%.ss: %.scm
 	@mkdir -p $(RACKET_BUILD_DIR)
 	@rm -f $@
 	plt-r6rs ++path $(RACR_RACKET_BIN) --install --collections $(RACKET_BUILD_DIR) $<
@@ -42,4 +42,4 @@ clean:
 	rm -rf $(LARCENY_BUILD_DIR)/*
 
 run: racket
-	fab call_racket:cli.scm,ag | tee ast-output.txt | head
+	fab call_racket:cli.scm,ag | tee ast-output.txt | less
