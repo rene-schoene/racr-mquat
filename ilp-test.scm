@@ -44,15 +44,15 @@
  
  (define (change-req-constraint ast name comparator new-value)
    (debug (->* (->Constraints (<=request ast))))
-   (let ([clause (ast-find-child (lambda (i child) (string=? (->name (=real (->return-type child))) name))
+   (let ([clause (ast-find-child (lambda (i child) (string=? (->name (=real (->ReturnType child))) name))
                                  (->Constraints (<=request ast)))])
      (rewrite-terminal 'value clause (lambda _ new-value))
      (rewrite-terminal 'comp clause comparator)))
  
  (define (change-req-mp-value ast new-value) (rewrite-terminal 'value (car (->* (->MetaParameter* (<=request ast)))) new-value))
  
- (define no-freq-hw-clauses (lambda _ (lambda (p) (if (string=? freq-name p) #f (list make-prov comp-eq (lambda _ 0.5))))))
- (define no-freq-sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? freq-name p) #f #t))))
+ (define no-freq-hw-clauses (lambda _ (lambda (p) (if (string=? pn-freq p) #f (list make-prov comp-eq (lambda _ 0.5))))))
+ (define no-freq-sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? pn-freq p) #f #t))))
  
  (define (run-test id-string)
 ;   (set!no-frequency) ; only use property load for system creation
@@ -597,7 +597,7 @@
    ; Normally only deployable on resource of type-0 (which is only res-2)
    (let* ([hw-types (lambda (res-name) (if (or (string=? res-name "r-1") (string=? res-name "r-3")) (cons 1 #t) #f))]
           [load-f (lambda (lomp target) (if (string=? (->name target) "type-1") 0.3 0.7))]
-          [sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? load-name p) (list make-req comp-max-eq load-f)
+          [sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? pn-load p) (list make-req comp-max-eq load-f)
                                                         ((no-freq-sw-clauses) p comp-nr))))]
           [ast (create-system 3 0 1 2 2 (list #f sw-clauses no-freq-hw-clauses hw-types))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) "m-1-1-1")
@@ -636,7 +636,7 @@
    (define (add-resource name status prototype parent)
      (let* ([type (->type prototype)]
             [cs (->* (->ProvClause* prototype))]
-            [new-cs (map (lambda (c) (:ProvClause mquat-spec (->return-type c) (->comparator c) (->value c))) cs)])
+            [new-cs (map (lambda (c) (:ProvClause mquat-spec (:PropertyRef (ast-child 'refname (->ReturnType c))) (->comparator c) (->value c))) cs)])
        (rewrite-add (->SubResources parent) (:Resource mquat-spec name type status (list) new-cs))))
    ; General description: New resources entering the system, enabling new configurations
    (let ([ast (create-system 2 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
@@ -703,14 +703,14 @@
                                                             (->Property* (car (->* (->ResourceType* (->HWRoot ast)))))))]
               [find-prop-sw (lambda (name comp) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
                                                                  (->Property* comp)))]
-              [load (find-prop-hw load-name)]
+              [load (find-prop-hw pn-load)]
               [energy (find-prop-sw pn-energy (find-create-comp comp-nr))]
               [prev-p (and req-comp-nr (find-prop-sw (node-name "p" (list req-comp-nr)) (find-create-comp req-comp-nr)))]
               [this-p (find-prop-sw (node-name "p" (list comp-nr)) (find-create-comp comp-nr))]
-              [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec load comp-max-eq load-f)
-                                                    (:ProvClause mquat-spec energy comp-max-eq energy-f)
-                                                    (:ProvClause mquat-spec this-p comp-max-eq prov-f)
-                                                    (and req-comp-nr (:ReqClause mquat-spec prev-p comp-max-eq prev-f))))]
+              [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec (:PropertyRef pn-load) comp-max-eq load-f)
+                                                    (:ProvClause mquat-spec (:PropertyRef pn-energy) comp-max-eq energy-f)
+                                                    (:ProvClause mquat-spec (:PropertyRef (->name this-p)) comp-max-eq prov-f)
+                                                    (and req-comp-nr (:ReqClause mquat-spec (:PropertyRef (->name prev-p)) comp-max-eq prev-f))))]
               [new (:Mode mquat-spec (node-name "m" (list mode-nr impl-nr comp-nr)) clauses)])
          (rewrite-add (->Mode* impl) new) new))
      (define (prov-obj val id) (+ val (/ id 1e3)))
@@ -767,7 +767,7 @@
           [name->type-nr (lambda (type-name) (string->number (substring type-name 5 (string-length type-name))))]
           [load-f (lambda (lomp target) (case (name->type-nr (->name target)) [(0) 0.2] [(1) 0.4] [(2) 0.7]
                                           [else (error "load-f" "wrong type" (->name target))]))]
-          [sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? load-name p) (list make-req comp-max-eq load-f)
+          [sw-clauses (lambda _ (lambda (p comp-nr) (if (string=? pn-load p) (list make-req comp-max-eq load-f)
                                                         ((no-freq-sw-clauses) p comp-nr))))]
           [ast (create-system 30 3 1 1 2 (list #f sw-clauses no-freq-hw-clauses hw-types))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) "m-1-1-1")
@@ -854,11 +854,11 @@
         (info "reqs" req-cls (length req-cls))
         (info "provs" prov-cls (length prov-cls))
         (for-each (lambda (cl) (info "comp" (eq? comp-max-eq (->comparator cl)) "sub" (ast-subtype? cl 'ReqClause)
-                                     "prop" (eq? p2 (=real (->return-type cl))))) (=every-sw-clause ast))
+                                     "prop" (eq? p2 (=real (->ReturnType cl))))) (=every-sw-clause ast))
         ; "clone" req-clauses cls in p1 and change new clauses to target new property
-        (for-each (lambda (cl) (rewrite-add (<- cl) (:ReqClause mquat-spec new-p (->comparator cl) (->value cl)))) req-cls)
+        (for-each (lambda (cl) (rewrite-add (<- cl) (:ReqClause mquat-spec (:PropertyRef (->name new-p)) (->comparator cl) (->value cl)))) req-cls)
         ; "clone" prov-clauses in p2
-        (for-each (lambda (cl) (rewrite-add (<- cl) (:ProvClause mquat-spec new-p (->comparator cl) (->value cl)))) prov-cls)
+        (for-each (lambda (cl) (rewrite-add (<- cl) (:ProvClause mquat-spec (:PropertyRef (->name new-p)) (->comparator cl) (->value cl)))) prov-cls)
         ; adjust values, s.t. one impl fulfills req for first property only, second impl fulfills req for second property only
         (change-sw-req ast "p-2" comp-max-eq 10 "m-1-1-1" "m-1-2-1")
         (change-sw-req ast "new-p-2" comp-max-eq 10 "m-1-1-1" "m-1-2-1")

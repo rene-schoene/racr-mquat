@@ -65,12 +65,14 @@ def confirm(question, default_val = False):
     prompt = question
     if isinstance(default_val, bool):
         prompt += ' [{0}]'.format('Y/n' if default_val else 'y/N')
+    elif isinstance(default_val,int):
+        prompt += ' [{0}]'.format(default_val)
     answer = raw_input(prompt + ' ')
     if answer == '':
         answer = default_val
     if isinstance(default_val, bool):
         return answer in ('y','Y','yes','Yes',True)
-    if isinstance(default_val,int):
+    elif isinstance(default_val,int):
         return int(answer)
     return answer
 

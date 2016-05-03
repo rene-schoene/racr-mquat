@@ -16,12 +16,12 @@
  (define (clauses-to-list loc)
    (fold-left
     (lambda (result clause)
-      (let ([returnType (->name (=real (->return-type clause)))]
+      (let ([returnType (->name (=real (->ReturnType clause)))]
             [evalValue (=eval clause)]
             [compName (comp->rev-string (->comparator clause))])
         (cons
          (if (ast-subtype? clause 'ProvClause) (list returnType compName evalValue)
-             (list returnType 'on (name-or-type (<<- (=real (->return-type clause))))
+             (list returnType 'on (name-or-type (<<- (=real (->ReturnType clause))))
                    compName evalValue 'currently: (=actual-value clause)))
          result)))
     (list) loc))

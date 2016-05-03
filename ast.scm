@@ -13,7 +13,7 @@
          ->Impl* ->selected-impl ; Comp
          ->Mode* ->deployed-on ->selected-mode ; Impl
          ->Clause* ; Mode
-         ->return-type ->comparator ; Clause
+         ->ReturnType ->comparator ; Clause
          ->ResourceType* ; HWRoot
          ->container? ; ResourceType
          ->type ->status ->ProvClause* ; Resource
@@ -47,7 +47,7 @@
  (define (->target n)         (ast-child 'target n))
  (define (->Constraints n)    (ast-child 'Constraints n))
  (define (->objective n)      (ast-child 'objective n))
- (define (->return-type n)    (ast-child 'returntype n))
+ (define (->ReturnType n)     (ast-child 'ReturnType n))
  (define (->comparator n)     (ast-child 'comp n))
  (define (->value n)          (ast-child 'value n))
  (define (->unit n)           (ast-child 'unit n))
@@ -82,10 +82,10 @@
     (ast-rule 'Comp->name-Impl*-selectedimpl-Property*)
     (ast-rule 'Impl->name-Mode*-reqcomps-deployedon-selectedmode)
     (ast-rule 'Mode->name-Clause*)
-    ;value is a function, expecting an AST-List-Node with MetaParameters and the target resource type, returning the value
-    ;comp is a lambda expecting two values, required and actual, returning #t or #f
-    (ast-rule 'Clause->returntype-comp-value)
+    ; value is a function, expecting an AST-List-Node with MetaParameters and the target resource type, returning the value
+    ; comp is a lambda expecting two values, required and actual, returning #t or #f
     ; target is either a Comp or a ResourceType
+    (ast-rule 'Clause->PropertyRef<ReturnType-comp-value)
     (ast-rule 'ReqClause:Clause->)
     (ast-rule 'ProvClause:Clause->)
     (ast-rule 'HWRoot->ResourceType*-Resource*<SubResources-RealProperty*)

@@ -75,8 +75,8 @@
      actual-value
      (ReqClause
       (lambda (n)
-        (let ([propName (->name (=real (->return-type n)))]
-              [target (<<- (=real (->return-type n)))])
+        (let ([propName (->name (=real (->ReturnType n)))]
+              [target (<<- (=real (->ReturnType n)))])
           ((->value (if (ast-subtype? target 'ResourceType)
                         ; hw → search in deployedon for name and type
                         (=provided-clause (->deployed-on (<=impl n)) propName target)
@@ -122,7 +122,7 @@
      (Property
       (lambda (n comparator)
         (filter (lambda (cl) (and (eq? comparator (->comparator cl)) (ast-subtype? cl 'ReqClause)
-                                  (eq? n (=real (->return-type cl))))) (=every-sw-clause n)))))
+                                  (eq? n (=real (->ReturnType cl))))) (=every-sw-clause n)))))
 
     ; =every-prov-clause: Return every provision clauses referencing this property and using the given comparator
     (ag-rule
@@ -130,7 +130,7 @@
      (Property
       (lambda (n comparator)
         (filter (lambda (cl) (and (eq? comparator (->comparator cl)) (ast-subtype? cl 'ProvClause)
-                                  (eq? n (=real (->return-type cl))))) (append (=every-sw-clause n) (=every-hw-clause n))))))
+                                  (eq? n (=real (->ReturnType cl))))) (append (=every-sw-clause n) (=every-hw-clause n))))))
 
     ; =every-container: Returns a list of every pe that can run software on it
     (ag-rule every-container (Root (lambda (n) (filter (lambda (pe) (->container? (->type pe))) (=every-pe n)))))
@@ -179,8 +179,8 @@
     ; =lookup-clause: Given a property, return the first clause referencing this property at this resource/mode
     (ag-rule
      lookup-clause
-     (Resource (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->return-type cl)))) (->ProvClause* n))))
-     (Mode (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->return-type cl)))) (->Clause* n)))))
+     (Resource (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->ReturnType cl)))) (->ProvClause* n))))
+     (Mode (lambda (n prop) (ast-find-child (lambda (i cl) (eq? (=real prop) (=real (->ReturnType cl)))) (->Clause* n)))))
 
     ; =lookup-property: Given the name of the property, resolves to a RealProperty. Always invoke on Root.
     (ag-rule
@@ -239,7 +239,7 @@
           (if (eq? (->type n) type) ; if n has correct type ...
               (let ([found-clause
                      (ast-find-child ; (1) ... then try to find a child in n ...
-                      (lambda (index clause) (string=? (->name (=real (->return-type clause))) name))
+                      (lambda (index clause) (string=? (->name (=real (->ReturnType clause))) name))
                       (->ProvClause* n))])
                 (if found-clause ; (1.q) if a child was found ...
                     found-clause ; (1.1) ... return it
@@ -253,7 +253,7 @@
     (ag-rule
      real
      (RealProperty (lambda (n) n))
-     (PropertyRef  (lambda (n) (=real (=lookup-property (<=root n) (ast-child 'refname n))))))
+     (PropertyRef  (lambda (n) (info n ", refname=" (ast-child 'refname n) ", hasParent=" (ast-has-parent? n)) (=real (=lookup-property (<=root n) (ast-child 'refname n))))))
 
     ; =req-comp-map: Returns a associate list, mapping required components to a list of implementations requiring that component
     (ag-rule
@@ -302,7 +302,7 @@
         (debug "search" name "in" (->name n))
         (ast-find-child
          (lambda (index clause)
-           (and (ast-subtype? clause subtype) (string=? (->name (=real (->return-type clause))) name)))
+           (and (ast-subtype? clause subtype) (string=? (->name (=real (->ReturnType clause))) name)))
          (->Clause* n)))))
 
     ; =search-pe: Search for a resource with the given name

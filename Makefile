@@ -40,3 +40,6 @@ ilp-noncached.scm: ilp.scm
 clean:
 	rm -rf $(RACKET_BUILD_DIR)/*
 	rm -rf $(LARCENY_BUILD_DIR)/*
+
+run: racket
+	fab call_racket:cli.scm,ag | tee ast-output.txt | head

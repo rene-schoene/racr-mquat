@@ -56,13 +56,13 @@
 ;; Software entities
 (define (make-mode workers particles)
   (:Mode ms (string-append "KLD-" (number->string workers) "-" (number->string particles))
-         (list (:ProvClause ms sample-energy comp-max-eq (make-energy-f workers particles))
-               (:ProvClause ms precision comp-min-eq (make-precision-f workers particles))
-               (:ProvClause ms sample-response-time comp-max-eq (make-rt-f workers particles))
+         (list (:ProvClause ms (:PropertyRef ms energy) comp-max-eq (make-energy-f workers particles))
+               (:ProvClause ms (:PropertyRef (->name precision)) comp-min-eq (make-precision-f workers particles))
+               (:ProvClause ms (:PropertyRef ms response-time) comp-max-eq (make-rt-f workers particles))
                )))
 (define modes (map make-mode (list 1 1 1 3 3 3 5 5 5) (list 300 500 700 300 500 700 300 500 700)))
 (define kld (:Impl ms "KLD" modes (list) #f #f))
-(define Sample (:Comp ms "Sampling" (list kld) #f (list precision sample-response-time sample-energy)))
+(define Sample (:Comp ms "Sampling" (list kld) #f (list precision (:PropertyRef ms response-time) (:PropertyRef ms energy))))
 
 (define ast
   (:Root ms
@@ -82,12 +82,12 @@
 (define (r id) (string-append "r-" (number->string id)))
 
 (define (update-request-constraints property property-value comparator)
-      (let ([clause? (ast-find-child (lambda (i n) (eq? (=real property) (=real (->return-type n))))
+      (let ([clause? (ast-find-child (lambda (i n) (eq? (=real property) (=real (->ReturnType n))))
                                      (->Constraints (<=request ast)))])
         (if (and property-value (> 0 property-value))
             (if clause? (rewrite-terminal 'value clause? (lambda _ property-value)) ; rewrite existing clause
                 ; add new clause
-                (rewrite-add (->Constraints (<=request ast)) (:ReqClause ms property comparator (lambda _ property-value))))
+                (rewrite-add (->Constraints (<=request ast)) (:ReqClause ms (:PropertyRef (->name (=real property))) comparator (lambda _ property-value))))
             (when clause? (rewrite-delete clause?))))) ; delete existing clause
 
 (define (update-request-objective objective)

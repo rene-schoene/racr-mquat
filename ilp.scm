@@ -238,7 +238,7 @@
 ;           (if (and (ast-subtype? clause clausetype) (eq? (->comparator clause) comparator))
 ;               (fold-left ; fold over pe
 ;                (lambda (inner pe)
-;                  (add-to-al inner (=real (->return-type clause))
+;                  (add-to-al inner (=real (->ReturnType clause))
 ;                             (list (=eval-on clause pe) (=ilp-binvar-deployed (<<- clause) pe))))
 ;;                             (=ilp-eval-binvar clause pe)))
 ;                result (=every-container n))
@@ -257,7 +257,7 @@
            (if (and (ast-subtype? clause clausetype) (eq? (->comparator clause) comparator))
                (fold-left ; fold over pe
                 (lambda (inner pe)
-                  (add-to-al inner (=real (->return-type clause))
+                  (add-to-al inner (=real (->ReturnType clause))
                              (list (=eval-on clause pe) (=ilp-binvar-deployed n pe))))
                 result (=every-container n))
                result))
@@ -269,7 +269,7 @@
         (fold-left
          (lambda (result clause)
            (if (eq? (->comparator clause) comparator)
-               (add-to-al result (=real (->return-type clause)) (list (=eval-on clause #f) "")) ;use arbitrary target #f
+               (add-to-al result (=real (->ReturnType clause)) (list (=eval-on clause #f) "")) ;use arbitrary target #f
                result))
          (list) (->* (->Constraints n))))))
 
@@ -283,9 +283,9 @@
 ;     (Comp
 ;      (lambda (n) ; → all properties required in here. ([prop (clause ... )] ... )
 ;        (fold-left
-;;         (lambda (result clause) (let ([prop (=real (->return-type clause))])
+;;         (lambda (result clause) (let ([prop (=real (->ReturnType clause))])
 ;;                                   (if (member prop result) result (cons prop result))))
-;         (lambda (result clause) (add-to-al result (=real (->return-type clause)) clause))
+;         (lambda (result clause) (add-to-al result (=real (->ReturnType clause)) clause))
 ;         (list) (=every-clause-of n)))))
 ;
 ;    (ag-rule
@@ -345,12 +345,12 @@
      (Clause
       (lambda (n pe)
         (att-value-compute 'ilp-eval-binvar)
-;        (let ([real-return-type (=real (->return-type n))])
+;        (let ([real-ReturnType (=real (->ReturnType n))])
         (debug "ilp-eval-binvar" n (->name pe))
-;          (if (or (eq? (->type pe) (<<- real-return-type))
-;                  (ast-subtype? (<<- real-return-type) 'HWRoot))
+;          (if (or (eq? (->type pe) (<<- real-ReturnType))
+;                  (ast-subtype? (<<- real-ReturnType) 'HWRoot))
         (list (=eval-on n (->type pe)) (=ilp-binvar-deployed (<<- n) pe))
-;              (begin (debug "not suitable" real-return-type pe) (list))))
+;              (begin (debug "not suitable" real-ReturnType pe) (list))))
         ))) ;empty pair if not a suitable clause
 
     (ag-rule
@@ -361,7 +361,7 @@
      (Clause
       (lambda (n)
         (att-value-compute 'required-hw-properties)
-        (let ([prop (=real (->return-type n))])
+        (let ([prop (=real (->ReturnType n))])
           (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
               (list (list (->comparator n) prop)) (list))))))
 
@@ -373,7 +373,7 @@
      (Clause
       (lambda (n)
         (att-value-compute 'required-hw-clauses)
-        (let ([prop (=real (->return-type n))])
+        (let ([prop (=real (->ReturnType n))])
           (if (and (ast-subtype? n 'ReqClause) (=hw? prop))
               (list (list (cons (->comparator n) prop) (list n))) (list))))))
 
