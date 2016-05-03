@@ -64,7 +64,9 @@
  (define (=value-attr n)       (att-value 'value-attr n))
  (define (=value-of n name)    (att-value 'value-of n name))
 
- (define (find-prop propname subtree) (ast-find-child* (lambda (i n) (string=? propname (->name n))) subtree))
+ (define (find-prop propname subtree)
+    (ast-find-child (lambda (i n) (and (ast-subtype? n 'RealProperty)
+                                       (string=? propname (->name n)))) subtree))
 
  (define (add-basic-ags mquat-spec)
    (with-specification
@@ -189,11 +191,9 @@
      (SWRoot (lambda (n propname) (or (find-prop propname (->RealProperty* n))
                                       (ast-find-child* (lambda (i c) (=lookup-property c propname)) (->Comp* n)))))
      (Comp (lambda (n propname) (find-prop propname (->Property* n))))
-     (HWRoot (lambda (n propname) (or (ast-find-child* (lambda (i rt) (=lookup-property rt propname)) (->ResourceType* n))
-                                      (ast-find-child* (lambda (i r) (=lookup-property r propname)) (->SubResources n)))))
-     (ResourceType (lambda (n propname) (find-prop propname (->RealProperty* n))))
-     (Resource (lambda (n propname) (or (find-prop propname (->Property* n))
-                                        (ast-find-child* (lambda (i sr) (=lookup-property sr propname)) (->SubResources n))))))
+     (HWRoot (lambda (n propname) (or (find-prop propname (->RealProperty* n))
+                                      (ast-find-child* (lambda (i rt) (=lookup-property rt propname)) (->ResourceType* n)))))
+     (ResourceType (lambda (n propname) (find-prop propname (->Property* n)))))
 
     ; <=impl: Get Impl in subtree of the Impl
     (ag-rule get-impl (Impl (lambda (n) n)))
@@ -253,7 +253,8 @@
     (ag-rule
      real
      (RealProperty (lambda (n) n))
-     (PropertyRef  (lambda (n) (debug n ", refname=" (ast-child 'refname n) ", hasParent=" (ast-has-parent? n)) (=lookup-property (<=root n) (ast-child 'refname n)))))
+     (PropertyRef  (lambda (n) ;(debug n ", refname=" (ast-child 'refname n) ", hasParent=" (ast-has-parent? n))
+                               (=lookup-property (<=root n) (ast-child 'refname n)))))
 
     ; =req-comp-map: Returns a associate list, mapping required components to a list of implementations requiring that component
     (ag-rule
