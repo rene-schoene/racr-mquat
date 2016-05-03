@@ -42,4 +42,4 @@ clean:
 	rm -rf $(LARCENY_BUILD_DIR)/*
 
 run: racket
-	fab call_racket:cli.scm,ag | tee ast-output.txt | less
+	fab call_racket:cli.scm,ag 2>&1 | tee ast-output.txt | less

@@ -48,10 +48,11 @@
      (let ([entry (assq nr types-al)])
        (if entry (cdr entry) (let ([new (make-type nr container?)]) (set! types-al (cons (cons nr new) types-al)) new))))
    (define (create-hw-clause udfs name property)
-     (let ([f (create-clause udfs default-hw-clause-gen name)])
-       (if f (let ([args (f (->name property))])
-               (if (eq? args #t) (set! args (default-hw-clause-gen (->name property))))
-               (if args ((car args) property (cadr args) (caddr args)) #f))
+     (let ([f (create-clause udfs default-hw-clause-gen name)]
+           [property-name (if (ast-subtype? property 'RealProperty) (->name property) (ast-child 'refname property))])
+       (if f (let ([args (f property-name)])
+               (if (eq? args #t) (set! args (default-hw-clause-gen property-name)))
+               (if args ((car args) property-name (cadr args) (caddr args)) #f))
            #f)))
    (define (default-hw-clause-gen property-name)
      (cond
@@ -137,13 +138,13 @@
      (cons sw-root (car (prop last-comp-nr)))))
 
  (define (create-request target-property)
-   (let* ([make-req (lambda (p maxVal digits offset) (:ReqClause mquat-spec p comp-min-eq (rand maxVal digits offset)))]
+   (let* ([make-req (lambda (propname maxVal digits offset) (:ReqClause mquat-spec (:PropertyRef mquat-spec propname) comp-min-eq (rand maxVal digits offset)))]
           [target (<<- target-property)])
      (debug "create-request: target-property = " target-property)
      (:Request
       mquat-spec
       (list (:MetaParameter mquat-spec mp-name ((rand 100 2 0))))
-      target (list (make-req target-property 1 2 0)) #f))) ;TODO: check type of target-property (terminal?, Property?)
+      target (list (make-req (->name (=real target-property)) 1 2 0)) #f))) ;TODO: check type of target-property (terminal?, Property?)
 
  ; Creates a new system.
  ; num-pe:        total number of resources
