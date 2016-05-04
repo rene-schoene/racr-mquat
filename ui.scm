@@ -38,7 +38,7 @@
                         [name (->name impl)])
                    (cons
                     (list
-                     (map (lambda (c) (->name c)) (ast-child 'reqcomps impl))
+                     (=req-comp-map impl)
                      (if (=selected? impl) (string-append "*" name) name)
                      (if (=deployed-on impl) (->name (=deployed-on impl)) #f)
                      (if (=selected? impl) (M (=mode-to-use impl)) #f))

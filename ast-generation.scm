@@ -128,7 +128,7 @@
             [does-req? (and last-comp-nr (reqc name))])
        (:Impl mquat-spec name
               (call-n-times (lambda (mode) (make-mode comp lon mode does-req? (= 1 impl))) mode-per-impl) ; Mode*
-              (if does-req? (list last-comp) (list)) #f #f))) ; reqcomps selected-mode deployed-on
+              (if does-req? (list (->name last-comp)) (list)) #f #f))) ; reqcomps selected-mode deployed-on
    (define (make-comp comp) (:Comp mquat-spec (node-name "c" (list comp))
                                    (call-n-times (lambda (impl) (make-impl comp impl)) impl-per-comp) #f
                                    (prop comp)))

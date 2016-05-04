@@ -58,7 +58,7 @@
                          (lambda _ 20) ;energy
                          rt-C1 (lambda _ 0.2) ;response-time
                          "static-mode-1a"))] ;name of Mode
-             (:Impl mquat-spec "Sample-Impl1a" (list mode1a) (list comp2) (->name cubie1) (->name mode1a)))]
+             (:Impl mquat-spec "Sample-Impl1a" (list mode1a) (list (->name comp2)) (->name cubie1) (->name mode1a)))]
           [c1-impl1b ; impl-1b is not deployed, default selected mode
            (:Impl
             mquat-spec "The-Sample-Impl1b"
@@ -87,7 +87,7 @@
               (lambda _ 100) ;energy
               rt-C1 (lambda _ 0.2) ;response-time
               "default-mode-1c"))
-            (list comp2) #f #f)]
+            (list (->name comp2)) #f #f)]
           [comp1 (:Comp mquat-spec "Example-Component" (list c1-impl1a c1-impl1b c1-impl1c) (->name c1-impl1a) (list rt-C1))])
      (:Root mquat-spec
             (:HWRoot mquat-spec (list Cubieboard) (list cubie1 cubie2) (list))

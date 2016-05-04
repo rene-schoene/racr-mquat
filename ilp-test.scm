@@ -687,14 +687,14 @@
        (let ([name (node-name prefix lon)])
          (or (ast-find-child (lambda (i child) (string=? (->name child) name)) l) (make-new))))
      (define (find-create-comp comp-nr) (find-create (->Comp* (->SWRoot ast)) "c" (list comp-nr) (lambda _ (add-comp comp-nr))))
-     (define (add-impl comp-nr impl-nr reqcomps)
-       (debug "#create new impl" comp-nr impl-nr reqcomps)
+     (define (add-impl comp-nr impl-nr reqcompnrs)
+       (debug "#create new impl" comp-nr impl-nr reqcompnrs)
        (let ([new (:Impl mquat-spec (node-name "i" (list impl-nr comp-nr)) (list)
-                         (map (lambda (nr) (find-create-comp nr)) reqcomps) #f #f)])
+                         (map (lambda (nr) (->name (find-create-comp nr))) reqcompnrs) #f #f)])
          (rewrite-add (->Impl* (find-create-comp comp-nr)) new) new))
-     (define (find-create-impl comp-nr impl-nr reqcomps) (find-create (->Impl* (find-create-comp comp-nr)) "i"
+     (define (find-create-impl comp-nr impl-nr reqcompnrs) (find-create (->Impl* (find-create-comp comp-nr)) "i"
                                                                       (list impl-nr comp-nr)
-                                                                      (lambda _ (add-impl comp-nr impl-nr reqcomps))))
+                                                                      (lambda _ (add-impl comp-nr impl-nr reqcompnrs))))
      (define (add-mode comp-nr impl-nr mode-nr req-comp-nr load-f energy-f prov-f prev-f)
        (debug "#create new mode" comp-nr impl-nr mode-nr req-comp-nr)
        (let* ([impl (find-create-impl comp-nr impl-nr (if req-comp-nr (list req-comp-nr) (list)))]

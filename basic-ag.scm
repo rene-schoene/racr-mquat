@@ -44,6 +44,10 @@
  (define (<=request n)         (att-value 'get-request n))
  (define (=real n)             (att-value 'real n))
  (define (<=root n)            (att-value 'get-root n))
+ (define (=search-comp n name) (att-value 'search-comp n name))
+ (define (=search-prov-clause n name) (att-value 'search-clause n name 'ProvClause))
+ (define (=search-req-clause n name)  (att-value 'search-clause n name 'ReqClause))
+ (define (=search-pe n name)   (att-value 'search-pe n name))
  (define (=selected-impl n)    (att-value 'selected-impl n))
  (define (=selected-mode n)    (att-value 'selected-mode n))
  (define (=selected? n)        (att-value 'selected? n))
@@ -53,6 +57,9 @@
  (define =type
    (case-lambda [(n name)      (att-value 'type n name)]
                 [(n)           (att-value 'type n)]))
+ (define (=value-attr n)       (att-value 'value-attr n))
+ (define (=value-of n name)    (att-value 'value-of n name))
+
  (define (=every-pe n)         (att-value 'every-pe n))
  (define (=every-container n)  (att-value 'every-container n))
  (define (=every-res-type n)   (att-value 'every-res-type n))
@@ -66,11 +73,6 @@
                                (att-value 'every-prov-clause n comp))
  (define (=every-sw-clause n)  (att-value 'every-sw-clause n))
  (define (=every-hw-clause n)  (att-value 'every-hw-clause n))
- (define (=search-prov-clause n name) (att-value 'search-clause n name 'ProvClause))
- (define (=search-req-clause n name)  (att-value 'search-clause n name 'ReqClause))
- (define (=search-pe n name)   (att-value 'search-pe n name))
- (define (=value-attr n)       (att-value 'value-attr n))
- (define (=value-of n name)    (att-value 'value-of n name))
 
  (define (find-prop propname subtree)
     (ast-find-child (lambda (i n) (and (ast-subtype? n 'RealProperty)
@@ -281,7 +283,7 @@
                         (add-to-al result-for-impl req impl))
                       result-for-comp (=req-comp-map impl))) ;fold over reqs of impl
          (list) (->* (->Impl* n))))) ;fold over impls
-     (Impl (lambda (n) (ast-child 'reqcomps n))))
+     (Impl (lambda (n) (map (lambda (compname) (=search-comp n compname)) (ast-child 'reqcomps n)))))
 
     ; =req-comp-min: Returns a minimal list of required components
     (ag-rule
@@ -289,13 +291,13 @@
      (Comp
       (lambda (n)
         (fold-left
-         (lambda (result impl) (intersect-b #f result (ast-child 'reqcomps impl)))
+         (lambda (result impl) (intersect-b #f result (=req-comp-map impl)))
          #f (->* (->Impl* n))))))
 
     ; =req-comp-all: Returns a list list of all possible required components
     (ag-rule
      req-comp-all
-     (Comp (lambda (n) (fold-left (lambda (result impl) (union result (ast-child 'reqcomps impl))) (list) (->* (->Impl* n))))))
+     (Comp (lambda (n) (fold-left (lambda (result impl) (union result (=req-comp-map impl))) (list) (->* (->Impl* n))))))
 
     ; <=request: Get request from every node
     (ag-rule get-request (Root (lambda (n) (ast-child 'Request n))))
@@ -316,6 +318,11 @@
          (lambda (index clause)
            (and (ast-subtype? clause subtype) (string=? (->name (=real (->ReturnType clause))) name)))
          (->Clause* n)))))
+
+    ; =search-comp: Search for a component with the given name
+    (ag-rule
+     search-comp
+     (Root (lambda (n name) (ast-find-child (lambda (i c) (string=? (->name c) name)) (->Comp* (->SWRoot n))))))
 
     ; =search-pe: Search for a resource with the given name
     (ag-rule
@@ -345,8 +352,9 @@
     ; [DEBUGGING] Returns the unit of the RealProperty the PropertyRef is pointing to
     (ag-rule remote-unit (PropertyRef (lambda (n) (->unit (=real n)))))
 
-    ; [DEBUGGING] Returns the names of all implementations of the Component the Request is pointing to
-    (ag-rule remote-impls (Request (lambda (n) (map ->name (->* (->Impl* (=target n)))))))
+    ; [DEBUGGING] Returns the names of all implementations of the Component, either the Request or the impl requiring it, is pointing to
+    (ag-rule remote-impls (Request (lambda (n) (map ->name (->* (->Impl* (=target n))))))
+                          (Impl (lambda (n) (map ->name (=req-comp-map n)))))
 
     ; [DEBUGGING] Returns the names of all modes of the selected implementation the Component is pointing to
     (ag-rule remote-modes (Comp (lambda (n) (let ([si (=selected-impl n)]) (if si (map ->name (->* (->Mode* si))) "No impl selected")))))
