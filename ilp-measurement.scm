@@ -300,7 +300,7 @@
                  req-comp-nr (lambda _ 0.8) ;req-comp-nr load-f
                  (lambda _ 20) (lambda _ 2) (lambda _ 7)) ;energy-f prov-f prev-f
        ;adjust request to target new comp
-       (rewrite-terminal 'target (<=request ast) (find-create-comp ast new-comp-nr))))
+       (rewrite-terminal 'target (<=request ast) (->name (find-create-comp ast new-comp-nr)))))
    (let* ([ast (cst id-s specs)]
           [rt (ast-child 1 (->ResourceType* (->HWRoot ast)))]
           [pe+parent (lambda (pe) (cons pe (<- pe)))]

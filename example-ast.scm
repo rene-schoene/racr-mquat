@@ -47,8 +47,8 @@
                           (* 1.5 mp-size))))
                   rt-C2 (lambda _ 0.5) ;response-time
                   "dynamic-mode-2a"))] ;name of Mode
-             (:Impl mquat-spec "Part-Impl2a" (list mode2a) (list) cubie1 mode2a))]
-          [comp2 (:Comp mquat-spec "Depth2-Component" (list part-impl2a) part-impl2a (list rt-C2))]
+             (:Impl mquat-spec "Part-Impl2a" (list mode2a) (list) (->name cubie1) (->name mode2a)))]
+          [comp2 (:Comp mquat-spec "Depth2-Component" (list part-impl2a) (->name part-impl2a) (list rt-C2))]
           [rt-C1 (make-simple-prop "response-time-C1" "ms" agg-sum)]
           [c1-impl1a
            (let
@@ -58,7 +58,7 @@
                          (lambda _ 20) ;energy
                          rt-C1 (lambda _ 0.2) ;response-time
                          "static-mode-1a"))] ;name of Mode
-             (:Impl mquat-spec "Sample-Impl1a" (list mode1a) (list comp2) cubie1 mode1a))]
+             (:Impl mquat-spec "Sample-Impl1a" (list mode1a) (list comp2) (->name cubie1) (->name mode1a)))]
           [c1-impl1b ; impl-1b is not deployed, default selected mode
            (:Impl
             mquat-spec "The-Sample-Impl1b"
@@ -88,7 +88,7 @@
               rt-C1 (lambda _ 0.2) ;response-time
               "default-mode-1c"))
             (list comp2) #f #f)]
-          [comp1 (:Comp mquat-spec "Example-Component" (list c1-impl1a c1-impl1b c1-impl1c) c1-impl1a (list rt-C1))])
+          [comp1 (:Comp mquat-spec "Example-Component" (list c1-impl1a c1-impl1b c1-impl1c) (->name c1-impl1a) (list rt-C1))])
      (:Root mquat-spec
             (:HWRoot mquat-spec (list Cubieboard) (list cubie1 cubie2) (list))
             (:SWRoot mquat-spec (list comp1 comp2) (list energy))
@@ -104,4 +104,4 @@
  (define cb1 (ast-child 1 (->SubResources (->HWRoot the-example-ast))))
  (define cb2 (ast-child 2 (->SubResources (->HWRoot the-example-ast))))
 
- (define (print-the-example-ast) (display-ast the-example-ast 'remote-unit 'remote-container)))
+ (define (print-the-example-ast) (display-ast the-example-ast 'remote-unit 'remote-container 'remote-impls 'remote-modes 'remote-props)))

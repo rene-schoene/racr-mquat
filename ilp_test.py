@@ -10,7 +10,7 @@ try:
 	from fabric.api import task
 except ImportError:
 	from fabric_workaround import task
-import utils
+import utils, properties
 from utils import local_quiet, assertTrue, assertTrueAssertion
 
 NUM_PROCESSORS = 4
@@ -36,6 +36,11 @@ def do_run(call_impl, given_ranges):
 	if not ranges:
 		print 'No test matches {0}. Aborting.'.format(list(given_ranges))
 		sys.exit(1)
+
+	# disable profiling as it disturbs ilp output
+	properties.profiling.value = False
+	properties.profiling.write_value()
+
 	test_ids = []
 	for lb,ub in ranges:
 		test_ids.extend(range(lb,ub+1))

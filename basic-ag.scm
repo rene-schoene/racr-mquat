@@ -8,7 +8,7 @@
  (mquat basic-ag)
  (export add-basic-ags
          =objective-val =objective-name =clauses-met?
-         =mode-to-use =selected? =deployed? =hw?
+         =mode-to-use =selected-impl =selected? =deployed-on =hw?
          =req-comp-map =req-comp-min =req-comp-all =real =target =type
          =eval =eval-on =value-of =actual-value =value-attr =maximum
          <=request <=impl <=comp
@@ -21,7 +21,7 @@
  (define (=actual-value n)     (att-value 'actual-value n))
  (define (=clauses-met? n)     (att-value 'clauses-met? n))
  (define (<=comp n)            (att-value 'get-comp n))
- (define (=deployed? n)        (att-value 'deployed? n))
+ (define (=deployed-on n)      (att-value 'deployed-on n))
  (define (=eval n)             (att-value 'eval n))
  (define (=eval-on n pe)       (att-value 'eval-on n pe))
  (define (=hw? n)              (att-value 'hw? n))
@@ -45,6 +45,7 @@
  (define (=real n)             (att-value 'real n))
  (define (<=root n)            (att-value 'get-root n))
  (define (=selected-impl n)    (att-value 'selected-impl n))
+ (define (=selected-mode n)    (att-value 'selected-mode n))
  (define (=selected? n)        (att-value 'selected? n))
  (define =target
    (case-lambda [(n name)      (att-value 'target n name)]
@@ -88,7 +89,7 @@
               [target (<<- (=real (->ReturnType n)))])
           ((->value (if (ast-subtype? target 'ResourceType)
                         ; hw → search in deployedon for name and type
-                        (=provided-clause (->deployed-on (<=impl n)) propName target)
+                        (=provided-clause (=deployed-on (<=impl n)) propName target)
                         ; sw → search in target-component
                         (=provided-clause (=mode-to-use (=selected-impl target)) propName)))
            (->MetaParameter* (<=request n)))))) ; Params from request, applied to the value function
@@ -108,8 +109,11 @@
      (ProvClause (lambda (n) #t)) ; Provision clauses are always fulfilled
      (Request    (lambda (n) (for-all =clauses-met? (->* (->Constraints n))))))
 
-    ; =deployed?: Returns #t, if the Implementation is deployed somewhere
-    (ag-rule deployed? (Impl (lambda (n) (ast-node? (->deployed-on n)))))
+    ; =deployed-on: Resolves the resource the implementation is deployed on; #f if not deployed anywhere
+    (ag-rule
+     deployed-on
+     (Impl (lambda (n) (let ([d (ast-child 'deployed-on n)])
+                            (and d (=search-pe n d))))))
 
     ; =eval: Call the function of a Clause with the MetaParams-AST-node of the request and on the current deployed resource type
     (ag-rule
@@ -119,7 +123,7 @@
         ; If inside a mode and impl of mode is selected, or outside of a mode ...
         (att-value 'eval-on n (if (and (ast-subtype? (<<- n) 'Mode) (=selected? (<=impl n)))
                                   ; use the resource deployed-on...
-                                  (->deployed-on (<=impl n))
+                                  (=deployed-on (<=impl n))
                                   #f))))) ; ... else evaluate it with #f as target
 
     ; =eval: Call the function of a Clause with the MetaParams-AST-node of the request and on the given resource type
@@ -216,7 +220,7 @@
      (ResourceType (lambda (n prop) (map (lambda (pe) (=lookup-clause pe prop)) (=resources-of n)))))
 
     ; =mode-to-use: Return either the selected-mode or the first mode
-    (ag-rule mode-to-use (Impl (lambda (n) (or (->selected-mode n) (ast-child 1 (->Mode* n))))))
+    (ag-rule mode-to-use (Impl (lambda (n) (or (=selected-mode n) (ast-child 1 (->Mode* n))))))
 
     ; =objective-name: Get the name of the objective, defaults to pn-energy
     (ag-rule objective-name (Root (lambda (n) (or (->objective (<=request n)) pn-energy))))
@@ -320,6 +324,12 @@
      (Resource (lambda (n name) (or (string=? (->name n) name) (ast-find-child (lambda (i pe) (=search-pe pe name))
                                                                                (->SubResources n))))))
 
+    ; =selected-mode: Resolves the selected mode of an implementation
+    (ag-rule
+     selected-mode
+     (Impl (lambda (n) (let ([sm (ast-child 'selectedmode n)])
+                           (and sm (ast-find-child (lambda (i m) (string=? sm (->name m))) (->Mode* n)))))))
+
     ; =selected-impl: Resolves the selected implementation of a component
     (ag-rule
      selected-impl
@@ -335,8 +345,14 @@
     ; [DEBUGGING] Returns the unit of the RealProperty the PropertyRef is pointing to
     (ag-rule remote-unit (PropertyRef (lambda (n) (->unit (=real n)))))
 
-    ; [DEBUGGING] Returns the names of all implements of the Component the Request is pointing to
+    ; [DEBUGGING] Returns the names of all implementations of the Component the Request is pointing to
     (ag-rule remote-impls (Request (lambda (n) (map ->name (->* (->Impl* (=target n)))))))
+
+    ; [DEBUGGING] Returns the names of all modes of the selected implementation the Component is pointing to
+    (ag-rule remote-modes (Comp (lambda (n) (let ([si (=selected-impl n)]) (if si (map ->name (->* (->Mode* si))) "No impl selected")))))
+
+    ; [DEBUGGING] Returns the property names of all clauses of the selected mode the Implementation is pointing to
+    (ag-rule remote-props (Impl (lambda (n) (let ([sm (=selected-mode n)]) (if sm (map (lambda (cl) (->name (=real (->ReturnType cl)))) (->* (->Clause* sm))) "No mode selected")))))
 
     ; =target: Resolves the component of a Request
     (ag-rule

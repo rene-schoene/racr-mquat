@@ -700,16 +700,17 @@
        (let* ([impl (find-create-impl comp-nr impl-nr (if req-comp-nr (list req-comp-nr) (list)))]
               [find-prop-hw (lambda (name) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
                                                             (->Property* (car (->* (->ResourceType* (->HWRoot ast)))))))]
-              [find-prop-sw (lambda (name comp) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
-                                                                 (->Property* comp)))]
+              ; [find-prop-sw (lambda (name comp) (ast-find-child (lambda (i child) (string=? (->name (=real child)) name))
+              ;                                                    (->Property* comp)))]
               [load (find-prop-hw pn-load)]
-              [energy (find-prop-sw pn-energy (find-create-comp comp-nr))]
-              [prev-p (and req-comp-nr (find-prop-sw (node-name "p" (list req-comp-nr)) (find-create-comp req-comp-nr)))]
-              [this-p (find-prop-sw (node-name "p" (list comp-nr)) (find-create-comp comp-nr))]
+;              [energy (find-prop-sw pn-energy (find-create-comp comp-nr))]
+;              [prev-p (and req-comp-nr (find-prop-sw (node-name "p" (list req-comp-nr)) (find-create-comp req-comp-nr)))]
+;              [this-p (find-prop-sw (node-name "p" (list comp-nr)) (find-create-comp comp-nr))]
               [clauses (filter (lambda (c) c) (list (:ReqClause mquat-spec (:PropertyRef mquat-spec pn-load) comp-max-eq load-f)
                                                     (:ProvClause mquat-spec (:PropertyRef mquat-spec pn-energy) comp-max-eq energy-f)
-                                                    (:ProvClause mquat-spec (:PropertyRef mquat-spec (->name this-p)) comp-max-eq prov-f)
-                                                    (and req-comp-nr (:ReqClause mquat-spec (:PropertyRef mquat-spec (->name prev-p)) comp-max-eq prev-f))))]
+                                                    (:ProvClause mquat-spec (:PropertyRef mquat-spec (node-name "p" (list comp-nr))) comp-max-eq prov-f)
+                                                    (and req-comp-nr (:ReqClause mquat-spec (:PropertyRef mquat-spec (node-name "p" (list req-comp-nr)))
+                                                                                 comp-max-eq prev-f))))]
               [new (:Mode mquat-spec (node-name "m" (list mode-nr impl-nr comp-nr)) clauses)])
          (rewrite-add (->Mode* impl) new) new))
      (define (prov-obj val id) (+ val (/ id 1e3)))
@@ -737,7 +738,7 @@
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)
         (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))
-        (rewrite-terminal 'target (<=request ast) (find-create-comp 2))]
+        (rewrite-terminal 'target (<=request ast) (->name (find-create-comp 2)))]
        [(604) ; New component with one impl and one mode and using the existing comp
         ; High load on res-1, high load required for comp-1-modes, low load required for new comp/mode
         ; Expected outcome: mode-1-1-1 on res-1 and (new) mode-2-1-1 on res-2
@@ -747,7 +748,7 @@
         (remove-req-constraints ast)
         (save-ilp tmp-lp ast)
         (add-mode 2 1 1 1 (lambda _ 0.8) (lambda _ 20) (lambda _ 2) (lambda _ 7))
-        (rewrite-terminal 'target (<=request ast) (find-create-comp 2))]
+        (rewrite-terminal 'target (<=request ast) (->name (find-create-comp 2)))]
        [(605) ; New component using the existing comp, with one impl and one mode. Request still targets old component.
         ; Expected outcome: mode-1-1-1 on either res-1 or res-2
         (change-sw-req ast "load" comp-max-eq 0.8)

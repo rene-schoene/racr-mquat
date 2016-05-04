@@ -40,7 +40,7 @@
                     (list
                      (map (lambda (c) (->name c)) (ast-child 'reqcomps impl))
                      (if (=selected? impl) (string-append "*" name) name)
-                     (if (=deployed? impl) (->name (->deployed-on impl)) #f)
+                     (if (=deployed-on impl) (->name (=deployed-on impl)) #f)
                      (if (=selected? impl) (M (=mode-to-use impl)) #f))
                     (I (cdr loi))))))])
      (fold-left
@@ -87,21 +87,21 @@
  
  ; Given a component (or an impl) and a resource, change deployed-on of the selected impl
  ; of the given component (or the given impl) to the given resource, returning the old resource
- (define (deploy-on x new-pe) (rewrite-terminal 'deployedon (if (ast-subtype? x 'Comp) (=selected-impl x) x) new-pe))
+ (define (deploy-on x new-pe) (rewrite-terminal 'deployedon (if (ast-subtype? x 'Comp) (=selected-impl x) x) (->name new-pe)))
  
  (define (use-next-impl comp)
    (let* ([former-impl (=selected-impl comp)]
           [former-index (ast-child-index former-impl)]
           [num-impls (ast-num-children (->Impl* comp))]
-          [former-deployed (->deployed-on former-impl)]
+          [former-deployed (=deployed-on former-impl)]
           [new-index (+ (mod former-index num-impls) 1)]
           [new-impl (ast-sibling new-index former-impl)]
           [first-new-mode (car (->* (->Mode* new-impl)))])
      (rewrite-terminal 'deployedon former-impl #f)
      (rewrite-terminal 'selectedmode former-impl #f)
      (rewrite-terminal 'selectedimpl comp (->name new-impl))
-     (rewrite-terminal 'deployedon new-impl former-deployed)
-     (rewrite-terminal 'selectedmode new-impl first-new-mode) ; use first mode
+     (rewrite-terminal 'deployedon new-impl (->name former-deployed))
+     (rewrite-terminal 'selectedmode new-impl (->name first-new-mode)) ; use first mode
      new-impl))
  
  (define (display-part node . attributes)
