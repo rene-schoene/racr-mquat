@@ -10,7 +10,7 @@
          ->name ->Property* ->* <- <<- ->SubResources ->value ; common
          ->HWRoot ->SWRoot ; Root
          ->Comp* ->RealProperty* ; SWRoot
-         ->Impl* ->selected-impl ; Comp
+         ->Impl* ; Comp
          ->Mode* ->deployed-on ->selected-mode ; Impl
          ->Clause* ; Mode
          ->ReturnType ->comparator ; Clause
@@ -31,7 +31,7 @@
  (define (->RealProperty* n)  (ast-child 'RealProperty* n))
  (define (->name n)           (ast-child 'name n))
  (define (->Impl* n)          (ast-child 'Impl* n))
- (define (->selected-impl n)  (ast-child 'selectedimpl n))
+; (define (->selected-impl n)  (ast-child 'selectedimpl n))
  (define (->Property* n)      (ast-child 'Property* n))
  (define (->deployed-on n)    (ast-child 'deployedon n))
  (define (->selected-mode n)  (ast-child 'selectedmode n))
@@ -77,6 +77,7 @@
 
     (ast-rule 'Root->HWRoot-SWRoot-Request-config)
     (ast-rule 'SWRoot->Comp*-RealProperty*)
+    ; selectedimpl points to a Impl
     (ast-rule 'Comp->name-Impl*-selectedimpl-Property*)
     (ast-rule 'Impl->name-Mode*-reqcomps-deployedon-selectedmode)
     (ast-rule 'Mode->name-Clause*)

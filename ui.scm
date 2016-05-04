@@ -87,10 +87,10 @@
  
  ; Given a component (or an impl) and a resource, change deployed-on of the selected impl
  ; of the given component (or the given impl) to the given resource, returning the old resource
- (define (deploy-on x new-pe) (rewrite-terminal 'deployedon (if (ast-subtype? x 'Comp) (->selected-impl x) x) new-pe))
+ (define (deploy-on x new-pe) (rewrite-terminal 'deployedon (if (ast-subtype? x 'Comp) (=selected-impl x) x) new-pe))
  
  (define (use-next-impl comp)
-   (let* ([former-impl (->selected-impl comp)]
+   (let* ([former-impl (=selected-impl comp)]
           [former-index (ast-child-index former-impl)]
           [num-impls (ast-num-children (->Impl* comp))]
           [former-deployed (->deployed-on former-impl)]
@@ -99,7 +99,7 @@
           [first-new-mode (car (->* (->Mode* new-impl)))])
      (rewrite-terminal 'deployedon former-impl #f)
      (rewrite-terminal 'selectedmode former-impl #f)
-     (rewrite-terminal 'selectedimpl comp new-impl)
+     (rewrite-terminal 'selectedimpl comp (->name new-impl))
      (rewrite-terminal 'deployedon new-impl former-deployed)
      (rewrite-terminal 'selectedmode new-impl first-new-mode) ; use first mode
      new-impl))

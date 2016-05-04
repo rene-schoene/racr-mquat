@@ -44,6 +44,7 @@
  (define (<=request n)         (att-value 'get-request n))
  (define (=real n)             (att-value 'real n))
  (define (<=root n)            (att-value 'get-root n))
+ (define (=selected-impl n)    (att-value 'selected-impl n))
  (define (=selected? n)        (att-value 'selected? n))
  (define =target
    (case-lambda [(n name)      (att-value 'target n name)]
@@ -89,7 +90,7 @@
                         ; hw → search in deployedon for name and type
                         (=provided-clause (->deployed-on (<=impl n)) propName target)
                         ; sw → search in target-component
-                        (=provided-clause (=mode-to-use (->selected-impl target)) propName)))
+                        (=provided-clause (=mode-to-use (=selected-impl target)) propName)))
            (->MetaParameter* (<=request n)))))) ; Params from request, applied to the value function
      (ProvClause (lambda (n) (=eval n))))
 
@@ -100,7 +101,7 @@
     (ag-rule
      clauses-met?
      (Root       (lambda (n) (and (=clauses-met? (<=request n)) (for-all =clauses-met? (->* (->Comp* (->SWRoot n)))))))
-     (Comp       (lambda (n) (=clauses-met? (->selected-impl n))))
+     (Comp       (lambda (n) (=clauses-met? (=selected-impl n))))
      (Impl       (lambda (n) (=clauses-met? (=mode-to-use n))))
      (Mode       (lambda (n) (for-all =clauses-met? (->* (->Clause* n)))))
      (ReqClause  (lambda (n) ((comp->f (->comparator n)) (=eval n) (=actual-value n))))
@@ -225,7 +226,7 @@
      objective-value
      (Root   (lambda (n)   (=objective-val (->SWRoot n))))
      (SWRoot (lambda (n)   (fold-left (lambda (total comp) (+ total (=objective-val comp))) 0 (->* (->Comp* (->SWRoot n))))))
-     (Comp   (lambda (n)   (=objective-val (->selected-impl n))))
+     (Comp   (lambda (n)   (=objective-val (=selected-impl n))))
      (Impl   (lambda (n)   (=objective-val (=mode-to-use n))))
      (Mode   (lambda (n)   (=eval (=provided-clause n (=objective-name n))))))
 
@@ -319,8 +320,14 @@
      (Resource (lambda (n name) (or (string=? (->name n) name) (ast-find-child (lambda (i pe) (=search-pe pe name))
                                                                                (->SubResources n))))))
 
+    ; =selected-impl: Resolves the selected implementation of a component
+    (ag-rule
+     selected-impl
+     (Comp (lambda (n) (let ([si (ast-child 'selectedimpl n)])
+                            (and si (ast-find-child (lambda (j i) (string=? si (->name i))) (->Impl* n)))))))
+
     ; =selected?: Returns #t, if the Implementation is selected by its component
-    (ag-rule selected? (Impl (lambda (n) (eq? (->selected-impl (<<- n)) n))))
+    (ag-rule selected? (Impl (lambda (n) (eq? (=selected-impl (<<- n)) n))))
 
     ; [DEBUGGING] Returns whether the ResourceType, the Resource is pointing to, is a container
     (ag-rule remote-container (Resource (lambda (n) (->container? (=type n)))))
