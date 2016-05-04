@@ -17,7 +17,7 @@
          ->ResourceType* ; HWRoot
          ->container? ; ResourceType
          ->status ->ProvClause* ; Resource
-         ->MetaParameter* ->target ->Constraints ->objective ; Request
+         ->MetaParameter* ->Constraints ->objective ; Request
          ->unit ->kind ->direction ->agg ; Property
          :Root :RealProperty :PropertyRef
          :SWRoot :Comp :Impl :Mode :ReqClause :ProvClause
@@ -43,7 +43,6 @@
  (define (->container? n)     (ast-child 'container n))
  (define (->ProvClause* n)    (ast-child 'ProvClause* n))
  (define (->MetaParameter* n) (ast-child 'MetaParameter* n))
- (define (->target n)         (ast-child 'target n))
  (define (->Constraints n)    (ast-child 'Constraints n))
  (define (->objective n)      (ast-child 'objective n))
  (define (->ReturnType n)     (ast-child 'ReturnType n))
@@ -91,6 +90,7 @@
     (ast-rule 'ResourceType->name-container-Property*)
     ; typename points to a ResourceType
     (ast-rule 'Resource->name-typename-status-Resource*<SubResources-ProvClause*)
+    ; target points to a Comp
     (ast-rule 'Request->MetaParameter*-target-ReqClause*<Constraints-objective)
     (ast-rule 'MetaParameter->name-value)
     (ast-rule 'Property->)

@@ -293,7 +293,7 @@
  ; 11 remove some modes
  (define (run-complex-test id-s specs)
    (define (new-request-comp ast)
-     (let ([req-comp-nr (ast-child-index (->target (<=request ast)))]
+     (let ([req-comp-nr (ast-child-index (=target (<=request ast)))]
            [new-comp-nr (+ 1 (ast-num-children (->Comp* (->SWRoot ast))))])
        ;params of add-mode: ast comp-nr impl-nr mode-nr req-comp-nr load-f energy-f prov-f prev-f
        (add-mode ast new-comp-nr 1 1 ;comp-nr impl-nr mode-nr

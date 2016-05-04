@@ -92,7 +92,7 @@
      (:Root mquat-spec
             (:HWRoot mquat-spec (list Cubieboard) (list cubie1 cubie2) (list))
             (:SWRoot mquat-spec (list comp1 comp2) (list energy))
-            (:Request mquat-spec (list (make-mp-size 50)) comp1
+            (:Request mquat-spec (list (make-mp-size 50)) (->name comp1)
                       (list (:ReqClause mquat-spec (make-ref rt-C1) comp-max-eq (lambda _ 0.3))) #f) #f)))
 
  (define comp1 (ast-child 1 (->Comp* (->SWRoot the-example-ast))))

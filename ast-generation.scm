@@ -139,7 +139,7 @@
 
  (define (create-request target-property)
    (let* ([make-req (lambda (propname maxVal digits offset) (:ReqClause mquat-spec (:PropertyRef mquat-spec propname) comp-min-eq (rand maxVal digits offset)))]
-          [target (<<- target-property)])
+          [target (->name (<<- target-property))])
      (debug "create-request: target-property = " target-property)
      (:Request
       mquat-spec

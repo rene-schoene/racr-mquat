@@ -9,7 +9,7 @@
  (export add-basic-ags
          =objective-val =objective-name =clauses-met?
          =mode-to-use =selected? =deployed? =hw?
-         =req-comp-map =req-comp-min =req-comp-all =real =type
+         =req-comp-map =req-comp-min =req-comp-all =real =target =type
          =eval =eval-on =value-of =actual-value =value-attr =maximum
          <=request <=impl <=comp
          =search-prov-clause =search-req-clause =search-pe =provided-clause
@@ -45,6 +45,9 @@
  (define (=real n)             (att-value 'real n))
  (define (<=root n)            (att-value 'get-root n))
  (define (=selected? n)        (att-value 'selected? n))
+ (define =target
+   (case-lambda [(n name)      (att-value 'target n name)]
+                [(n)           (att-value 'target n)]))
  (define =type
    (case-lambda [(n name)      (att-value 'type n name)]
                 [(n)           (att-value 'type n)]))
@@ -152,14 +155,14 @@
     ; =every-comp: Returns a list containing every component, that may be needed for the request
     (ag-rule
      every-comp
-     (Root (lambda (n) (=every-comp (->target (<=request n)))))
+     (Root (lambda (n) (=every-comp (=target (<=request n)))))
      (Comp (lambda (n) (cons n (fold-left (lambda (result c) (append (=every-comp c) result))
                                           (list) (=req-comp-all n))))))
 
     ; =every-impl: Returns a list containing every implementation, that may be needed for the request
     (ag-rule
      every-impl
-     (Root (lambda (n) (=every-impl (->target (<=request n)))))
+     (Root (lambda (n) (=every-impl (=target (<=request n)))))
      (Comp (lambda (n) (append (->* (->Impl* n)) (fold-left (lambda (result c) (append (=every-impl c) result))
                                                             (list) (=req-comp-all n))))))
 
@@ -319,11 +322,20 @@
     ; =selected?: Returns #t, if the Implementation is selected by its component
     (ag-rule selected? (Impl (lambda (n) (eq? (->selected-impl (<<- n)) n))))
 
-    ; =remote-container: Returns whether the ResourceType, the Resource is pointing to, is a container
+    ; [DEBUGGING] Returns whether the ResourceType, the Resource is pointing to, is a container
     (ag-rule remote-container (Resource (lambda (n) (->container? (=type n)))))
 
-    ; =remote-unit: Returns the unit of the RealProperty the PropertyRef is pointing to
+    ; [DEBUGGING] Returns the unit of the RealProperty the PropertyRef is pointing to
     (ag-rule remote-unit (PropertyRef (lambda (n) (->unit (=real n)))))
+
+    ; [DEBUGGING] Returns the names of all implements of the Component the Request is pointing to
+    (ag-rule remote-impls (Request (lambda (n) (map ->name (->* (->Impl* (=target n)))))))
+
+    ; =target: Resolves the component of a Request
+    (ag-rule
+     target
+     (Request (lambda (n) (=target (<=root n) (ast-child 'target n))))
+     (Root (lambda (n compname) (ast-find-child (lambda (i c) (string=? compname (->name c))) (->Comp* (->SWRoot n))))))
 
     ; =type: Resolves the type of a Resource
     (ag-rule

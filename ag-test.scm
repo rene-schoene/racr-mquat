@@ -16,4 +16,4 @@
 
  (define (do-it . args)
    (let ([ast (create-system 10 0 3 4 5)])
-     (display-ast ast 'remote-unit 'remote-container))))
+     (display-ast ast 'remote-unit 'remote-container 'remote-impls))))

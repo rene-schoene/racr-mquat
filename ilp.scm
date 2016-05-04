@@ -177,7 +177,7 @@
                (list "-" (=ilp-binvar n) "=" 0)
                (=every-container n))))))
 
-    (ag-rule request-target? (Comp (lambda (n) (eq? (->target (<=request n)) n))))
+    (ag-rule request-target? (Comp (lambda (n) (eq? (=target (<=request n)) n))))
 
     (ag-rule
      ilp-objective
@@ -222,9 +222,9 @@
       (lambda (n)
         (att-value-compute 'ilp-nego-sw)
         (cons (cons "request_target: " (fold-left (lambda (result impl) (cons* "+" (=ilp-binvar impl) result))
-                                                  (list "=" 1) (->* (->Impl* (->target n)))))
+                                                  (list "=" 1) (->* (->Impl* (=target n)))))
               (make-constraints
-               (=ilp-nego-reqc (->target n) 'ProvClause comp-eq) ;provs
+               (=ilp-nego-reqc (=target n) 'ProvClause comp-eq) ;provs
                (=ilp-nego-reqc n comp-max-eq) ;max-reqs
                (=ilp-nego-reqc n comp-min-eq) #t))))) ;min-reqs,request?
     (ag-rule
