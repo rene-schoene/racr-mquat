@@ -136,13 +136,13 @@
 
 (define (add-worker-to-ast id parent-id device-type time)
   (info ° "add-worker-to-ast" id parent-id device-type time) (flush-output-port (current-output-port))
-  (let ([new-pe (:Resource ms (r id) Cubieboard offline (list) (list))]
+  (let ([new-pe (:Resource ms (r id) (->name Cubieboard) offline (list) (list))]
         [parent-pe (search-parent parent-id)])
     (rewrite-add (->SubResources parent-pe) new-pe)))
 
 (define (add-switch-to-ast id parent-id time)
   (info ° "add-switch-to-ast" id parent-id time) (flush-output-port (current-output-port))
-  (let ([new-pe (:Resource ms (r id) Switch offline (list) (list))]
+  (let ([new-pe (:Resource ms (r id) (->name Switch) offline (list) (list))]
         [parent-pe (search-parent parent-id)])
     (rewrite-add (->SubResources parent-pe) new-pe)))
 

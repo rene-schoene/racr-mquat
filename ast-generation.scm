@@ -46,7 +46,7 @@
                                                     (list (:PropertyRef mquat-spec pn-load) (:PropertyRef mquat-spec pn-freq))))
    (define (type nr container?)
      (let ([entry (assq nr types-al)])
-       (if entry (cdr entry) (let ([new (make-type nr container?)]) (set! types-al (cons (cons nr new) types-al)) new))))
+       (->name (if entry (cdr entry) (let ([new (make-type nr container?)]) (set! types-al (cons (cons nr new) types-al)) new)))))
    (define (create-hw-clause udfs name property)
      (let ([f (create-clause udfs default-hw-clause-gen name)]
            [property-name (if (ast-subtype? property 'RealProperty) (->name property) (ast-child 'refname property))])

@@ -16,7 +16,7 @@
          ->ReturnType ->comparator ; Clause
          ->ResourceType* ; HWRoot
          ->container? ; ResourceType
-         ->type ->status ->ProvClause* ; Resource
+         ->status ->ProvClause* ; Resource
          ->MetaParameter* ->target ->Constraints ->objective ; Request
          ->unit ->kind ->direction ->agg ; Property
          :Root :RealProperty :PropertyRef
@@ -39,7 +39,6 @@
  (define (->Clause* n)        (ast-child 'Clause* n))
  (define (->ResourceType* n)  (ast-child 'ResourceType* n))
  (define (->SubResources n)   (ast-child 'SubResources n))
- (define (->type n)           (ast-child 'type n))
  (define (->status n)         (ast-child 'status n))
  (define (->container? n)     (ast-child 'container n))
  (define (->ProvClause* n)    (ast-child 'ProvClause* n))
@@ -90,8 +89,8 @@
     (ast-rule 'ProvClause:Clause->)
     (ast-rule 'HWRoot->ResourceType*-Resource*<SubResources-RealProperty*)
     (ast-rule 'ResourceType->name-container-Property*)
-    ; type is a ResourceType
-    (ast-rule 'Resource->name-type-status-Resource*<SubResources-ProvClause*)
+    ; typename points to a ResourceType
+    (ast-rule 'Resource->name-typename-status-Resource*<SubResources-ProvClause*)
     (ast-rule 'Request->MetaParameter*-target-ReqClause*<Constraints-objective)
     (ast-rule 'MetaParameter->name-value)
     (ast-rule 'Property->)

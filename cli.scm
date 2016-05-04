@@ -5,7 +5,7 @@
 ; Author: R. Schöne
 
 (import (rnrs) (mquat ilp-measurement)
- (mquat ilp-test) (mquat ag-test) (mquat utils))
+ (mquat ilp-test) (mquat ag-test) (mquat utils) (mquat example-ast))
 
 (define (print-usage) (error 'cli "No valid arguments found, either use 'test' or 'measure' as first parameter."))
 
@@ -16,4 +16,5 @@
   [(string=? "test" (car cmds)) (test-cli-call (cdr cmds))]
   [(string=? "measure" (car cmds)) (measurement-cli-call (cdr cmds))]
   [(string=? "ag" (car cmds)) (do-it (cdr cmds))]
+  [(string=? "ea" (car cmds)) (print-the-example-ast)]
   [else (print-usage)])

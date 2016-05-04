@@ -58,7 +58,7 @@
                        [rest (R (cdr lor))])
                    (cons
                     (list
-                     (->name (->type (car lor))) ; resource type name
+                     (->name (=type (car lor))) ; resource type name
                      (->name (car lor)) ; resource name
                      (clauses-to-list (->* (->ProvClause* (car lor))))) ; list of clauses
                     (if (null? subs) rest (cons subs rest))))))])
@@ -104,9 +104,12 @@
      (rewrite-terminal 'selectedmode new-impl first-new-mode) ; use first mode
      new-impl))
  
- (define (display-part node)
+ (define (display-part node . attributes)
    (define (print name) (cons name (lambda (v) v)))
-   (define printer (list)); (print 'eval)))
+   ; (define printer (list)); (print 'eval)))
+   (define printer (map (lambda (att) (print att)) (car attributes)))
+   ; (display (car attributes)) (newline)
+   ; (display (list 'remote-unit 'remote-container)) (newline)
    (print-ast node printer (current-output-port)))
  
- (define (display-ast ast) (display-part ast)))
+ (define (display-ast ast . attributes) (display-part ast attributes)))

@@ -193,7 +193,7 @@
          (list) (=every-mode n))))
      (Resource (lambda (n mode) (att-value-compute 'ilp-objective)
                  (debug n mode) (list (prepend-sign (=eval-on (=provided-clause mode (=objective-name n))
-                                                              (->type n)))
+                                                              (=type n)))
                                       (=ilp-binvar-deployed mode n)))))
 
     ; Creates a list of NFP-negotiation constraints
@@ -315,7 +315,7 @@
                                        (ctf "ilp-nego-hw0" =ilp-nego-hw0 n (caar entry) (cdar entry) pe)
                                        (list "<=" ((f-val-signed (caar entry) (cdar entry))
                                                    (=eval-on (=provided-clause pe (->name (cdar entry))
-                                                                               (->type pe)) pe))))
+                                                                               (=type pe)) pe))))
                                        inner))
              (list) (=every-container n))
             result))
@@ -338,7 +338,7 @@
                                            (=ilp-name pe) "_" (comp-name comp) ": "))
                       (fold-left (lambda (result p) #|(debug p)|# (cons* (f (car p)) (cadr p) result)) (list) lop)
 ;                      (list "<=" (f (=eval-on (=provided-clause pe (->name prop)
-;                                                                (->type pe)) pe)))
+;                                                                (=type pe)) pe)))
                       )))))
     (ag-rule
      ilp-eval-binvar
@@ -347,9 +347,9 @@
         (att-value-compute 'ilp-eval-binvar)
 ;        (let ([real-ReturnType (=real (->ReturnType n))])
         (debug "ilp-eval-binvar" n (->name pe))
-;          (if (or (eq? (->type pe) (<<- real-ReturnType))
+;          (if (or (eq? (=type pe) (<<- real-ReturnType))
 ;                  (ast-subtype? (<<- real-ReturnType) 'HWRoot))
-        (list (=eval-on n (->type pe)) (=ilp-binvar-deployed (<<- n) pe))
+        (list (=eval-on n (=type pe)) (=ilp-binvar-deployed (<<- n) pe))
 ;              (begin (debug "not suitable" real-ReturnType pe) (list))))
         ))) ;empty pair if not a suitable clause
 

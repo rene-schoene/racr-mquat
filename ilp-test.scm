@@ -21,7 +21,7 @@
                         (filter (lambda (res) (find (lambda (name) (string=? (->name res) name)) res-names))
                                 (=every-pe ast)))]
          [f (if (procedure? new-value) new-value (lambda _ new-value))])
-     (for-each (lambda (res) (rewrite-terminal 'value (=provided-clause res prop-name (->type res)) f)) resources)))
+     (for-each (lambda (res) (rewrite-terminal 'value (=provided-clause res prop-name (=type res)) f)) resources)))
  
  (define (change-sw-req ast prop-name comparator new-value . mode-names)
    (let ([modes (if (null? mode-names) (=every-mode ast)
@@ -634,10 +634,9 @@
 
  (define (new-resources id)
    (define (add-resource name status prototype parent)
-     (let* ([type (->type prototype)]
-            [cs (->* (->ProvClause* prototype))]
+     (let* ([cs (->* (->ProvClause* prototype))]
             [new-cs (map (lambda (c) (:ProvClause mquat-spec (:PropertyRef mquat-spec (ast-child 'refname (->ReturnType c))) (->comparator c) (->value c))) cs)])
-       (rewrite-add (->SubResources parent) (:Resource mquat-spec name type status (list) new-cs))))
+       (rewrite-add (->SubResources parent) (:Resource mquat-spec name (ast-child 'typename prototype) status (list) new-cs))))
    ; General description: New resources entering the system, enabling new configurations
    (let ([ast (create-system 2 0 1 1 2 (list #f no-freq-sw-clauses no-freq-hw-clauses #f))])
      (change-sw-prov ast pn-energy (+ 10 (/ id 1e3)) "m-1-1-1")

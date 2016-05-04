@@ -9,7 +9,7 @@
  (export add-basic-ags
          =objective-val =objective-name =clauses-met?
          =mode-to-use =selected? =deployed? =hw?
-         =req-comp-map =req-comp-min =req-comp-all =real
+         =req-comp-map =req-comp-min =req-comp-all =real =type
          =eval =eval-on =value-of =actual-value =value-attr =maximum
          <=request <=impl <=comp
          =search-prov-clause =search-req-clause =search-pe =provided-clause
@@ -36,8 +36,8 @@
  (define (=objective-name n)   (att-value 'objective-name n))
  (define (=objective-val n)    (att-value 'objective-value n))
  (define =provided-clause
-   (case-lambda ((n name type) (att-value 'provided-clause n name type))
-                ((n name)      (att-value 'provided-clause n name))))
+   (case-lambda [(n name type) (att-value 'provided-clause n name type)]
+                [(n name)      (att-value 'provided-clause n name)]))
  (define (=req-comp-map n)     (att-value 'req-comp-map n))
  (define (=req-comp-min n)     (att-value 'req-comp-min n))
  (define (=req-comp-all n)     (att-value 'req-comp-all n))
@@ -45,6 +45,9 @@
  (define (=real n)             (att-value 'real n))
  (define (<=root n)            (att-value 'get-root n))
  (define (=selected? n)        (att-value 'selected? n))
+ (define =type
+   (case-lambda [(n name)      (att-value 'type n name)]
+                [(n)           (att-value 'type n)]))
  (define (=every-pe n)         (att-value 'every-pe n))
  (define (=every-container n)  (att-value 'every-container n))
  (define (=every-res-type n)   (att-value 'every-res-type n))
@@ -135,7 +138,7 @@
                                   (eq? n (=real (->ReturnType cl))))) (append (=every-sw-clause n) (=every-hw-clause n))))))
 
     ; =every-container: Returns a list of every pe that can run software on it
-    (ag-rule every-container (Root (lambda (n) (filter (lambda (pe) (->container? (->type pe))) (=every-pe n)))))
+    (ag-rule every-container (Root (lambda (n) (filter (lambda (pe) (->container? (=type pe))) (=every-pe n)))))
 
     ; =every-pe: Returns a list containing every resource
     (ag-rule
@@ -236,7 +239,7 @@
                  (ast-find-child
                   (lambda (index subres) (=provided-clause subres))
                   (->SubResources n)))])
-          (if (eq? (->type n) type) ; if n has correct type ...
+          (if (eq? (=type n) type) ; if n has correct type ...
               (let ([found-clause
                      (ast-find-child ; (1) ... then try to find a child in n ...
                       (lambda (index clause) (string=? (->name (=real (->ReturnType clause))) name))
@@ -293,7 +296,7 @@
     (ag-rule get-root (Root (lambda (n) n)))
 
     ; Returns all resources of the type
-    (ag-rule resources-of (ResourceType (lambda (n) (filter (lambda (pe) (eq? n (->type pe))) (=every-pe n)))))
+    (ag-rule resources-of (ResourceType (lambda (n) (filter (lambda (pe) (eq? n (=type pe))) (=every-pe n)))))
 
     ; =search-{prov|req}-clause: Returns a clause, matching property-name and clause-node-subtype (ReqClause or ProvClause)
     (ag-rule
@@ -316,8 +319,17 @@
     ; =selected?: Returns #t, if the Implementation is selected by its component
     (ag-rule selected? (Impl (lambda (n) (eq? (->selected-impl (<<- n)) n))))
 
+    ; =remote-container: Returns whether the ResourceType, the Resource is pointing to, is a container
+    (ag-rule remote-container (Resource (lambda (n) (->container? (=type n)))))
+
     ; =remote-unit: Returns the unit of the RealProperty the PropertyRef is pointing to
     (ag-rule remote-unit (PropertyRef (lambda (n) (->unit (=real n)))))
+
+    ; =type: Resolves the type of a Resource
+    (ag-rule
+     type
+     (Resource (lambda (n) (=type (<=root n) (ast-child 'typename n))))
+     (Root (lambda (n typename) (ast-find-child (lambda (i rt) (string=? typename (->name rt))) (->ResourceType* (->HWRoot n))))))
 
     ; =value-of: Given a metaparameter name, return the value of the according metaparameter
     (ag-rule value-of (Request (lambda (n name)
