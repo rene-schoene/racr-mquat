@@ -5,6 +5,8 @@ larceny-bin
 **/*.scm~
 *.class
 *.out
+*.dot
+*.dot.pdf
 
 # Test and measurment directories, files and output
 test
