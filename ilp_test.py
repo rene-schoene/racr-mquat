@@ -10,8 +10,9 @@ try:
 	from fabric.api import task
 except ImportError:
 	from fabric_workaround import task
-import utils, properties
-from utils import local_quiet, assertTrue, assertTrueAssertion
+from properties import profiling
+import utils
+from utils import local_quiet, assertTrue, assertTrueAssertion, call_racket, call_larceny
 
 NUM_PROCESSORS = 4
 
@@ -20,12 +21,12 @@ utils.assertTrue = assertTrueAssertion
 @task(name = 'racket')
 def run_racket(*given_ranges):
 	""" Run ILP tests using Racket """
-	do_run(utils.call_racket, given_ranges)
+	do_run(call_racket, given_ranges)
 
 @task(name = 'larceny')
 def run_larceny(*given_ranges):
 	""" Run ILP tests using larceny """
-	do_run(utils.call_larceny, given_ranges)
+	do_run(call_larceny, given_ranges)
 
 def do_run(call_impl, given_ranges):
 	if not os.path.exists('test'):
@@ -38,8 +39,8 @@ def do_run(call_impl, given_ranges):
 		sys.exit(1)
 
 	# disable profiling as it disturbs ilp output
-	properties.profiling.value = False
-	properties.profiling.write_value()
+	profiling.value = False
+	profiling.write_value()
 
 	test_ids = []
 	for lb,ub in ranges:
