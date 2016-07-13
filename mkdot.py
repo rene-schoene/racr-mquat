@@ -47,6 +47,6 @@ def convert(f, output=None):
 						options = 'headlabel = "{0}", label = "{1}"'.format('*', context)
 					else:
 						options = 'headlabel = "*"'
-				fd.write('{0} -> {1}[{2}]\n'.format(lhand, child, options))
+				fd.write('{0} -> {1}[arrowtail = diamond, dir = back, {2}]\n'.format(lhand, child, options))
 		fd.write(footer)
 	local_quiet('dot {0} -Tpdf > {0}.pdf'.format(output))
