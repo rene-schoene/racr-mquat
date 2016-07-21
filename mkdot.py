@@ -89,6 +89,7 @@ def test_ba():
 	print mk_balanced_atts([str(i) for i in xrange(34)])
 
 	print mk_balanced_atts(['check-model','to-ilp','ilp-objective','ilp-nego','ilp-binary-vars','clauses-met?','every-container','every-pe','every-res-type','every-comp','every-impl','every-mode','every-sw-clause','every-hw-clause','lookup-property','objective-name','objective-value','get-request','get-root','search-comp','search-pe','target','type'])
+	print mk_balanced_atts(dict2list({'comp': 'eq', 'value': '#<procedure:...st-generation.ss:28:39>'}))
 
 @task(default=True)
 def run():
@@ -145,5 +146,97 @@ def convert(f, balance_atts, *atts):
 					else:
 						options = 'headlabel = "*"'
 				fd.write('{0} -> {1}[arrowtail = diamond, dir = back, {2}]\n'.format(lhand, child, options))
+		fd.write(footer)
+	local_quiet('dot {0} -Tpdf > {0}.pdf'.format(output))
+
+t_new_nt   = '-\\'
+t_new_list = '-*'
+t_level    = ' |'
+t_terminal = '|- '
+t_attr     = '| <'
+s_list     = '>*'
+debugging  = False
+
+def dict2list(d, sep=':'):
+	return ['{0}{1}{2}'.format(key,sep,value) for key,value in d.iteritems()]
+
+def clean(value):
+	return value.strip().replace('{', '(').replace('}', ')')
+
+@task
+def mkast(f):
+	output = f + '.dot'
+	d = {} # node-name -> [(terminal-value-list, attribut-value-list)]
+	with open(f) as fd:
+		lines = fd.readlines()
+	level = 0  # current, expected indendation level
+	nid   = 0  # node id
+	stack = [] # stack of node-names
+	current_node = ''
+	for i, line in enumerate(lines):
+		try:
+			read_level = line.count(t_level)
+			if read_level < level:
+				# some node was finished, do something
+				if debugging:
+					print '> Level adaptation at line', i+1
+					print line.rstrip()
+					print stack
+					print "read_level:", read_level, "level:", level, "current:", current_node
+				for _ in xrange(level - read_level): ## FIXME: maybe add 1 to this
+					current_node = stack.pop()
+				level = read_level
+#				if current_node.startswith(s_list):
+#					print '>> List-Hack for', current_node
+#					level -= 1
+#					current_node = stack.pop()
+			if t_new_nt in line:
+				# TODO: also make a link to previous node
+				stack.append(current_node)
+				current_node = '{0}-{1}'.format(line[line.find(t_new_nt)+2:].strip(),nid)
+				nid   += 1
+				level += 1
+				d.setdefault(current_node, [{},{},stack[-1]])
+				if debugging:
+					print '> new node:', current_node, 'stack:', stack
+			elif t_new_list in line:
+				# TODO: somehow remember current name of list nonterminal
+				stack.append(current_node)
+				level += 1
+				name = line[line.find(t_new_list)+3:].strip()
+#				stack.append(s_list + name)
+				if debugging:
+					print '> found list in', current_node, ':', name, 'stack:', stack
+				pass
+			elif t_terminal in line:
+				key, _, value = line[line.find(t_terminal)+3:].partition(':')
+				if debugging:
+					print '> found terminal in', current_node, ':', key.strip(), '==', value.strip()
+				d[current_node][0][key.strip()] = clean(value)
+			elif t_attr in line:
+				key, _, value = line[line.find(t_attr)+3:].partition('>')
+				if debugging:
+					print '> found attribute in', current_node, ':', key, '=>', value.strip()
+				d[current_node][1][key] = clean(value)
+		except:
+			if debugging:
+				print ">> Error in line", i+1
+				print stack
+			raise
+
+	if debugging:
+		print(d)
+	with open(output, 'w') as fd:
+		fd.write(header)
+		for nodename,values in d.iteritems():
+			# define the hierachy
+			nodename = nodename.replace('-', '_')
+			if values[2]:
+				parent = values[2].replace('-', '_')
+				fd.write('{0} -> {1}\n'.format(parent, nodename))
+			terminal_string  = '{ ' + ' } | { '.join([' | '.join(l) for l in mk_balanced_atts(dict2list(values[0]))]) + ' }'
+			attribute_string = '{ ' + ' } | { '.join([' | '.join(l) for l in mk_balanced_atts(dict2list(values[1]))]) + ' }'
+			# define the node
+			fd.write('{0} [label = "{{{0} | {{ t | {1} }} | {{ a | {2} }} }}"]\n'.format(nodename, terminal_string, attribute_string))
 		fd.write(footer)
 	local_quiet('dot {0} -Tpdf > {0}.pdf'.format(output))
