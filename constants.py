@@ -5,7 +5,7 @@
 
 import os
 
-RACR_HOME = "$HOME/git/2bt/racr/racr/"
+RACR_HOME = "$HOME/git/d-2bt/racr/racr/"
 PROGRAM_HOME = "$HOME/git/racr-mquat/"
 PROGRAM_PACKAGE = "mquat"
 
